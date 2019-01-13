@@ -12,15 +12,6 @@ module('Integration | Component | application-footer', function(hooks) {
 
     await render(hbs`{{application-footer}}`);
 
-    assert.equal(this.element.textContent.trim(), '');
-
-    // Template block usage:
-    await render(hbs`
-      {{#application-footer}}
-        template block text
-      {{/application-footer}}
-    `);
-
-    assert.equal(this.element.textContent.trim(), 'template block text');
+    assert.equal(this.element.textContent.trim(), 'The content of this site is licensed under a Creative Commons Attribution 4.0 International License.');
   });
 });
