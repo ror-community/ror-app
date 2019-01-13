@@ -61389,6 +61389,2606 @@ requireModule('ember')
 
 }());
 
+;if (typeof FastBoot === 'undefined') {
+/**!
+ * @fileOverview Kickass library to create and place poppers near their reference elements.
+ * @version 1.14.6
+ * @license
+ * Copyright (c) 2016 Federico Zivolo and contributors
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+(function (global, factory) {
+	typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
+	typeof define === 'function' && define.amd ? define(factory) :
+	(global.Popper = factory());
+}(this, (function () { 'use strict';
+
+var isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined';
+
+var longerTimeoutBrowsers = ['Edge', 'Trident', 'Firefox'];
+var timeoutDuration = 0;
+for (var i = 0; i < longerTimeoutBrowsers.length; i += 1) {
+  if (isBrowser && navigator.userAgent.indexOf(longerTimeoutBrowsers[i]) >= 0) {
+    timeoutDuration = 1;
+    break;
+  }
+}
+
+function microtaskDebounce(fn) {
+  var called = false;
+  return function () {
+    if (called) {
+      return;
+    }
+    called = true;
+    window.Promise.resolve().then(function () {
+      called = false;
+      fn();
+    });
+  };
+}
+
+function taskDebounce(fn) {
+  var scheduled = false;
+  return function () {
+    if (!scheduled) {
+      scheduled = true;
+      setTimeout(function () {
+        scheduled = false;
+        fn();
+      }, timeoutDuration);
+    }
+  };
+}
+
+var supportsMicroTasks = isBrowser && window.Promise;
+
+/**
+* Create a debounced version of a method, that's asynchronously deferred
+* but called in the minimum time possible.
+*
+* @method
+* @memberof Popper.Utils
+* @argument {Function} fn
+* @returns {Function}
+*/
+var debounce = supportsMicroTasks ? microtaskDebounce : taskDebounce;
+
+/**
+ * Check if the given variable is a function
+ * @method
+ * @memberof Popper.Utils
+ * @argument {Any} functionToCheck - variable to check
+ * @returns {Boolean} answer to: is a function?
+ */
+function isFunction(functionToCheck) {
+  var getType = {};
+  return functionToCheck && getType.toString.call(functionToCheck) === '[object Function]';
+}
+
+/**
+ * Get CSS computed property of the given element
+ * @method
+ * @memberof Popper.Utils
+ * @argument {Eement} element
+ * @argument {String} property
+ */
+function getStyleComputedProperty(element, property) {
+  if (element.nodeType !== 1) {
+    return [];
+  }
+  // NOTE: 1 DOM access here
+  var window = element.ownerDocument.defaultView;
+  var css = window.getComputedStyle(element, null);
+  return property ? css[property] : css;
+}
+
+/**
+ * Returns the parentNode or the host of the element
+ * @method
+ * @memberof Popper.Utils
+ * @argument {Element} element
+ * @returns {Element} parent
+ */
+function getParentNode(element) {
+  if (element.nodeName === 'HTML') {
+    return element;
+  }
+  return element.parentNode || element.host;
+}
+
+/**
+ * Returns the scrolling parent of the given element
+ * @method
+ * @memberof Popper.Utils
+ * @argument {Element} element
+ * @returns {Element} scroll parent
+ */
+function getScrollParent(element) {
+  // Return body, `getScroll` will take care to get the correct `scrollTop` from it
+  if (!element) {
+    return document.body;
+  }
+
+  switch (element.nodeName) {
+    case 'HTML':
+    case 'BODY':
+      return element.ownerDocument.body;
+    case '#document':
+      return element.body;
+  }
+
+  // Firefox want us to check `-x` and `-y` variations as well
+
+  var _getStyleComputedProp = getStyleComputedProperty(element),
+      overflow = _getStyleComputedProp.overflow,
+      overflowX = _getStyleComputedProp.overflowX,
+      overflowY = _getStyleComputedProp.overflowY;
+
+  if (/(auto|scroll|overlay)/.test(overflow + overflowY + overflowX)) {
+    return element;
+  }
+
+  return getScrollParent(getParentNode(element));
+}
+
+var isIE11 = isBrowser && !!(window.MSInputMethodContext && document.documentMode);
+var isIE10 = isBrowser && /MSIE 10/.test(navigator.userAgent);
+
+/**
+ * Determines if the browser is Internet Explorer
+ * @method
+ * @memberof Popper.Utils
+ * @param {Number} version to check
+ * @returns {Boolean} isIE
+ */
+function isIE(version) {
+  if (version === 11) {
+    return isIE11;
+  }
+  if (version === 10) {
+    return isIE10;
+  }
+  return isIE11 || isIE10;
+}
+
+/**
+ * Returns the offset parent of the given element
+ * @method
+ * @memberof Popper.Utils
+ * @argument {Element} element
+ * @returns {Element} offset parent
+ */
+function getOffsetParent(element) {
+  if (!element) {
+    return document.documentElement;
+  }
+
+  var noOffsetParent = isIE(10) ? document.body : null;
+
+  // NOTE: 1 DOM access here
+  var offsetParent = element.offsetParent || null;
+  // Skip hidden elements which don't have an offsetParent
+  while (offsetParent === noOffsetParent && element.nextElementSibling) {
+    offsetParent = (element = element.nextElementSibling).offsetParent;
+  }
+
+  var nodeName = offsetParent && offsetParent.nodeName;
+
+  if (!nodeName || nodeName === 'BODY' || nodeName === 'HTML') {
+    return element ? element.ownerDocument.documentElement : document.documentElement;
+  }
+
+  // .offsetParent will return the closest TH, TD or TABLE in case
+  // no offsetParent is present, I hate this job...
+  if (['TH', 'TD', 'TABLE'].indexOf(offsetParent.nodeName) !== -1 && getStyleComputedProperty(offsetParent, 'position') === 'static') {
+    return getOffsetParent(offsetParent);
+  }
+
+  return offsetParent;
+}
+
+function isOffsetContainer(element) {
+  var nodeName = element.nodeName;
+
+  if (nodeName === 'BODY') {
+    return false;
+  }
+  return nodeName === 'HTML' || getOffsetParent(element.firstElementChild) === element;
+}
+
+/**
+ * Finds the root node (document, shadowDOM root) of the given element
+ * @method
+ * @memberof Popper.Utils
+ * @argument {Element} node
+ * @returns {Element} root node
+ */
+function getRoot(node) {
+  if (node.parentNode !== null) {
+    return getRoot(node.parentNode);
+  }
+
+  return node;
+}
+
+/**
+ * Finds the offset parent common to the two provided nodes
+ * @method
+ * @memberof Popper.Utils
+ * @argument {Element} element1
+ * @argument {Element} element2
+ * @returns {Element} common offset parent
+ */
+function findCommonOffsetParent(element1, element2) {
+  // This check is needed to avoid errors in case one of the elements isn't defined for any reason
+  if (!element1 || !element1.nodeType || !element2 || !element2.nodeType) {
+    return document.documentElement;
+  }
+
+  // Here we make sure to give as "start" the element that comes first in the DOM
+  var order = element1.compareDocumentPosition(element2) & Node.DOCUMENT_POSITION_FOLLOWING;
+  var start = order ? element1 : element2;
+  var end = order ? element2 : element1;
+
+  // Get common ancestor container
+  var range = document.createRange();
+  range.setStart(start, 0);
+  range.setEnd(end, 0);
+  var commonAncestorContainer = range.commonAncestorContainer;
+
+  // Both nodes are inside #document
+
+  if (element1 !== commonAncestorContainer && element2 !== commonAncestorContainer || start.contains(end)) {
+    if (isOffsetContainer(commonAncestorContainer)) {
+      return commonAncestorContainer;
+    }
+
+    return getOffsetParent(commonAncestorContainer);
+  }
+
+  // one of the nodes is inside shadowDOM, find which one
+  var element1root = getRoot(element1);
+  if (element1root.host) {
+    return findCommonOffsetParent(element1root.host, element2);
+  } else {
+    return findCommonOffsetParent(element1, getRoot(element2).host);
+  }
+}
+
+/**
+ * Gets the scroll value of the given element in the given side (top and left)
+ * @method
+ * @memberof Popper.Utils
+ * @argument {Element} element
+ * @argument {String} side `top` or `left`
+ * @returns {number} amount of scrolled pixels
+ */
+function getScroll(element) {
+  var side = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 'top';
+
+  var upperSide = side === 'top' ? 'scrollTop' : 'scrollLeft';
+  var nodeName = element.nodeName;
+
+  if (nodeName === 'BODY' || nodeName === 'HTML') {
+    var html = element.ownerDocument.documentElement;
+    var scrollingElement = element.ownerDocument.scrollingElement || html;
+    return scrollingElement[upperSide];
+  }
+
+  return element[upperSide];
+}
+
+/*
+ * Sum or subtract the element scroll values (left and top) from a given rect object
+ * @method
+ * @memberof Popper.Utils
+ * @param {Object} rect - Rect object you want to change
+ * @param {HTMLElement} element - The element from the function reads the scroll values
+ * @param {Boolean} subtract - set to true if you want to subtract the scroll values
+ * @return {Object} rect - The modifier rect object
+ */
+function includeScroll(rect, element) {
+  var subtract = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : false;
+
+  var scrollTop = getScroll(element, 'top');
+  var scrollLeft = getScroll(element, 'left');
+  var modifier = subtract ? -1 : 1;
+  rect.top += scrollTop * modifier;
+  rect.bottom += scrollTop * modifier;
+  rect.left += scrollLeft * modifier;
+  rect.right += scrollLeft * modifier;
+  return rect;
+}
+
+/*
+ * Helper to detect borders of a given element
+ * @method
+ * @memberof Popper.Utils
+ * @param {CSSStyleDeclaration} styles
+ * Result of `getStyleComputedProperty` on the given element
+ * @param {String} axis - `x` or `y`
+ * @return {number} borders - The borders size of the given axis
+ */
+
+function getBordersSize(styles, axis) {
+  var sideA = axis === 'x' ? 'Left' : 'Top';
+  var sideB = sideA === 'Left' ? 'Right' : 'Bottom';
+
+  return parseFloat(styles['border' + sideA + 'Width'], 10) + parseFloat(styles['border' + sideB + 'Width'], 10);
+}
+
+function getSize(axis, body, html, computedStyle) {
+  return Math.max(body['offset' + axis], body['scroll' + axis], html['client' + axis], html['offset' + axis], html['scroll' + axis], isIE(10) ? parseInt(html['offset' + axis]) + parseInt(computedStyle['margin' + (axis === 'Height' ? 'Top' : 'Left')]) + parseInt(computedStyle['margin' + (axis === 'Height' ? 'Bottom' : 'Right')]) : 0);
+}
+
+function getWindowSizes(document) {
+  var body = document.body;
+  var html = document.documentElement;
+  var computedStyle = isIE(10) && getComputedStyle(html);
+
+  return {
+    height: getSize('Height', body, html, computedStyle),
+    width: getSize('Width', body, html, computedStyle)
+  };
+}
+
+var classCallCheck = function (instance, Constructor) {
+  if (!(instance instanceof Constructor)) {
+    throw new TypeError("Cannot call a class as a function");
+  }
+};
+
+var createClass = function () {
+  function defineProperties(target, props) {
+    for (var i = 0; i < props.length; i++) {
+      var descriptor = props[i];
+      descriptor.enumerable = descriptor.enumerable || false;
+      descriptor.configurable = true;
+      if ("value" in descriptor) descriptor.writable = true;
+      Object.defineProperty(target, descriptor.key, descriptor);
+    }
+  }
+
+  return function (Constructor, protoProps, staticProps) {
+    if (protoProps) defineProperties(Constructor.prototype, protoProps);
+    if (staticProps) defineProperties(Constructor, staticProps);
+    return Constructor;
+  };
+}();
+
+
+
+
+
+var defineProperty = function (obj, key, value) {
+  if (key in obj) {
+    Object.defineProperty(obj, key, {
+      value: value,
+      enumerable: true,
+      configurable: true,
+      writable: true
+    });
+  } else {
+    obj[key] = value;
+  }
+
+  return obj;
+};
+
+var _extends = Object.assign || function (target) {
+  for (var i = 1; i < arguments.length; i++) {
+    var source = arguments[i];
+
+    for (var key in source) {
+      if (Object.prototype.hasOwnProperty.call(source, key)) {
+        target[key] = source[key];
+      }
+    }
+  }
+
+  return target;
+};
+
+/**
+ * Given element offsets, generate an output similar to getBoundingClientRect
+ * @method
+ * @memberof Popper.Utils
+ * @argument {Object} offsets
+ * @returns {Object} ClientRect like output
+ */
+function getClientRect(offsets) {
+  return _extends({}, offsets, {
+    right: offsets.left + offsets.width,
+    bottom: offsets.top + offsets.height
+  });
+}
+
+/**
+ * Get bounding client rect of given element
+ * @method
+ * @memberof Popper.Utils
+ * @param {HTMLElement} element
+ * @return {Object} client rect
+ */
+function getBoundingClientRect(element) {
+  var rect = {};
+
+  // IE10 10 FIX: Please, don't ask, the element isn't
+  // considered in DOM in some circumstances...
+  // This isn't reproducible in IE10 compatibility mode of IE11
+  try {
+    if (isIE(10)) {
+      rect = element.getBoundingClientRect();
+      var scrollTop = getScroll(element, 'top');
+      var scrollLeft = getScroll(element, 'left');
+      rect.top += scrollTop;
+      rect.left += scrollLeft;
+      rect.bottom += scrollTop;
+      rect.right += scrollLeft;
+    } else {
+      rect = element.getBoundingClientRect();
+    }
+  } catch (e) {}
+
+  var result = {
+    left: rect.left,
+    top: rect.top,
+    width: rect.right - rect.left,
+    height: rect.bottom - rect.top
+  };
+
+  // subtract scrollbar size from sizes
+  var sizes = element.nodeName === 'HTML' ? getWindowSizes(element.ownerDocument) : {};
+  var width = sizes.width || element.clientWidth || result.right - result.left;
+  var height = sizes.height || element.clientHeight || result.bottom - result.top;
+
+  var horizScrollbar = element.offsetWidth - width;
+  var vertScrollbar = element.offsetHeight - height;
+
+  // if an hypothetical scrollbar is detected, we must be sure it's not a `border`
+  // we make this check conditional for performance reasons
+  if (horizScrollbar || vertScrollbar) {
+    var styles = getStyleComputedProperty(element);
+    horizScrollbar -= getBordersSize(styles, 'x');
+    vertScrollbar -= getBordersSize(styles, 'y');
+
+    result.width -= horizScrollbar;
+    result.height -= vertScrollbar;
+  }
+
+  return getClientRect(result);
+}
+
+function getOffsetRectRelativeToArbitraryNode(children, parent) {
+  var fixedPosition = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : false;
+
+  var isIE10 = isIE(10);
+  var isHTML = parent.nodeName === 'HTML';
+  var childrenRect = getBoundingClientRect(children);
+  var parentRect = getBoundingClientRect(parent);
+  var scrollParent = getScrollParent(children);
+
+  var styles = getStyleComputedProperty(parent);
+  var borderTopWidth = parseFloat(styles.borderTopWidth, 10);
+  var borderLeftWidth = parseFloat(styles.borderLeftWidth, 10);
+
+  // In cases where the parent is fixed, we must ignore negative scroll in offset calc
+  if (fixedPosition && isHTML) {
+    parentRect.top = Math.max(parentRect.top, 0);
+    parentRect.left = Math.max(parentRect.left, 0);
+  }
+  var offsets = getClientRect({
+    top: childrenRect.top - parentRect.top - borderTopWidth,
+    left: childrenRect.left - parentRect.left - borderLeftWidth,
+    width: childrenRect.width,
+    height: childrenRect.height
+  });
+  offsets.marginTop = 0;
+  offsets.marginLeft = 0;
+
+  // Subtract margins of documentElement in case it's being used as parent
+  // we do this only on HTML because it's the only element that behaves
+  // differently when margins are applied to it. The margins are included in
+  // the box of the documentElement, in the other cases not.
+  if (!isIE10 && isHTML) {
+    var marginTop = parseFloat(styles.marginTop, 10);
+    var marginLeft = parseFloat(styles.marginLeft, 10);
+
+    offsets.top -= borderTopWidth - marginTop;
+    offsets.bottom -= borderTopWidth - marginTop;
+    offsets.left -= borderLeftWidth - marginLeft;
+    offsets.right -= borderLeftWidth - marginLeft;
+
+    // Attach marginTop and marginLeft because in some circumstances we may need them
+    offsets.marginTop = marginTop;
+    offsets.marginLeft = marginLeft;
+  }
+
+  if (isIE10 && !fixedPosition ? parent.contains(scrollParent) : parent === scrollParent && scrollParent.nodeName !== 'BODY') {
+    offsets = includeScroll(offsets, parent);
+  }
+
+  return offsets;
+}
+
+function getViewportOffsetRectRelativeToArtbitraryNode(element) {
+  var excludeScroll = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
+
+  var html = element.ownerDocument.documentElement;
+  var relativeOffset = getOffsetRectRelativeToArbitraryNode(element, html);
+  var width = Math.max(html.clientWidth, window.innerWidth || 0);
+  var height = Math.max(html.clientHeight, window.innerHeight || 0);
+
+  var scrollTop = !excludeScroll ? getScroll(html) : 0;
+  var scrollLeft = !excludeScroll ? getScroll(html, 'left') : 0;
+
+  var offset = {
+    top: scrollTop - relativeOffset.top + relativeOffset.marginTop,
+    left: scrollLeft - relativeOffset.left + relativeOffset.marginLeft,
+    width: width,
+    height: height
+  };
+
+  return getClientRect(offset);
+}
+
+/**
+ * Check if the given element is fixed or is inside a fixed parent
+ * @method
+ * @memberof Popper.Utils
+ * @argument {Element} element
+ * @argument {Element} customContainer
+ * @returns {Boolean} answer to "isFixed?"
+ */
+function isFixed(element) {
+  var nodeName = element.nodeName;
+  if (nodeName === 'BODY' || nodeName === 'HTML') {
+    return false;
+  }
+  if (getStyleComputedProperty(element, 'position') === 'fixed') {
+    return true;
+  }
+  return isFixed(getParentNode(element));
+}
+
+/**
+ * Finds the first parent of an element that has a transformed property defined
+ * @method
+ * @memberof Popper.Utils
+ * @argument {Element} element
+ * @returns {Element} first transformed parent or documentElement
+ */
+
+function getFixedPositionOffsetParent(element) {
+  // This check is needed to avoid errors in case one of the elements isn't defined for any reason
+  if (!element || !element.parentElement || isIE()) {
+    return document.documentElement;
+  }
+  var el = element.parentElement;
+  while (el && getStyleComputedProperty(el, 'transform') === 'none') {
+    el = el.parentElement;
+  }
+  return el || document.documentElement;
+}
+
+/**
+ * Computed the boundaries limits and return them
+ * @method
+ * @memberof Popper.Utils
+ * @param {HTMLElement} popper
+ * @param {HTMLElement} reference
+ * @param {number} padding
+ * @param {HTMLElement} boundariesElement - Element used to define the boundaries
+ * @param {Boolean} fixedPosition - Is in fixed position mode
+ * @returns {Object} Coordinates of the boundaries
+ */
+function getBoundaries(popper, reference, padding, boundariesElement) {
+  var fixedPosition = arguments.length > 4 && arguments[4] !== undefined ? arguments[4] : false;
+
+  // NOTE: 1 DOM access here
+
+  var boundaries = { top: 0, left: 0 };
+  var offsetParent = fixedPosition ? getFixedPositionOffsetParent(popper) : findCommonOffsetParent(popper, reference);
+
+  // Handle viewport case
+  if (boundariesElement === 'viewport') {
+    boundaries = getViewportOffsetRectRelativeToArtbitraryNode(offsetParent, fixedPosition);
+  } else {
+    // Handle other cases based on DOM element used as boundaries
+    var boundariesNode = void 0;
+    if (boundariesElement === 'scrollParent') {
+      boundariesNode = getScrollParent(getParentNode(reference));
+      if (boundariesNode.nodeName === 'BODY') {
+        boundariesNode = popper.ownerDocument.documentElement;
+      }
+    } else if (boundariesElement === 'window') {
+      boundariesNode = popper.ownerDocument.documentElement;
+    } else {
+      boundariesNode = boundariesElement;
+    }
+
+    var offsets = getOffsetRectRelativeToArbitraryNode(boundariesNode, offsetParent, fixedPosition);
+
+    // In case of HTML, we need a different computation
+    if (boundariesNode.nodeName === 'HTML' && !isFixed(offsetParent)) {
+      var _getWindowSizes = getWindowSizes(popper.ownerDocument),
+          height = _getWindowSizes.height,
+          width = _getWindowSizes.width;
+
+      boundaries.top += offsets.top - offsets.marginTop;
+      boundaries.bottom = height + offsets.top;
+      boundaries.left += offsets.left - offsets.marginLeft;
+      boundaries.right = width + offsets.left;
+    } else {
+      // for all the other DOM elements, this one is good
+      boundaries = offsets;
+    }
+  }
+
+  // Add paddings
+  padding = padding || 0;
+  var isPaddingNumber = typeof padding === 'number';
+  boundaries.left += isPaddingNumber ? padding : padding.left || 0;
+  boundaries.top += isPaddingNumber ? padding : padding.top || 0;
+  boundaries.right -= isPaddingNumber ? padding : padding.right || 0;
+  boundaries.bottom -= isPaddingNumber ? padding : padding.bottom || 0;
+
+  return boundaries;
+}
+
+function getArea(_ref) {
+  var width = _ref.width,
+      height = _ref.height;
+
+  return width * height;
+}
+
+/**
+ * Utility used to transform the `auto` placement to the placement with more
+ * available space.
+ * @method
+ * @memberof Popper.Utils
+ * @argument {Object} data - The data object generated by update method
+ * @argument {Object} options - Modifiers configuration and options
+ * @returns {Object} The data object, properly modified
+ */
+function computeAutoPlacement(placement, refRect, popper, reference, boundariesElement) {
+  var padding = arguments.length > 5 && arguments[5] !== undefined ? arguments[5] : 0;
+
+  if (placement.indexOf('auto') === -1) {
+    return placement;
+  }
+
+  var boundaries = getBoundaries(popper, reference, padding, boundariesElement);
+
+  var rects = {
+    top: {
+      width: boundaries.width,
+      height: refRect.top - boundaries.top
+    },
+    right: {
+      width: boundaries.right - refRect.right,
+      height: boundaries.height
+    },
+    bottom: {
+      width: boundaries.width,
+      height: boundaries.bottom - refRect.bottom
+    },
+    left: {
+      width: refRect.left - boundaries.left,
+      height: boundaries.height
+    }
+  };
+
+  var sortedAreas = Object.keys(rects).map(function (key) {
+    return _extends({
+      key: key
+    }, rects[key], {
+      area: getArea(rects[key])
+    });
+  }).sort(function (a, b) {
+    return b.area - a.area;
+  });
+
+  var filteredAreas = sortedAreas.filter(function (_ref2) {
+    var width = _ref2.width,
+        height = _ref2.height;
+    return width >= popper.clientWidth && height >= popper.clientHeight;
+  });
+
+  var computedPlacement = filteredAreas.length > 0 ? filteredAreas[0].key : sortedAreas[0].key;
+
+  var variation = placement.split('-')[1];
+
+  return computedPlacement + (variation ? '-' + variation : '');
+}
+
+/**
+ * Get offsets to the reference element
+ * @method
+ * @memberof Popper.Utils
+ * @param {Object} state
+ * @param {Element} popper - the popper element
+ * @param {Element} reference - the reference element (the popper will be relative to this)
+ * @param {Element} fixedPosition - is in fixed position mode
+ * @returns {Object} An object containing the offsets which will be applied to the popper
+ */
+function getReferenceOffsets(state, popper, reference) {
+  var fixedPosition = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : null;
+
+  var commonOffsetParent = fixedPosition ? getFixedPositionOffsetParent(popper) : findCommonOffsetParent(popper, reference);
+  return getOffsetRectRelativeToArbitraryNode(reference, commonOffsetParent, fixedPosition);
+}
+
+/**
+ * Get the outer sizes of the given element (offset size + margins)
+ * @method
+ * @memberof Popper.Utils
+ * @argument {Element} element
+ * @returns {Object} object containing width and height properties
+ */
+function getOuterSizes(element) {
+  var window = element.ownerDocument.defaultView;
+  var styles = window.getComputedStyle(element);
+  var x = parseFloat(styles.marginTop || 0) + parseFloat(styles.marginBottom || 0);
+  var y = parseFloat(styles.marginLeft || 0) + parseFloat(styles.marginRight || 0);
+  var result = {
+    width: element.offsetWidth + y,
+    height: element.offsetHeight + x
+  };
+  return result;
+}
+
+/**
+ * Get the opposite placement of the given one
+ * @method
+ * @memberof Popper.Utils
+ * @argument {String} placement
+ * @returns {String} flipped placement
+ */
+function getOppositePlacement(placement) {
+  var hash = { left: 'right', right: 'left', bottom: 'top', top: 'bottom' };
+  return placement.replace(/left|right|bottom|top/g, function (matched) {
+    return hash[matched];
+  });
+}
+
+/**
+ * Get offsets to the popper
+ * @method
+ * @memberof Popper.Utils
+ * @param {Object} position - CSS position the Popper will get applied
+ * @param {HTMLElement} popper - the popper element
+ * @param {Object} referenceOffsets - the reference offsets (the popper will be relative to this)
+ * @param {String} placement - one of the valid placement options
+ * @returns {Object} popperOffsets - An object containing the offsets which will be applied to the popper
+ */
+function getPopperOffsets(popper, referenceOffsets, placement) {
+  placement = placement.split('-')[0];
+
+  // Get popper node sizes
+  var popperRect = getOuterSizes(popper);
+
+  // Add position, width and height to our offsets object
+  var popperOffsets = {
+    width: popperRect.width,
+    height: popperRect.height
+  };
+
+  // depending by the popper placement we have to compute its offsets slightly differently
+  var isHoriz = ['right', 'left'].indexOf(placement) !== -1;
+  var mainSide = isHoriz ? 'top' : 'left';
+  var secondarySide = isHoriz ? 'left' : 'top';
+  var measurement = isHoriz ? 'height' : 'width';
+  var secondaryMeasurement = !isHoriz ? 'height' : 'width';
+
+  popperOffsets[mainSide] = referenceOffsets[mainSide] + referenceOffsets[measurement] / 2 - popperRect[measurement] / 2;
+  if (placement === secondarySide) {
+    popperOffsets[secondarySide] = referenceOffsets[secondarySide] - popperRect[secondaryMeasurement];
+  } else {
+    popperOffsets[secondarySide] = referenceOffsets[getOppositePlacement(secondarySide)];
+  }
+
+  return popperOffsets;
+}
+
+/**
+ * Mimics the `find` method of Array
+ * @method
+ * @memberof Popper.Utils
+ * @argument {Array} arr
+ * @argument prop
+ * @argument value
+ * @returns index or -1
+ */
+function find(arr, check) {
+  // use native find if supported
+  if (Array.prototype.find) {
+    return arr.find(check);
+  }
+
+  // use `filter` to obtain the same behavior of `find`
+  return arr.filter(check)[0];
+}
+
+/**
+ * Return the index of the matching object
+ * @method
+ * @memberof Popper.Utils
+ * @argument {Array} arr
+ * @argument prop
+ * @argument value
+ * @returns index or -1
+ */
+function findIndex(arr, prop, value) {
+  // use native findIndex if supported
+  if (Array.prototype.findIndex) {
+    return arr.findIndex(function (cur) {
+      return cur[prop] === value;
+    });
+  }
+
+  // use `find` + `indexOf` if `findIndex` isn't supported
+  var match = find(arr, function (obj) {
+    return obj[prop] === value;
+  });
+  return arr.indexOf(match);
+}
+
+/**
+ * Loop trough the list of modifiers and run them in order,
+ * each of them will then edit the data object.
+ * @method
+ * @memberof Popper.Utils
+ * @param {dataObject} data
+ * @param {Array} modifiers
+ * @param {String} ends - Optional modifier name used as stopper
+ * @returns {dataObject}
+ */
+function runModifiers(modifiers, data, ends) {
+  var modifiersToRun = ends === undefined ? modifiers : modifiers.slice(0, findIndex(modifiers, 'name', ends));
+
+  modifiersToRun.forEach(function (modifier) {
+    if (modifier['function']) {
+      // eslint-disable-line dot-notation
+      console.warn('`modifier.function` is deprecated, use `modifier.fn`!');
+    }
+    var fn = modifier['function'] || modifier.fn; // eslint-disable-line dot-notation
+    if (modifier.enabled && isFunction(fn)) {
+      // Add properties to offsets to make them a complete clientRect object
+      // we do this before each modifier to make sure the previous one doesn't
+      // mess with these values
+      data.offsets.popper = getClientRect(data.offsets.popper);
+      data.offsets.reference = getClientRect(data.offsets.reference);
+
+      data = fn(data, modifier);
+    }
+  });
+
+  return data;
+}
+
+/**
+ * Updates the position of the popper, computing the new offsets and applying
+ * the new style.<br />
+ * Prefer `scheduleUpdate` over `update` because of performance reasons.
+ * @method
+ * @memberof Popper
+ */
+function update() {
+  // if popper is destroyed, don't perform any further update
+  if (this.state.isDestroyed) {
+    return;
+  }
+
+  var data = {
+    instance: this,
+    styles: {},
+    arrowStyles: {},
+    attributes: {},
+    flipped: false,
+    offsets: {}
+  };
+
+  // compute reference element offsets
+  data.offsets.reference = getReferenceOffsets(this.state, this.popper, this.reference, this.options.positionFixed);
+
+  // compute auto placement, store placement inside the data object,
+  // modifiers will be able to edit `placement` if needed
+  // and refer to originalPlacement to know the original value
+  data.placement = computeAutoPlacement(this.options.placement, data.offsets.reference, this.popper, this.reference, this.options.modifiers.flip.boundariesElement, this.options.modifiers.flip.padding);
+
+  // store the computed placement inside `originalPlacement`
+  data.originalPlacement = data.placement;
+
+  data.positionFixed = this.options.positionFixed;
+
+  // compute the popper offsets
+  data.offsets.popper = getPopperOffsets(this.popper, data.offsets.reference, data.placement);
+
+  data.offsets.popper.position = this.options.positionFixed ? 'fixed' : 'absolute';
+
+  // run the modifiers
+  data = runModifiers(this.modifiers, data);
+
+  // the first `update` will call `onCreate` callback
+  // the other ones will call `onUpdate` callback
+  if (!this.state.isCreated) {
+    this.state.isCreated = true;
+    this.options.onCreate(data);
+  } else {
+    this.options.onUpdate(data);
+  }
+}
+
+/**
+ * Helper used to know if the given modifier is enabled.
+ * @method
+ * @memberof Popper.Utils
+ * @returns {Boolean}
+ */
+function isModifierEnabled(modifiers, modifierName) {
+  return modifiers.some(function (_ref) {
+    var name = _ref.name,
+        enabled = _ref.enabled;
+    return enabled && name === modifierName;
+  });
+}
+
+/**
+ * Get the prefixed supported property name
+ * @method
+ * @memberof Popper.Utils
+ * @argument {String} property (camelCase)
+ * @returns {String} prefixed property (camelCase or PascalCase, depending on the vendor prefix)
+ */
+function getSupportedPropertyName(property) {
+  var prefixes = [false, 'ms', 'Webkit', 'Moz', 'O'];
+  var upperProp = property.charAt(0).toUpperCase() + property.slice(1);
+
+  for (var i = 0; i < prefixes.length; i++) {
+    var prefix = prefixes[i];
+    var toCheck = prefix ? '' + prefix + upperProp : property;
+    if (typeof document.body.style[toCheck] !== 'undefined') {
+      return toCheck;
+    }
+  }
+  return null;
+}
+
+/**
+ * Destroys the popper.
+ * @method
+ * @memberof Popper
+ */
+function destroy() {
+  this.state.isDestroyed = true;
+
+  // touch DOM only if `applyStyle` modifier is enabled
+  if (isModifierEnabled(this.modifiers, 'applyStyle')) {
+    this.popper.removeAttribute('x-placement');
+    this.popper.style.position = '';
+    this.popper.style.top = '';
+    this.popper.style.left = '';
+    this.popper.style.right = '';
+    this.popper.style.bottom = '';
+    this.popper.style.willChange = '';
+    this.popper.style[getSupportedPropertyName('transform')] = '';
+  }
+
+  this.disableEventListeners();
+
+  // remove the popper if user explicity asked for the deletion on destroy
+  // do not use `remove` because IE11 doesn't support it
+  if (this.options.removeOnDestroy) {
+    this.popper.parentNode.removeChild(this.popper);
+  }
+  return this;
+}
+
+/**
+ * Get the window associated with the element
+ * @argument {Element} element
+ * @returns {Window}
+ */
+function getWindow(element) {
+  var ownerDocument = element.ownerDocument;
+  return ownerDocument ? ownerDocument.defaultView : window;
+}
+
+function attachToScrollParents(scrollParent, event, callback, scrollParents) {
+  var isBody = scrollParent.nodeName === 'BODY';
+  var target = isBody ? scrollParent.ownerDocument.defaultView : scrollParent;
+  target.addEventListener(event, callback, { passive: true });
+
+  if (!isBody) {
+    attachToScrollParents(getScrollParent(target.parentNode), event, callback, scrollParents);
+  }
+  scrollParents.push(target);
+}
+
+/**
+ * Setup needed event listeners used to update the popper position
+ * @method
+ * @memberof Popper.Utils
+ * @private
+ */
+function setupEventListeners(reference, options, state, updateBound) {
+  // Resize event listener on window
+  state.updateBound = updateBound;
+  getWindow(reference).addEventListener('resize', state.updateBound, { passive: true });
+
+  // Scroll event listener on scroll parents
+  var scrollElement = getScrollParent(reference);
+  attachToScrollParents(scrollElement, 'scroll', state.updateBound, state.scrollParents);
+  state.scrollElement = scrollElement;
+  state.eventsEnabled = true;
+
+  return state;
+}
+
+/**
+ * It will add resize/scroll events and start recalculating
+ * position of the popper element when they are triggered.
+ * @method
+ * @memberof Popper
+ */
+function enableEventListeners() {
+  if (!this.state.eventsEnabled) {
+    this.state = setupEventListeners(this.reference, this.options, this.state, this.scheduleUpdate);
+  }
+}
+
+/**
+ * Remove event listeners used to update the popper position
+ * @method
+ * @memberof Popper.Utils
+ * @private
+ */
+function removeEventListeners(reference, state) {
+  // Remove resize event listener on window
+  getWindow(reference).removeEventListener('resize', state.updateBound);
+
+  // Remove scroll event listener on scroll parents
+  state.scrollParents.forEach(function (target) {
+    target.removeEventListener('scroll', state.updateBound);
+  });
+
+  // Reset state
+  state.updateBound = null;
+  state.scrollParents = [];
+  state.scrollElement = null;
+  state.eventsEnabled = false;
+  return state;
+}
+
+/**
+ * It will remove resize/scroll events and won't recalculate popper position
+ * when they are triggered. It also won't trigger `onUpdate` callback anymore,
+ * unless you call `update` method manually.
+ * @method
+ * @memberof Popper
+ */
+function disableEventListeners() {
+  if (this.state.eventsEnabled) {
+    cancelAnimationFrame(this.scheduleUpdate);
+    this.state = removeEventListeners(this.reference, this.state);
+  }
+}
+
+/**
+ * Tells if a given input is a number
+ * @method
+ * @memberof Popper.Utils
+ * @param {*} input to check
+ * @return {Boolean}
+ */
+function isNumeric(n) {
+  return n !== '' && !isNaN(parseFloat(n)) && isFinite(n);
+}
+
+/**
+ * Set the style to the given popper
+ * @method
+ * @memberof Popper.Utils
+ * @argument {Element} element - Element to apply the style to
+ * @argument {Object} styles
+ * Object with a list of properties and values which will be applied to the element
+ */
+function setStyles(element, styles) {
+  Object.keys(styles).forEach(function (prop) {
+    var unit = '';
+    // add unit if the value is numeric and is one of the following
+    if (['width', 'height', 'top', 'right', 'bottom', 'left'].indexOf(prop) !== -1 && isNumeric(styles[prop])) {
+      unit = 'px';
+    }
+    element.style[prop] = styles[prop] + unit;
+  });
+}
+
+/**
+ * Set the attributes to the given popper
+ * @method
+ * @memberof Popper.Utils
+ * @argument {Element} element - Element to apply the attributes to
+ * @argument {Object} styles
+ * Object with a list of properties and values which will be applied to the element
+ */
+function setAttributes(element, attributes) {
+  Object.keys(attributes).forEach(function (prop) {
+    var value = attributes[prop];
+    if (value !== false) {
+      element.setAttribute(prop, attributes[prop]);
+    } else {
+      element.removeAttribute(prop);
+    }
+  });
+}
+
+/**
+ * @function
+ * @memberof Modifiers
+ * @argument {Object} data - The data object generated by `update` method
+ * @argument {Object} data.styles - List of style properties - values to apply to popper element
+ * @argument {Object} data.attributes - List of attribute properties - values to apply to popper element
+ * @argument {Object} options - Modifiers configuration and options
+ * @returns {Object} The same data object
+ */
+function applyStyle(data) {
+  // any property present in `data.styles` will be applied to the popper,
+  // in this way we can make the 3rd party modifiers add custom styles to it
+  // Be aware, modifiers could override the properties defined in the previous
+  // lines of this modifier!
+  setStyles(data.instance.popper, data.styles);
+
+  // any property present in `data.attributes` will be applied to the popper,
+  // they will be set as HTML attributes of the element
+  setAttributes(data.instance.popper, data.attributes);
+
+  // if arrowElement is defined and arrowStyles has some properties
+  if (data.arrowElement && Object.keys(data.arrowStyles).length) {
+    setStyles(data.arrowElement, data.arrowStyles);
+  }
+
+  return data;
+}
+
+/**
+ * Set the x-placement attribute before everything else because it could be used
+ * to add margins to the popper margins needs to be calculated to get the
+ * correct popper offsets.
+ * @method
+ * @memberof Popper.modifiers
+ * @param {HTMLElement} reference - The reference element used to position the popper
+ * @param {HTMLElement} popper - The HTML element used as popper
+ * @param {Object} options - Popper.js options
+ */
+function applyStyleOnLoad(reference, popper, options, modifierOptions, state) {
+  // compute reference element offsets
+  var referenceOffsets = getReferenceOffsets(state, popper, reference, options.positionFixed);
+
+  // compute auto placement, store placement inside the data object,
+  // modifiers will be able to edit `placement` if needed
+  // and refer to originalPlacement to know the original value
+  var placement = computeAutoPlacement(options.placement, referenceOffsets, popper, reference, options.modifiers.flip.boundariesElement, options.modifiers.flip.padding);
+
+  popper.setAttribute('x-placement', placement);
+
+  // Apply `position` to popper before anything else because
+  // without the position applied we can't guarantee correct computations
+  setStyles(popper, { position: options.positionFixed ? 'fixed' : 'absolute' });
+
+  return options;
+}
+
+/**
+ * @function
+ * @memberof Popper.Utils
+ * @argument {Object} data - The data object generated by `update` method
+ * @argument {Boolean} shouldRound - If the offsets should be rounded at all
+ * @returns {Object} The popper's position offsets rounded
+ *
+ * The tale of pixel-perfect positioning. It's still not 100% perfect, but as
+ * good as it can be within reason.
+ * Discussion here: https://github.com/FezVrasta/popper.js/pull/715
+ *
+ * Low DPI screens cause a popper to be blurry if not using full pixels (Safari
+ * as well on High DPI screens).
+ *
+ * Firefox prefers no rounding for positioning and does not have blurriness on
+ * high DPI screens.
+ *
+ * Only horizontal placement and left/right values need to be considered.
+ */
+function getRoundedOffsets(data, shouldRound) {
+  var _data$offsets = data.offsets,
+      popper = _data$offsets.popper,
+      reference = _data$offsets.reference;
+
+
+  var isVertical = ['left', 'right'].indexOf(data.placement) !== -1;
+  var isVariation = data.placement.indexOf('-') !== -1;
+  var sameWidthOddness = reference.width % 2 === popper.width % 2;
+  var bothOddWidth = reference.width % 2 === 1 && popper.width % 2 === 1;
+  var noRound = function noRound(v) {
+    return v;
+  };
+
+  var horizontalToInteger = !shouldRound ? noRound : isVertical || isVariation || sameWidthOddness ? Math.round : Math.floor;
+  var verticalToInteger = !shouldRound ? noRound : Math.round;
+
+  return {
+    left: horizontalToInteger(bothOddWidth && !isVariation && shouldRound ? popper.left - 1 : popper.left),
+    top: verticalToInteger(popper.top),
+    bottom: verticalToInteger(popper.bottom),
+    right: horizontalToInteger(popper.right)
+  };
+}
+
+var isFirefox = isBrowser && /Firefox/i.test(navigator.userAgent);
+
+/**
+ * @function
+ * @memberof Modifiers
+ * @argument {Object} data - The data object generated by `update` method
+ * @argument {Object} options - Modifiers configuration and options
+ * @returns {Object} The data object, properly modified
+ */
+function computeStyle(data, options) {
+  var x = options.x,
+      y = options.y;
+  var popper = data.offsets.popper;
+
+  // Remove this legacy support in Popper.js v2
+
+  var legacyGpuAccelerationOption = find(data.instance.modifiers, function (modifier) {
+    return modifier.name === 'applyStyle';
+  }).gpuAcceleration;
+  if (legacyGpuAccelerationOption !== undefined) {
+    console.warn('WARNING: `gpuAcceleration` option moved to `computeStyle` modifier and will not be supported in future versions of Popper.js!');
+  }
+  var gpuAcceleration = legacyGpuAccelerationOption !== undefined ? legacyGpuAccelerationOption : options.gpuAcceleration;
+
+  var offsetParent = getOffsetParent(data.instance.popper);
+  var offsetParentRect = getBoundingClientRect(offsetParent);
+
+  // Styles
+  var styles = {
+    position: popper.position
+  };
+
+  var offsets = getRoundedOffsets(data, window.devicePixelRatio < 2 || !isFirefox);
+
+  var sideA = x === 'bottom' ? 'top' : 'bottom';
+  var sideB = y === 'right' ? 'left' : 'right';
+
+  // if gpuAcceleration is set to `true` and transform is supported,
+  //  we use `translate3d` to apply the position to the popper we
+  // automatically use the supported prefixed version if needed
+  var prefixedProperty = getSupportedPropertyName('transform');
+
+  // now, let's make a step back and look at this code closely (wtf?)
+  // If the content of the popper grows once it's been positioned, it
+  // may happen that the popper gets misplaced because of the new content
+  // overflowing its reference element
+  // To avoid this problem, we provide two options (x and y), which allow
+  // the consumer to define the offset origin.
+  // If we position a popper on top of a reference element, we can set
+  // `x` to `top` to make the popper grow towards its top instead of
+  // its bottom.
+  var left = void 0,
+      top = void 0;
+  if (sideA === 'bottom') {
+    // when offsetParent is <html> the positioning is relative to the bottom of the screen (excluding the scrollbar)
+    // and not the bottom of the html element
+    if (offsetParent.nodeName === 'HTML') {
+      top = -offsetParent.clientHeight + offsets.bottom;
+    } else {
+      top = -offsetParentRect.height + offsets.bottom;
+    }
+  } else {
+    top = offsets.top;
+  }
+  if (sideB === 'right') {
+    if (offsetParent.nodeName === 'HTML') {
+      left = -offsetParent.clientWidth + offsets.right;
+    } else {
+      left = -offsetParentRect.width + offsets.right;
+    }
+  } else {
+    left = offsets.left;
+  }
+  if (gpuAcceleration && prefixedProperty) {
+    styles[prefixedProperty] = 'translate3d(' + left + 'px, ' + top + 'px, 0)';
+    styles[sideA] = 0;
+    styles[sideB] = 0;
+    styles.willChange = 'transform';
+  } else {
+    // othwerise, we use the standard `top`, `left`, `bottom` and `right` properties
+    var invertTop = sideA === 'bottom' ? -1 : 1;
+    var invertLeft = sideB === 'right' ? -1 : 1;
+    styles[sideA] = top * invertTop;
+    styles[sideB] = left * invertLeft;
+    styles.willChange = sideA + ', ' + sideB;
+  }
+
+  // Attributes
+  var attributes = {
+    'x-placement': data.placement
+  };
+
+  // Update `data` attributes, styles and arrowStyles
+  data.attributes = _extends({}, attributes, data.attributes);
+  data.styles = _extends({}, styles, data.styles);
+  data.arrowStyles = _extends({}, data.offsets.arrow, data.arrowStyles);
+
+  return data;
+}
+
+/**
+ * Helper used to know if the given modifier depends from another one.<br />
+ * It checks if the needed modifier is listed and enabled.
+ * @method
+ * @memberof Popper.Utils
+ * @param {Array} modifiers - list of modifiers
+ * @param {String} requestingName - name of requesting modifier
+ * @param {String} requestedName - name of requested modifier
+ * @returns {Boolean}
+ */
+function isModifierRequired(modifiers, requestingName, requestedName) {
+  var requesting = find(modifiers, function (_ref) {
+    var name = _ref.name;
+    return name === requestingName;
+  });
+
+  var isRequired = !!requesting && modifiers.some(function (modifier) {
+    return modifier.name === requestedName && modifier.enabled && modifier.order < requesting.order;
+  });
+
+  if (!isRequired) {
+    var _requesting = '`' + requestingName + '`';
+    var requested = '`' + requestedName + '`';
+    console.warn(requested + ' modifier is required by ' + _requesting + ' modifier in order to work, be sure to include it before ' + _requesting + '!');
+  }
+  return isRequired;
+}
+
+/**
+ * @function
+ * @memberof Modifiers
+ * @argument {Object} data - The data object generated by update method
+ * @argument {Object} options - Modifiers configuration and options
+ * @returns {Object} The data object, properly modified
+ */
+function arrow(data, options) {
+  var _data$offsets$arrow;
+
+  // arrow depends on keepTogether in order to work
+  if (!isModifierRequired(data.instance.modifiers, 'arrow', 'keepTogether')) {
+    return data;
+  }
+
+  var arrowElement = options.element;
+
+  // if arrowElement is a string, suppose it's a CSS selector
+  if (typeof arrowElement === 'string') {
+    arrowElement = data.instance.popper.querySelector(arrowElement);
+
+    // if arrowElement is not found, don't run the modifier
+    if (!arrowElement) {
+      return data;
+    }
+  } else {
+    // if the arrowElement isn't a query selector we must check that the
+    // provided DOM node is child of its popper node
+    if (!data.instance.popper.contains(arrowElement)) {
+      console.warn('WARNING: `arrow.element` must be child of its popper element!');
+      return data;
+    }
+  }
+
+  var placement = data.placement.split('-')[0];
+  var _data$offsets = data.offsets,
+      popper = _data$offsets.popper,
+      reference = _data$offsets.reference;
+
+  var isVertical = ['left', 'right'].indexOf(placement) !== -1;
+
+  var len = isVertical ? 'height' : 'width';
+  var sideCapitalized = isVertical ? 'Top' : 'Left';
+  var side = sideCapitalized.toLowerCase();
+  var altSide = isVertical ? 'left' : 'top';
+  var opSide = isVertical ? 'bottom' : 'right';
+  var arrowElementSize = getOuterSizes(arrowElement)[len];
+
+  //
+  // extends keepTogether behavior making sure the popper and its
+  // reference have enough pixels in conjunction
+  //
+
+  // top/left side
+  if (reference[opSide] - arrowElementSize < popper[side]) {
+    data.offsets.popper[side] -= popper[side] - (reference[opSide] - arrowElementSize);
+  }
+  // bottom/right side
+  if (reference[side] + arrowElementSize > popper[opSide]) {
+    data.offsets.popper[side] += reference[side] + arrowElementSize - popper[opSide];
+  }
+  data.offsets.popper = getClientRect(data.offsets.popper);
+
+  // compute center of the popper
+  var center = reference[side] + reference[len] / 2 - arrowElementSize / 2;
+
+  // Compute the sideValue using the updated popper offsets
+  // take popper margin in account because we don't have this info available
+  var css = getStyleComputedProperty(data.instance.popper);
+  var popperMarginSide = parseFloat(css['margin' + sideCapitalized], 10);
+  var popperBorderSide = parseFloat(css['border' + sideCapitalized + 'Width'], 10);
+  var sideValue = center - data.offsets.popper[side] - popperMarginSide - popperBorderSide;
+
+  // prevent arrowElement from being placed not contiguously to its popper
+  sideValue = Math.max(Math.min(popper[len] - arrowElementSize, sideValue), 0);
+
+  data.arrowElement = arrowElement;
+  data.offsets.arrow = (_data$offsets$arrow = {}, defineProperty(_data$offsets$arrow, side, Math.round(sideValue)), defineProperty(_data$offsets$arrow, altSide, ''), _data$offsets$arrow);
+
+  return data;
+}
+
+/**
+ * Get the opposite placement variation of the given one
+ * @method
+ * @memberof Popper.Utils
+ * @argument {String} placement variation
+ * @returns {String} flipped placement variation
+ */
+function getOppositeVariation(variation) {
+  if (variation === 'end') {
+    return 'start';
+  } else if (variation === 'start') {
+    return 'end';
+  }
+  return variation;
+}
+
+/**
+ * List of accepted placements to use as values of the `placement` option.<br />
+ * Valid placements are:
+ * - `auto`
+ * - `top`
+ * - `right`
+ * - `bottom`
+ * - `left`
+ *
+ * Each placement can have a variation from this list:
+ * - `-start`
+ * - `-end`
+ *
+ * Variations are interpreted easily if you think of them as the left to right
+ * written languages. Horizontally (`top` and `bottom`), `start` is left and `end`
+ * is right.<br />
+ * Vertically (`left` and `right`), `start` is top and `end` is bottom.
+ *
+ * Some valid examples are:
+ * - `top-end` (on top of reference, right aligned)
+ * - `right-start` (on right of reference, top aligned)
+ * - `bottom` (on bottom, centered)
+ * - `auto-end` (on the side with more space available, alignment depends by placement)
+ *
+ * @static
+ * @type {Array}
+ * @enum {String}
+ * @readonly
+ * @method placements
+ * @memberof Popper
+ */
+var placements = ['auto-start', 'auto', 'auto-end', 'top-start', 'top', 'top-end', 'right-start', 'right', 'right-end', 'bottom-end', 'bottom', 'bottom-start', 'left-end', 'left', 'left-start'];
+
+// Get rid of `auto` `auto-start` and `auto-end`
+var validPlacements = placements.slice(3);
+
+/**
+ * Given an initial placement, returns all the subsequent placements
+ * clockwise (or counter-clockwise).
+ *
+ * @method
+ * @memberof Popper.Utils
+ * @argument {String} placement - A valid placement (it accepts variations)
+ * @argument {Boolean} counter - Set to true to walk the placements counterclockwise
+ * @returns {Array} placements including their variations
+ */
+function clockwise(placement) {
+  var counter = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
+
+  var index = validPlacements.indexOf(placement);
+  var arr = validPlacements.slice(index + 1).concat(validPlacements.slice(0, index));
+  return counter ? arr.reverse() : arr;
+}
+
+var BEHAVIORS = {
+  FLIP: 'flip',
+  CLOCKWISE: 'clockwise',
+  COUNTERCLOCKWISE: 'counterclockwise'
+};
+
+/**
+ * @function
+ * @memberof Modifiers
+ * @argument {Object} data - The data object generated by update method
+ * @argument {Object} options - Modifiers configuration and options
+ * @returns {Object} The data object, properly modified
+ */
+function flip(data, options) {
+  // if `inner` modifier is enabled, we can't use the `flip` modifier
+  if (isModifierEnabled(data.instance.modifiers, 'inner')) {
+    return data;
+  }
+
+  if (data.flipped && data.placement === data.originalPlacement) {
+    // seems like flip is trying to loop, probably there's not enough space on any of the flippable sides
+    return data;
+  }
+
+  var boundaries = getBoundaries(data.instance.popper, data.instance.reference, options.padding, options.boundariesElement, data.positionFixed);
+
+  var placement = data.placement.split('-')[0];
+  var placementOpposite = getOppositePlacement(placement);
+  var variation = data.placement.split('-')[1] || '';
+
+  var flipOrder = [];
+
+  switch (options.behavior) {
+    case BEHAVIORS.FLIP:
+      flipOrder = [placement, placementOpposite];
+      break;
+    case BEHAVIORS.CLOCKWISE:
+      flipOrder = clockwise(placement);
+      break;
+    case BEHAVIORS.COUNTERCLOCKWISE:
+      flipOrder = clockwise(placement, true);
+      break;
+    default:
+      flipOrder = options.behavior;
+  }
+
+  flipOrder.forEach(function (step, index) {
+    if (placement !== step || flipOrder.length === index + 1) {
+      return data;
+    }
+
+    placement = data.placement.split('-')[0];
+    placementOpposite = getOppositePlacement(placement);
+
+    var popperOffsets = data.offsets.popper;
+    var refOffsets = data.offsets.reference;
+
+    // using floor because the reference offsets may contain decimals we are not going to consider here
+    var floor = Math.floor;
+    var overlapsRef = placement === 'left' && floor(popperOffsets.right) > floor(refOffsets.left) || placement === 'right' && floor(popperOffsets.left) < floor(refOffsets.right) || placement === 'top' && floor(popperOffsets.bottom) > floor(refOffsets.top) || placement === 'bottom' && floor(popperOffsets.top) < floor(refOffsets.bottom);
+
+    var overflowsLeft = floor(popperOffsets.left) < floor(boundaries.left);
+    var overflowsRight = floor(popperOffsets.right) > floor(boundaries.right);
+    var overflowsTop = floor(popperOffsets.top) < floor(boundaries.top);
+    var overflowsBottom = floor(popperOffsets.bottom) > floor(boundaries.bottom);
+
+    var overflowsBoundaries = placement === 'left' && overflowsLeft || placement === 'right' && overflowsRight || placement === 'top' && overflowsTop || placement === 'bottom' && overflowsBottom;
+
+    // flip the variation if required
+    var isVertical = ['top', 'bottom'].indexOf(placement) !== -1;
+    var flippedVariation = !!options.flipVariations && (isVertical && variation === 'start' && overflowsLeft || isVertical && variation === 'end' && overflowsRight || !isVertical && variation === 'start' && overflowsTop || !isVertical && variation === 'end' && overflowsBottom);
+
+    if (overlapsRef || overflowsBoundaries || flippedVariation) {
+      // this boolean to detect any flip loop
+      data.flipped = true;
+
+      if (overlapsRef || overflowsBoundaries) {
+        placement = flipOrder[index + 1];
+      }
+
+      if (flippedVariation) {
+        variation = getOppositeVariation(variation);
+      }
+
+      data.placement = placement + (variation ? '-' + variation : '');
+
+      // this object contains `position`, we want to preserve it along with
+      // any additional property we may add in the future
+      data.offsets.popper = _extends({}, data.offsets.popper, getPopperOffsets(data.instance.popper, data.offsets.reference, data.placement));
+
+      data = runModifiers(data.instance.modifiers, data, 'flip');
+    }
+  });
+  return data;
+}
+
+/**
+ * @function
+ * @memberof Modifiers
+ * @argument {Object} data - The data object generated by update method
+ * @argument {Object} options - Modifiers configuration and options
+ * @returns {Object} The data object, properly modified
+ */
+function keepTogether(data) {
+  var _data$offsets = data.offsets,
+      popper = _data$offsets.popper,
+      reference = _data$offsets.reference;
+
+  var placement = data.placement.split('-')[0];
+  var floor = Math.floor;
+  var isVertical = ['top', 'bottom'].indexOf(placement) !== -1;
+  var side = isVertical ? 'right' : 'bottom';
+  var opSide = isVertical ? 'left' : 'top';
+  var measurement = isVertical ? 'width' : 'height';
+
+  if (popper[side] < floor(reference[opSide])) {
+    data.offsets.popper[opSide] = floor(reference[opSide]) - popper[measurement];
+  }
+  if (popper[opSide] > floor(reference[side])) {
+    data.offsets.popper[opSide] = floor(reference[side]);
+  }
+
+  return data;
+}
+
+/**
+ * Converts a string containing value + unit into a px value number
+ * @function
+ * @memberof {modifiers~offset}
+ * @private
+ * @argument {String} str - Value + unit string
+ * @argument {String} measurement - `height` or `width`
+ * @argument {Object} popperOffsets
+ * @argument {Object} referenceOffsets
+ * @returns {Number|String}
+ * Value in pixels, or original string if no values were extracted
+ */
+function toValue(str, measurement, popperOffsets, referenceOffsets) {
+  // separate value from unit
+  var split = str.match(/((?:\-|\+)?\d*\.?\d*)(.*)/);
+  var value = +split[1];
+  var unit = split[2];
+
+  // If it's not a number it's an operator, I guess
+  if (!value) {
+    return str;
+  }
+
+  if (unit.indexOf('%') === 0) {
+    var element = void 0;
+    switch (unit) {
+      case '%p':
+        element = popperOffsets;
+        break;
+      case '%':
+      case '%r':
+      default:
+        element = referenceOffsets;
+    }
+
+    var rect = getClientRect(element);
+    return rect[measurement] / 100 * value;
+  } else if (unit === 'vh' || unit === 'vw') {
+    // if is a vh or vw, we calculate the size based on the viewport
+    var size = void 0;
+    if (unit === 'vh') {
+      size = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
+    } else {
+      size = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
+    }
+    return size / 100 * value;
+  } else {
+    // if is an explicit pixel unit, we get rid of the unit and keep the value
+    // if is an implicit unit, it's px, and we return just the value
+    return value;
+  }
+}
+
+/**
+ * Parse an `offset` string to extrapolate `x` and `y` numeric offsets.
+ * @function
+ * @memberof {modifiers~offset}
+ * @private
+ * @argument {String} offset
+ * @argument {Object} popperOffsets
+ * @argument {Object} referenceOffsets
+ * @argument {String} basePlacement
+ * @returns {Array} a two cells array with x and y offsets in numbers
+ */
+function parseOffset(offset, popperOffsets, referenceOffsets, basePlacement) {
+  var offsets = [0, 0];
+
+  // Use height if placement is left or right and index is 0 otherwise use width
+  // in this way the first offset will use an axis and the second one
+  // will use the other one
+  var useHeight = ['right', 'left'].indexOf(basePlacement) !== -1;
+
+  // Split the offset string to obtain a list of values and operands
+  // The regex addresses values with the plus or minus sign in front (+10, -20, etc)
+  var fragments = offset.split(/(\+|\-)/).map(function (frag) {
+    return frag.trim();
+  });
+
+  // Detect if the offset string contains a pair of values or a single one
+  // they could be separated by comma or space
+  var divider = fragments.indexOf(find(fragments, function (frag) {
+    return frag.search(/,|\s/) !== -1;
+  }));
+
+  if (fragments[divider] && fragments[divider].indexOf(',') === -1) {
+    console.warn('Offsets separated by white space(s) are deprecated, use a comma (,) instead.');
+  }
+
+  // If divider is found, we divide the list of values and operands to divide
+  // them by ofset X and Y.
+  var splitRegex = /\s*,\s*|\s+/;
+  var ops = divider !== -1 ? [fragments.slice(0, divider).concat([fragments[divider].split(splitRegex)[0]]), [fragments[divider].split(splitRegex)[1]].concat(fragments.slice(divider + 1))] : [fragments];
+
+  // Convert the values with units to absolute pixels to allow our computations
+  ops = ops.map(function (op, index) {
+    // Most of the units rely on the orientation of the popper
+    var measurement = (index === 1 ? !useHeight : useHeight) ? 'height' : 'width';
+    var mergeWithPrevious = false;
+    return op
+    // This aggregates any `+` or `-` sign that aren't considered operators
+    // e.g.: 10 + +5 => [10, +, +5]
+    .reduce(function (a, b) {
+      if (a[a.length - 1] === '' && ['+', '-'].indexOf(b) !== -1) {
+        a[a.length - 1] = b;
+        mergeWithPrevious = true;
+        return a;
+      } else if (mergeWithPrevious) {
+        a[a.length - 1] += b;
+        mergeWithPrevious = false;
+        return a;
+      } else {
+        return a.concat(b);
+      }
+    }, [])
+    // Here we convert the string values into number values (in px)
+    .map(function (str) {
+      return toValue(str, measurement, popperOffsets, referenceOffsets);
+    });
+  });
+
+  // Loop trough the offsets arrays and execute the operations
+  ops.forEach(function (op, index) {
+    op.forEach(function (frag, index2) {
+      if (isNumeric(frag)) {
+        offsets[index] += frag * (op[index2 - 1] === '-' ? -1 : 1);
+      }
+    });
+  });
+  return offsets;
+}
+
+/**
+ * @function
+ * @memberof Modifiers
+ * @argument {Object} data - The data object generated by update method
+ * @argument {Object} options - Modifiers configuration and options
+ * @argument {Number|String} options.offset=0
+ * The offset value as described in the modifier description
+ * @returns {Object} The data object, properly modified
+ */
+function offset(data, _ref) {
+  var offset = _ref.offset;
+  var placement = data.placement,
+      _data$offsets = data.offsets,
+      popper = _data$offsets.popper,
+      reference = _data$offsets.reference;
+
+  var basePlacement = placement.split('-')[0];
+
+  var offsets = void 0;
+  if (isNumeric(+offset)) {
+    offsets = [+offset, 0];
+  } else {
+    offsets = parseOffset(offset, popper, reference, basePlacement);
+  }
+
+  if (basePlacement === 'left') {
+    popper.top += offsets[0];
+    popper.left -= offsets[1];
+  } else if (basePlacement === 'right') {
+    popper.top += offsets[0];
+    popper.left += offsets[1];
+  } else if (basePlacement === 'top') {
+    popper.left += offsets[0];
+    popper.top -= offsets[1];
+  } else if (basePlacement === 'bottom') {
+    popper.left += offsets[0];
+    popper.top += offsets[1];
+  }
+
+  data.popper = popper;
+  return data;
+}
+
+/**
+ * @function
+ * @memberof Modifiers
+ * @argument {Object} data - The data object generated by `update` method
+ * @argument {Object} options - Modifiers configuration and options
+ * @returns {Object} The data object, properly modified
+ */
+function preventOverflow(data, options) {
+  var boundariesElement = options.boundariesElement || getOffsetParent(data.instance.popper);
+
+  // If offsetParent is the reference element, we really want to
+  // go one step up and use the next offsetParent as reference to
+  // avoid to make this modifier completely useless and look like broken
+  if (data.instance.reference === boundariesElement) {
+    boundariesElement = getOffsetParent(boundariesElement);
+  }
+
+  // NOTE: DOM access here
+  // resets the popper's position so that the document size can be calculated excluding
+  // the size of the popper element itself
+  var transformProp = getSupportedPropertyName('transform');
+  var popperStyles = data.instance.popper.style; // assignment to help minification
+  var top = popperStyles.top,
+      left = popperStyles.left,
+      transform = popperStyles[transformProp];
+
+  popperStyles.top = '';
+  popperStyles.left = '';
+  popperStyles[transformProp] = '';
+
+  var boundaries = getBoundaries(data.instance.popper, data.instance.reference, options.padding, boundariesElement, data.positionFixed);
+
+  // NOTE: DOM access here
+  // restores the original style properties after the offsets have been computed
+  popperStyles.top = top;
+  popperStyles.left = left;
+  popperStyles[transformProp] = transform;
+
+  options.boundaries = boundaries;
+
+  var order = options.priority;
+  var popper = data.offsets.popper;
+
+  var check = {
+    primary: function primary(placement) {
+      var value = popper[placement];
+      if (popper[placement] < boundaries[placement] && !options.escapeWithReference) {
+        value = Math.max(popper[placement], boundaries[placement]);
+      }
+      return defineProperty({}, placement, value);
+    },
+    secondary: function secondary(placement) {
+      var mainSide = placement === 'right' ? 'left' : 'top';
+      var value = popper[mainSide];
+      if (popper[placement] > boundaries[placement] && !options.escapeWithReference) {
+        value = Math.min(popper[mainSide], boundaries[placement] - (placement === 'right' ? popper.width : popper.height));
+      }
+      return defineProperty({}, mainSide, value);
+    }
+  };
+
+  order.forEach(function (placement) {
+    var side = ['left', 'top'].indexOf(placement) !== -1 ? 'primary' : 'secondary';
+    popper = _extends({}, popper, check[side](placement));
+  });
+
+  data.offsets.popper = popper;
+
+  return data;
+}
+
+/**
+ * @function
+ * @memberof Modifiers
+ * @argument {Object} data - The data object generated by `update` method
+ * @argument {Object} options - Modifiers configuration and options
+ * @returns {Object} The data object, properly modified
+ */
+function shift(data) {
+  var placement = data.placement;
+  var basePlacement = placement.split('-')[0];
+  var shiftvariation = placement.split('-')[1];
+
+  // if shift shiftvariation is specified, run the modifier
+  if (shiftvariation) {
+    var _data$offsets = data.offsets,
+        reference = _data$offsets.reference,
+        popper = _data$offsets.popper;
+
+    var isVertical = ['bottom', 'top'].indexOf(basePlacement) !== -1;
+    var side = isVertical ? 'left' : 'top';
+    var measurement = isVertical ? 'width' : 'height';
+
+    var shiftOffsets = {
+      start: defineProperty({}, side, reference[side]),
+      end: defineProperty({}, side, reference[side] + reference[measurement] - popper[measurement])
+    };
+
+    data.offsets.popper = _extends({}, popper, shiftOffsets[shiftvariation]);
+  }
+
+  return data;
+}
+
+/**
+ * @function
+ * @memberof Modifiers
+ * @argument {Object} data - The data object generated by update method
+ * @argument {Object} options - Modifiers configuration and options
+ * @returns {Object} The data object, properly modified
+ */
+function hide(data) {
+  if (!isModifierRequired(data.instance.modifiers, 'hide', 'preventOverflow')) {
+    return data;
+  }
+
+  var refRect = data.offsets.reference;
+  var bound = find(data.instance.modifiers, function (modifier) {
+    return modifier.name === 'preventOverflow';
+  }).boundaries;
+
+  if (refRect.bottom < bound.top || refRect.left > bound.right || refRect.top > bound.bottom || refRect.right < bound.left) {
+    // Avoid unnecessary DOM access if visibility hasn't changed
+    if (data.hide === true) {
+      return data;
+    }
+
+    data.hide = true;
+    data.attributes['x-out-of-boundaries'] = '';
+  } else {
+    // Avoid unnecessary DOM access if visibility hasn't changed
+    if (data.hide === false) {
+      return data;
+    }
+
+    data.hide = false;
+    data.attributes['x-out-of-boundaries'] = false;
+  }
+
+  return data;
+}
+
+/**
+ * @function
+ * @memberof Modifiers
+ * @argument {Object} data - The data object generated by `update` method
+ * @argument {Object} options - Modifiers configuration and options
+ * @returns {Object} The data object, properly modified
+ */
+function inner(data) {
+  var placement = data.placement;
+  var basePlacement = placement.split('-')[0];
+  var _data$offsets = data.offsets,
+      popper = _data$offsets.popper,
+      reference = _data$offsets.reference;
+
+  var isHoriz = ['left', 'right'].indexOf(basePlacement) !== -1;
+
+  var subtractLength = ['top', 'left'].indexOf(basePlacement) === -1;
+
+  popper[isHoriz ? 'left' : 'top'] = reference[basePlacement] - (subtractLength ? popper[isHoriz ? 'width' : 'height'] : 0);
+
+  data.placement = getOppositePlacement(placement);
+  data.offsets.popper = getClientRect(popper);
+
+  return data;
+}
+
+/**
+ * Modifier function, each modifier can have a function of this type assigned
+ * to its `fn` property.<br />
+ * These functions will be called on each update, this means that you must
+ * make sure they are performant enough to avoid performance bottlenecks.
+ *
+ * @function ModifierFn
+ * @argument {dataObject} data - The data object generated by `update` method
+ * @argument {Object} options - Modifiers configuration and options
+ * @returns {dataObject} The data object, properly modified
+ */
+
+/**
+ * Modifiers are plugins used to alter the behavior of your poppers.<br />
+ * Popper.js uses a set of 9 modifiers to provide all the basic functionalities
+ * needed by the library.
+ *
+ * Usually you don't want to override the `order`, `fn` and `onLoad` props.
+ * All the other properties are configurations that could be tweaked.
+ * @namespace modifiers
+ */
+var modifiers = {
+  /**
+   * Modifier used to shift the popper on the start or end of its reference
+   * element.<br />
+   * It will read the variation of the `placement` property.<br />
+   * It can be one either `-end` or `-start`.
+   * @memberof modifiers
+   * @inner
+   */
+  shift: {
+    /** @prop {number} order=100 - Index used to define the order of execution */
+    order: 100,
+    /** @prop {Boolean} enabled=true - Whether the modifier is enabled or not */
+    enabled: true,
+    /** @prop {ModifierFn} */
+    fn: shift
+  },
+
+  /**
+   * The `offset` modifier can shift your popper on both its axis.
+   *
+   * It accepts the following units:
+   * - `px` or unit-less, interpreted as pixels
+   * - `%` or `%r`, percentage relative to the length of the reference element
+   * - `%p`, percentage relative to the length of the popper element
+   * - `vw`, CSS viewport width unit
+   * - `vh`, CSS viewport height unit
+   *
+   * For length is intended the main axis relative to the placement of the popper.<br />
+   * This means that if the placement is `top` or `bottom`, the length will be the
+   * `width`. In case of `left` or `right`, it will be the `height`.
+   *
+   * You can provide a single value (as `Number` or `String`), or a pair of values
+   * as `String` divided by a comma or one (or more) white spaces.<br />
+   * The latter is a deprecated method because it leads to confusion and will be
+   * removed in v2.<br />
+   * Additionally, it accepts additions and subtractions between different units.
+   * Note that multiplications and divisions aren't supported.
+   *
+   * Valid examples are:
+   * ```
+   * 10
+   * '10%'
+   * '10, 10'
+   * '10%, 10'
+   * '10 + 10%'
+   * '10 - 5vh + 3%'
+   * '-10px + 5vh, 5px - 6%'
+   * ```
+   * > **NB**: If you desire to apply offsets to your poppers in a way that may make them overlap
+   * > with their reference element, unfortunately, you will have to disable the `flip` modifier.
+   * > You can read more on this at this [issue](https://github.com/FezVrasta/popper.js/issues/373).
+   *
+   * @memberof modifiers
+   * @inner
+   */
+  offset: {
+    /** @prop {number} order=200 - Index used to define the order of execution */
+    order: 200,
+    /** @prop {Boolean} enabled=true - Whether the modifier is enabled or not */
+    enabled: true,
+    /** @prop {ModifierFn} */
+    fn: offset,
+    /** @prop {Number|String} offset=0
+     * The offset value as described in the modifier description
+     */
+    offset: 0
+  },
+
+  /**
+   * Modifier used to prevent the popper from being positioned outside the boundary.
+   *
+   * A scenario exists where the reference itself is not within the boundaries.<br />
+   * We can say it has "escaped the boundaries" — or just "escaped".<br />
+   * In this case we need to decide whether the popper should either:
+   *
+   * - detach from the reference and remain "trapped" in the boundaries, or
+   * - if it should ignore the boundary and "escape with its reference"
+   *
+   * When `escapeWithReference` is set to`true` and reference is completely
+   * outside its boundaries, the popper will overflow (or completely leave)
+   * the boundaries in order to remain attached to the edge of the reference.
+   *
+   * @memberof modifiers
+   * @inner
+   */
+  preventOverflow: {
+    /** @prop {number} order=300 - Index used to define the order of execution */
+    order: 300,
+    /** @prop {Boolean} enabled=true - Whether the modifier is enabled or not */
+    enabled: true,
+    /** @prop {ModifierFn} */
+    fn: preventOverflow,
+    /**
+     * @prop {Array} [priority=['left','right','top','bottom']]
+     * Popper will try to prevent overflow following these priorities by default,
+     * then, it could overflow on the left and on top of the `boundariesElement`
+     */
+    priority: ['left', 'right', 'top', 'bottom'],
+    /**
+     * @prop {number} padding=5
+     * Amount of pixel used to define a minimum distance between the boundaries
+     * and the popper. This makes sure the popper always has a little padding
+     * between the edges of its container
+     */
+    padding: 5,
+    /**
+     * @prop {String|HTMLElement} boundariesElement='scrollParent'
+     * Boundaries used by the modifier. Can be `scrollParent`, `window`,
+     * `viewport` or any DOM element.
+     */
+    boundariesElement: 'scrollParent'
+  },
+
+  /**
+   * Modifier used to make sure the reference and its popper stay near each other
+   * without leaving any gap between the two. Especially useful when the arrow is
+   * enabled and you want to ensure that it points to its reference element.
+   * It cares only about the first axis. You can still have poppers with margin
+   * between the popper and its reference element.
+   * @memberof modifiers
+   * @inner
+   */
+  keepTogether: {
+    /** @prop {number} order=400 - Index used to define the order of execution */
+    order: 400,
+    /** @prop {Boolean} enabled=true - Whether the modifier is enabled or not */
+    enabled: true,
+    /** @prop {ModifierFn} */
+    fn: keepTogether
+  },
+
+  /**
+   * This modifier is used to move the `arrowElement` of the popper to make
+   * sure it is positioned between the reference element and its popper element.
+   * It will read the outer size of the `arrowElement` node to detect how many
+   * pixels of conjunction are needed.
+   *
+   * It has no effect if no `arrowElement` is provided.
+   * @memberof modifiers
+   * @inner
+   */
+  arrow: {
+    /** @prop {number} order=500 - Index used to define the order of execution */
+    order: 500,
+    /** @prop {Boolean} enabled=true - Whether the modifier is enabled or not */
+    enabled: true,
+    /** @prop {ModifierFn} */
+    fn: arrow,
+    /** @prop {String|HTMLElement} element='[x-arrow]' - Selector or node used as arrow */
+    element: '[x-arrow]'
+  },
+
+  /**
+   * Modifier used to flip the popper's placement when it starts to overlap its
+   * reference element.
+   *
+   * Requires the `preventOverflow` modifier before it in order to work.
+   *
+   * **NOTE:** this modifier will interrupt the current update cycle and will
+   * restart it if it detects the need to flip the placement.
+   * @memberof modifiers
+   * @inner
+   */
+  flip: {
+    /** @prop {number} order=600 - Index used to define the order of execution */
+    order: 600,
+    /** @prop {Boolean} enabled=true - Whether the modifier is enabled or not */
+    enabled: true,
+    /** @prop {ModifierFn} */
+    fn: flip,
+    /**
+     * @prop {String|Array} behavior='flip'
+     * The behavior used to change the popper's placement. It can be one of
+     * `flip`, `clockwise`, `counterclockwise` or an array with a list of valid
+     * placements (with optional variations)
+     */
+    behavior: 'flip',
+    /**
+     * @prop {number} padding=5
+     * The popper will flip if it hits the edges of the `boundariesElement`
+     */
+    padding: 5,
+    /**
+     * @prop {String|HTMLElement} boundariesElement='viewport'
+     * The element which will define the boundaries of the popper position.
+     * The popper will never be placed outside of the defined boundaries
+     * (except if `keepTogether` is enabled)
+     */
+    boundariesElement: 'viewport'
+  },
+
+  /**
+   * Modifier used to make the popper flow toward the inner of the reference element.
+   * By default, when this modifier is disabled, the popper will be placed outside
+   * the reference element.
+   * @memberof modifiers
+   * @inner
+   */
+  inner: {
+    /** @prop {number} order=700 - Index used to define the order of execution */
+    order: 700,
+    /** @prop {Boolean} enabled=false - Whether the modifier is enabled or not */
+    enabled: false,
+    /** @prop {ModifierFn} */
+    fn: inner
+  },
+
+  /**
+   * Modifier used to hide the popper when its reference element is outside of the
+   * popper boundaries. It will set a `x-out-of-boundaries` attribute which can
+   * be used to hide with a CSS selector the popper when its reference is
+   * out of boundaries.
+   *
+   * Requires the `preventOverflow` modifier before it in order to work.
+   * @memberof modifiers
+   * @inner
+   */
+  hide: {
+    /** @prop {number} order=800 - Index used to define the order of execution */
+    order: 800,
+    /** @prop {Boolean} enabled=true - Whether the modifier is enabled or not */
+    enabled: true,
+    /** @prop {ModifierFn} */
+    fn: hide
+  },
+
+  /**
+   * Computes the style that will be applied to the popper element to gets
+   * properly positioned.
+   *
+   * Note that this modifier will not touch the DOM, it just prepares the styles
+   * so that `applyStyle` modifier can apply it. This separation is useful
+   * in case you need to replace `applyStyle` with a custom implementation.
+   *
+   * This modifier has `850` as `order` value to maintain backward compatibility
+   * with previous versions of Popper.js. Expect the modifiers ordering method
+   * to change in future major versions of the library.
+   *
+   * @memberof modifiers
+   * @inner
+   */
+  computeStyle: {
+    /** @prop {number} order=850 - Index used to define the order of execution */
+    order: 850,
+    /** @prop {Boolean} enabled=true - Whether the modifier is enabled or not */
+    enabled: true,
+    /** @prop {ModifierFn} */
+    fn: computeStyle,
+    /**
+     * @prop {Boolean} gpuAcceleration=true
+     * If true, it uses the CSS 3D transformation to position the popper.
+     * Otherwise, it will use the `top` and `left` properties
+     */
+    gpuAcceleration: true,
+    /**
+     * @prop {string} [x='bottom']
+     * Where to anchor the X axis (`bottom` or `top`). AKA X offset origin.
+     * Change this if your popper should grow in a direction different from `bottom`
+     */
+    x: 'bottom',
+    /**
+     * @prop {string} [x='left']
+     * Where to anchor the Y axis (`left` or `right`). AKA Y offset origin.
+     * Change this if your popper should grow in a direction different from `right`
+     */
+    y: 'right'
+  },
+
+  /**
+   * Applies the computed styles to the popper element.
+   *
+   * All the DOM manipulations are limited to this modifier. This is useful in case
+   * you want to integrate Popper.js inside a framework or view library and you
+   * want to delegate all the DOM manipulations to it.
+   *
+   * Note that if you disable this modifier, you must make sure the popper element
+   * has its position set to `absolute` before Popper.js can do its work!
+   *
+   * Just disable this modifier and define your own to achieve the desired effect.
+   *
+   * @memberof modifiers
+   * @inner
+   */
+  applyStyle: {
+    /** @prop {number} order=900 - Index used to define the order of execution */
+    order: 900,
+    /** @prop {Boolean} enabled=true - Whether the modifier is enabled or not */
+    enabled: true,
+    /** @prop {ModifierFn} */
+    fn: applyStyle,
+    /** @prop {Function} */
+    onLoad: applyStyleOnLoad,
+    /**
+     * @deprecated since version 1.10.0, the property moved to `computeStyle` modifier
+     * @prop {Boolean} gpuAcceleration=true
+     * If true, it uses the CSS 3D transformation to position the popper.
+     * Otherwise, it will use the `top` and `left` properties
+     */
+    gpuAcceleration: undefined
+  }
+};
+
+/**
+ * The `dataObject` is an object containing all the information used by Popper.js.
+ * This object is passed to modifiers and to the `onCreate` and `onUpdate` callbacks.
+ * @name dataObject
+ * @property {Object} data.instance The Popper.js instance
+ * @property {String} data.placement Placement applied to popper
+ * @property {String} data.originalPlacement Placement originally defined on init
+ * @property {Boolean} data.flipped True if popper has been flipped by flip modifier
+ * @property {Boolean} data.hide True if the reference element is out of boundaries, useful to know when to hide the popper
+ * @property {HTMLElement} data.arrowElement Node used as arrow by arrow modifier
+ * @property {Object} data.styles Any CSS property defined here will be applied to the popper. It expects the JavaScript nomenclature (eg. `marginBottom`)
+ * @property {Object} data.arrowStyles Any CSS property defined here will be applied to the popper arrow. It expects the JavaScript nomenclature (eg. `marginBottom`)
+ * @property {Object} data.boundaries Offsets of the popper boundaries
+ * @property {Object} data.offsets The measurements of popper, reference and arrow elements
+ * @property {Object} data.offsets.popper `top`, `left`, `width`, `height` values
+ * @property {Object} data.offsets.reference `top`, `left`, `width`, `height` values
+ * @property {Object} data.offsets.arrow] `top` and `left` offsets, only one of them will be different from 0
+ */
+
+/**
+ * Default options provided to Popper.js constructor.<br />
+ * These can be overridden using the `options` argument of Popper.js.<br />
+ * To override an option, simply pass an object with the same
+ * structure of the `options` object, as the 3rd argument. For example:
+ * ```
+ * new Popper(ref, pop, {
+ *   modifiers: {
+ *     preventOverflow: { enabled: false }
+ *   }
+ * })
+ * ```
+ * @type {Object}
+ * @static
+ * @memberof Popper
+ */
+var Defaults = {
+  /**
+   * Popper's placement.
+   * @prop {Popper.placements} placement='bottom'
+   */
+  placement: 'bottom',
+
+  /**
+   * Set this to true if you want popper to position it self in 'fixed' mode
+   * @prop {Boolean} positionFixed=false
+   */
+  positionFixed: false,
+
+  /**
+   * Whether events (resize, scroll) are initially enabled.
+   * @prop {Boolean} eventsEnabled=true
+   */
+  eventsEnabled: true,
+
+  /**
+   * Set to true if you want to automatically remove the popper when
+   * you call the `destroy` method.
+   * @prop {Boolean} removeOnDestroy=false
+   */
+  removeOnDestroy: false,
+
+  /**
+   * Callback called when the popper is created.<br />
+   * By default, it is set to no-op.<br />
+   * Access Popper.js instance with `data.instance`.
+   * @prop {onCreate}
+   */
+  onCreate: function onCreate() {},
+
+  /**
+   * Callback called when the popper is updated. This callback is not called
+   * on the initialization/creation of the popper, but only on subsequent
+   * updates.<br />
+   * By default, it is set to no-op.<br />
+   * Access Popper.js instance with `data.instance`.
+   * @prop {onUpdate}
+   */
+  onUpdate: function onUpdate() {},
+
+  /**
+   * List of modifiers used to modify the offsets before they are applied to the popper.
+   * They provide most of the functionalities of Popper.js.
+   * @prop {modifiers}
+   */
+  modifiers: modifiers
+};
+
+/**
+ * @callback onCreate
+ * @param {dataObject} data
+ */
+
+/**
+ * @callback onUpdate
+ * @param {dataObject} data
+ */
+
+// Utils
+// Methods
+var Popper = function () {
+  /**
+   * Creates a new Popper.js instance.
+   * @class Popper
+   * @param {HTMLElement|referenceObject} reference - The reference element used to position the popper
+   * @param {HTMLElement} popper - The HTML element used as the popper
+   * @param {Object} options - Your custom options to override the ones defined in [Defaults](#defaults)
+   * @return {Object} instance - The generated Popper.js instance
+   */
+  function Popper(reference, popper) {
+    var _this = this;
+
+    var options = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
+    classCallCheck(this, Popper);
+
+    this.scheduleUpdate = function () {
+      return requestAnimationFrame(_this.update);
+    };
+
+    // make update() debounced, so that it only runs at most once-per-tick
+    this.update = debounce(this.update.bind(this));
+
+    // with {} we create a new object with the options inside it
+    this.options = _extends({}, Popper.Defaults, options);
+
+    // init state
+    this.state = {
+      isDestroyed: false,
+      isCreated: false,
+      scrollParents: []
+    };
+
+    // get reference and popper elements (allow jQuery wrappers)
+    this.reference = reference && reference.jquery ? reference[0] : reference;
+    this.popper = popper && popper.jquery ? popper[0] : popper;
+
+    // Deep merge modifiers options
+    this.options.modifiers = {};
+    Object.keys(_extends({}, Popper.Defaults.modifiers, options.modifiers)).forEach(function (name) {
+      _this.options.modifiers[name] = _extends({}, Popper.Defaults.modifiers[name] || {}, options.modifiers ? options.modifiers[name] : {});
+    });
+
+    // Refactoring modifiers' list (Object => Array)
+    this.modifiers = Object.keys(this.options.modifiers).map(function (name) {
+      return _extends({
+        name: name
+      }, _this.options.modifiers[name]);
+    })
+    // sort the modifiers by order
+    .sort(function (a, b) {
+      return a.order - b.order;
+    });
+
+    // modifiers have the ability to execute arbitrary code when Popper.js get inited
+    // such code is executed in the same order of its modifier
+    // they could add new properties to their options configuration
+    // BE AWARE: don't add options to `options.modifiers.name` but to `modifierOptions`!
+    this.modifiers.forEach(function (modifierOptions) {
+      if (modifierOptions.enabled && isFunction(modifierOptions.onLoad)) {
+        modifierOptions.onLoad(_this.reference, _this.popper, _this.options, modifierOptions, _this.state);
+      }
+    });
+
+    // fire the first update to position the popper in the right place
+    this.update();
+
+    var eventsEnabled = this.options.eventsEnabled;
+    if (eventsEnabled) {
+      // setup event listeners, they will take care of update the position in specific situations
+      this.enableEventListeners();
+    }
+
+    this.state.eventsEnabled = eventsEnabled;
+  }
+
+  // We can't use class properties because they don't get listed in the
+  // class prototype and break stuff like Sinon stubs
+
+
+  createClass(Popper, [{
+    key: 'update',
+    value: function update$$1() {
+      return update.call(this);
+    }
+  }, {
+    key: 'destroy',
+    value: function destroy$$1() {
+      return destroy.call(this);
+    }
+  }, {
+    key: 'enableEventListeners',
+    value: function enableEventListeners$$1() {
+      return enableEventListeners.call(this);
+    }
+  }, {
+    key: 'disableEventListeners',
+    value: function disableEventListeners$$1() {
+      return disableEventListeners.call(this);
+    }
+
+    /**
+     * Schedules an update. It will run on the next UI update available.
+     * @method scheduleUpdate
+     * @memberof Popper
+     */
+
+
+    /**
+     * Collection of utilities useful when writing custom modifiers.
+     * Starting from version 1.7, this method is available only if you
+     * include `popper-utils.js` before `popper.js`.
+     *
+     * **DEPRECATION**: This way to access PopperUtils is deprecated
+     * and will be removed in v2! Use the PopperUtils module directly instead.
+     * Due to the high instability of the methods contained in Utils, we can't
+     * guarantee them to follow semver. Use them at your own risk!
+     * @static
+     * @private
+     * @type {Object}
+     * @deprecated since version 1.8
+     * @member Utils
+     * @memberof Popper
+     */
+
+  }]);
+  return Popper;
+}();
+
+/**
+ * The `referenceObject` is an object that provides an interface compatible with Popper.js
+ * and lets you use it as replacement of a real DOM node.<br />
+ * You can use this method to position a popper relatively to a set of coordinates
+ * in case you don't have a DOM node to use as reference.
+ *
+ * ```
+ * new Popper(referenceObject, popperNode);
+ * ```
+ *
+ * NB: This feature isn't supported in Internet Explorer 10.
+ * @name referenceObject
+ * @property {Function} data.getBoundingClientRect
+ * A function that returns a set of coordinates compatible with the native `getBoundingClientRect` method.
+ * @property {number} data.clientWidth
+ * An ES6 getter that will return the width of the virtual reference element.
+ * @property {number} data.clientHeight
+ * An ES6 getter that will return the height of the virtual reference element.
+ */
+
+
+Popper.Utils = (typeof window !== 'undefined' ? window : global).PopperUtils;
+Popper.placements = placements;
+Popper.Defaults = Defaults;
+
+return Popper;
+
+})));
+
+
+}
+;Ember.libraries.register('Ember Bootstrap', '2.4.0');
+;/* globals Ember, require, WeakMap */
+
+(function() {
+  var _Ember;
+
+  if (typeof Ember !== 'undefined') {
+    _Ember = Ember;
+  } else {
+    _Ember = require('ember').default;
+  }
+
+  if (!_Ember.WeakMap) {
+    _Ember.WeakMap = WeakMap;
+  }
+})();
+
 ;/* globals define */
 
 function createDeprecatedModule(moduleId) {
@@ -63066,6 +65666,9126 @@ createDeprecatedModule('resolver');
   });
   exports.default = _isFastboot.default ? najax : Ember.$.ajax;
 });
+;define('ember-bootstrap/components/base/bs-accordion', ['exports', 'ember-bootstrap/templates/components/bs-accordion', 'ember-bootstrap/utils/listen-to-cp'], function (exports, _bsAccordion, _listenToCp) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend({
+    layout: _bsAccordion.default,
+    ariaRole: 'tablist',
+
+    /**
+     * The value of the currently selected accordion item. Set this to change selection programmatically.
+     *
+     * When the selection is changed by user interaction this property will not update by using two-way bindings in order
+     * to follow DDAU best practices. If you want to react to such changes, subscribe to the `onChange` action
+     *
+     * @property selected
+     * @public
+     */
+    selected: null,
+
+    /**
+     * @property itemComponent
+     * @type {String}
+     * @private
+     */
+    itemComponent: 'bs-accordion/item',
+
+    /**
+     * The value of the currently selected accordion item
+     *
+     * @property isSelected
+     * @private
+     */
+    isSelected: (0, _listenToCp.default)('selected'),
+
+    /**
+     * Action when the selected accordion item is about to be changed.
+     *
+     * You can return false to prevent changing the active item, and do that in your action by
+     * setting the `selected` accordingly.
+     *
+     * @event onChange
+     * @param newValue
+     * @param oldValue
+     * @public
+     */
+    onChange(newValue, oldValue) {}, // eslint-disable-line no-unused-vars
+
+    actions: {
+      change(newValue) {
+        let oldValue = this.get('isSelected');
+        if (oldValue === newValue) {
+          newValue = null;
+        }
+        if (this.get('onChange')(newValue, oldValue) !== false) {
+          this.set('isSelected', newValue);
+        }
+      }
+    }
+
+  });
+});
+;define('ember-bootstrap/components/base/bs-accordion/item', ['exports', 'ember-bootstrap/mixins/type-class', 'ember-bootstrap/templates/components/bs-accordion/item'], function (exports, _typeClass, _item) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend(_typeClass.default, {
+    layout: _item.default,
+
+    /**
+     * Add additional binding to mark the entire component area disabled
+     */
+    classNameBindings: ['disabled'],
+    /**
+     * The title of the accordion item, displayed as a .panel-title element
+     *
+     * @property title
+     * @type string
+     * @public
+     */
+    title: null,
+
+    /**
+     * The value of the accordion item, which is used as the value of the `selected` property of the parent [Components.Accordion](Components.Accordion.html) component
+     *
+     * @property value
+     * @public
+     */
+    value: Ember.computed.oneWay('elementId'),
+
+    /**
+     * @property selected
+     * @private
+     */
+    selected: null,
+
+    /**
+     * @property titleComponent
+     * @type {String}
+     * @private
+     */
+    titleComponent: 'bs-accordion/item/title',
+
+    /**
+     * @property bodyComponent
+     * @type {String}
+     * @private
+     */
+    bodyComponent: 'bs-accordion/item/body',
+
+    /**
+     * @property collapsed
+     * @type boolean
+     * @readonly
+     * @private
+     */
+    collapsed: Ember.computed('value', 'selected', function () {
+      return this.get('value') !== this.get('selected');
+    }).readOnly(),
+
+    /**
+     * @property active
+     * @type boolean
+     * @readonly
+     * @private
+     */
+    active: Ember.computed.not('collapsed'),
+
+    /**
+     * @property disabled
+     * @type boolean
+     * @public
+     */
+    disabled: false,
+
+    /**
+     * Reference to the parent `Components.Accordion` class.
+     *
+     * @property accordion
+     * @private
+     */
+    accordion: null,
+
+    /**
+     * @event onClick
+     * @public
+     */
+    onClick() {}
+
+  });
+});
+;define('ember-bootstrap/components/base/bs-accordion/item/body', ['exports', 'ember-bootstrap/templates/components/bs-accordion/body'], function (exports, _body) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend({
+    layout: _body.default,
+    tagName: '',
+
+    /**
+     * @property collapsed
+     * @type boolean
+     * @public
+     */
+    collapsed: null,
+
+    /**
+     * @property collapseComponent
+     * @type {String}
+     * @private
+     */
+    collapseComponent: 'bs-collapse'
+  });
+});
+;define('ember-bootstrap/components/base/bs-accordion/item/title', ['exports', 'ember-bootstrap/templates/components/bs-accordion/title'], function (exports, _title) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend({
+    layout: _title.default,
+    ariaRole: 'tab',
+    classNameBindings: ['collapsed:collapsed:expanded'],
+
+    /**
+     * @property collapsed
+     * @type boolean
+     * @public
+     */
+    collapsed: null,
+
+    /**
+     * @property disabled
+     * @type boolean
+     * @private
+     */
+    disabled: false,
+
+    /**
+     * @event onClick
+     * @public
+     */
+    onClick() {},
+
+    click(e) {
+      e.preventDefault();
+      if (!this.get('disabled')) {
+        this.get('onClick')();
+      }
+    }
+
+  });
+});
+;define('ember-bootstrap/components/base/bs-alert', ['exports', 'ember-bootstrap/mixins/transition-support', 'ember-bootstrap/templates/components/bs-alert', 'ember-bootstrap/mixins/type-class', 'ember-bootstrap/utils/listen-to-cp'], function (exports, _transitionSupport, _bsAlert, _typeClass, _listenToCp) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend(_typeClass.default, _transitionSupport.default, {
+    layout: _bsAlert.default,
+    classNameBindings: ['alert', 'fade', 'dismissible:alert-dismissible'],
+
+    /**
+     * A dismissible alert will have a close button in the upper right corner, that the user can click to dismiss
+     * the alert.
+     *
+     * @property dismissible
+     * @type boolean
+     * @default true
+     * @public
+     */
+    dismissible: true,
+
+    /**
+     * If true the alert is completely hidden. Will be set when the fade animation has finished.
+     *
+     * @property hidden
+     * @type boolean
+     * @default false
+     * @readonly
+     * @private
+     */
+    hidden: false,
+
+    /**
+     * This property controls if the alert should be visible. If false it might still be in the DOM until the fade animation
+     * has completed.
+     *
+     * When the alert is dismissed by user interaction this property will not update by using two-way bindings in order
+     * to follow DDAU best practices. If you want to react to such changes, subscribe to the `onDismiss` action
+     *
+     * @property visible
+     * @type boolean
+     * @default true
+     * @public
+     */
+    visible: true,
+
+    /**
+     * @property _visible
+     * @private
+     */
+    _visible: (0, _listenToCp.default)('visible'),
+
+    /**
+     * @property notVisible
+     * @private
+     */
+    notVisible: Ember.computed.not('_visible'),
+
+    /**
+     * Set to false to disable the fade out animation when hiding the alert.
+     *
+     * @property fade
+     * @type boolean
+     * @default true
+     * @public
+     */
+    fade: true,
+
+    /**
+     * Computed property to set the alert class to the component div. Will be false when dismissed to have the component
+     * div (which cannot be removed form DOM by the component itself) without any markup.
+     *
+     * @property alert
+     * @type boolean
+     * @private
+     */
+    alert: Ember.computed.not('hidden'),
+    showAlert: Ember.computed.and('_visible', 'fade'),
+
+    /**
+     * @property classTypePrefix
+     * @type String
+     * @default 'alert'
+     * @private
+     */
+    classTypePrefix: 'alert',
+
+    /**
+     * The duration of the fade out animation
+     *
+     * @property fadeDuration
+     * @type number
+     * @default 150
+     * @public
+     */
+    fadeDuration: 150,
+
+    /**
+     * The action to be sent after the alert has been dismissed (including the CSS transition).
+     *
+     * @event onDismissed
+     * @public
+     */
+    onDismissed() {},
+
+    /**
+     * The action is called when the close button is clicked.
+     *
+     * You can return false to prevent closing the alert automatically, and do that in your action by
+     * setting `visible` to false.
+     *
+     * @event onDismiss
+     * @public
+     */
+    onDismiss() {},
+
+    actions: {
+      dismiss() {
+        if (this.get('onDismiss')() !== false) {
+          this.set('_visible', false);
+        }
+      }
+    },
+
+    /**
+     * Call to make the alert visible again after it has been hidden
+     *
+     * @method show
+     * @private
+     */
+    show() {
+      this.set('hidden', false);
+    },
+
+    /**
+     * Call to hide the alert. If the `fade` property is true, this will fade out the alert before being finally
+     * dismissed.
+     *
+     * @method hide
+     * @private
+     */
+    hide() {
+      if (this.get('usesTransition')) {
+        Ember.run.later(this, function () {
+          if (!this.get('isDestroyed')) {
+            this.set('hidden', true);
+            this.get('onDismissed')();
+          }
+        }, this.get('fadeDuration'));
+      } else {
+        this.set('hidden', true);
+        this.get('onDismissed')();
+      }
+    },
+
+    init() {
+      this._super(...arguments);
+      this.set('hidden', !this.get('_visible'));
+    },
+
+    _observeIsVisible: Ember.observer('_visible', function () {
+      if (this.get('_visible')) {
+        this.show();
+      } else {
+        this.hide();
+      }
+    })
+  });
+});
+;define('ember-bootstrap/components/base/bs-button-group', ['exports', 'ember-bootstrap/templates/components/bs-button-group', 'ember-bootstrap/mixins/size-class'], function (exports, _bsButtonGroup, _sizeClass) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend(_sizeClass.default, {
+    layout: _bsButtonGroup.default,
+    ariaRole: 'group',
+    classNameBindings: ['vertical:btn-group-vertical:btn-group', 'justified:btn-group-justified'],
+
+    /**
+     * @property buttonComponent
+     * @type {String}
+     * @private
+     */
+    buttonComponent: 'bs-button-group/button',
+
+    /**
+     * @property classTypePrefix
+     * @type String
+     * @default 'btn-group'
+     * @protected
+     */
+    classTypePrefix: 'btn-group',
+
+    /**
+     * Set to true for a vertically stacked button group, see http://getbootstrap.com/components/#btn-groups-vertical
+     *
+     * @property vertical
+     * @type boolean
+     * @default false
+     * @public
+     */
+    vertical: false,
+
+    /**
+     * Set to true for the buttons to stretch at equal sizes to span the entire width of its parent.
+     *
+     * *Important*: You have to wrap every button component in a `div class="btn-group">`:
+     *
+     * ```handlebars
+     * <div class="btn-group" role="group">
+     * {{#bs-button}}My Button{{/bs-button}}
+     * </div>
+     * ```
+     *
+     * See http://getbootstrap.com/components/#btn-groups-justified
+     *
+     * @property justified
+     * @type boolean
+     * @default false
+     * @public
+     */
+    justified: false,
+
+    /**
+     * The type of the button group specifies how child buttons behave and how the `value` property will be computed:
+     *
+     * ### null
+     * If `type` is not set (null), the button group will add no functionality besides Bootstrap styling
+     *
+     * ### radio
+     * if `type` is set to "radio", the buttons will behave like radio buttons:
+     * * the `value` property of the button group will reflect the `value` property of the active button
+     * * thus only one button may be active
+     *
+     * ### checkbox
+     * if `type` is set to "checkbox", the buttons will behave like checkboxes:
+     * * any number of buttons may be active
+     * * the `value` property of the button group will be an array containing the `value` properties of all active buttons
+     *
+     * @property type
+     * @type string
+     * @default null
+     * @public
+     */
+    type: null,
+
+    /**
+     * The value of the button group, computed by its child buttons.
+     * See the `type` property for how the value property is constructed.
+     *
+     * When you set the value, the corresponding buttons will be activated:
+     * * use a single value for a radio button group to activate the button with the same value
+     * * use an array of values for a checkbox button group to activate all the buttons with values contained in the array
+     *
+     * @property value
+     * @type array
+     * @public
+     */
+    value: undefined,
+
+    /**
+     * @property isRadio
+     * @type boolean
+     * @private
+     */
+    isRadio: Ember.computed.equal('type', 'radio').readOnly(),
+
+    /**
+     * This action is called whenever the button group's value should be changed because the user clicked a button.
+     * You will receive the new value of the button group (based on the `type` property), which you should use to update the
+     * `value` property.
+     *
+     * @event onChange
+     * @param {*} value
+     * @public
+     */
+    onChange() {},
+
+    actions: {
+      buttonPressed(pressedValue) {
+        let newValue;
+
+        if (this.get('isRadio')) {
+          newValue = pressedValue;
+        } else {
+          if (!Ember.isArray(this.get('value'))) {
+            newValue = Ember.A([pressedValue]);
+          } else {
+            newValue = Ember.A(this.get('value').slice());
+            if (newValue.includes(pressedValue)) {
+              newValue.removeObject(pressedValue);
+            } else {
+              newValue.pushObject(pressedValue);
+            }
+          }
+        }
+
+        this.get('onChange')(newValue);
+      }
+    }
+  });
+});
+;define('ember-bootstrap/components/base/bs-button-group/button', ['exports', 'ember-bootstrap/components/bs-button'], function (exports, _bsButton) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _bsButton.default.extend({
+
+    /**
+     * @property groupValue
+     * @private
+     */
+    groupValue: null,
+
+    /**
+     * @property buttonGroupType
+     * @type string
+     * @private
+     */
+    buttonGroupType: false,
+
+    /**
+     * @property active
+     * @type boolean
+     * @readonly
+     * @private
+     */
+    active: Ember.computed('buttonGroupType', 'groupValue.[]', 'value', function () {
+      let { value, groupValue } = this.getProperties('value', 'groupValue');
+      if (this.get('buttonGroupType') === 'radio') {
+        return value === groupValue;
+      } else {
+        if (Ember.isArray(groupValue)) {
+          return groupValue.indexOf(value) !== -1;
+        }
+      }
+      return false;
+    }).readOnly()
+
+  });
+});
+;define('ember-bootstrap/components/base/bs-button', ['exports', 'ember-bootstrap/templates/components/bs-button', 'ember-bootstrap/mixins/type-class', 'ember-bootstrap/mixins/size-class'], function (exports, _bsButton, _typeClass, _sizeClass) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend(_typeClass.default, _sizeClass.default, {
+    layout: _bsButton.default,
+    tagName: 'button',
+    classNames: ['btn'],
+    classNameBindings: ['active', 'block:btn-block'],
+
+    /**
+     * @property classTypePrefix
+     * @type String
+     * @default 'btn'
+     * @private
+     */
+    classTypePrefix: 'btn',
+
+    attributeBindings: ['disabled', 'buttonType:type', 'title'],
+
+    /**
+     * Default label of the button. Not need if used as a block component
+     *
+     * @property defaultText
+     * @type string
+     * @public
+     */
+    defaultText: null,
+
+    /**
+     * Label of the button used if `onClick` event has returned a Promise which is pending.
+     * Not considered if used as a block component.
+     *
+     * @property pendingText
+     * @type string
+     * @public
+     */
+    pendingText: undefined,
+
+    /**
+     * Label of the button used if `onClick` event has returned a Promise which succeeded.
+     * Not considered if used as a block component.
+     *
+     * @property fulfilledText
+     * @type string
+     * @public
+     */
+    fulfilledText: undefined,
+
+    /**
+     * @property resolvedText
+     * @type string
+     * @deprecated
+     * @public
+     */
+    resolvedText: Ember.computed.deprecatingAlias('fulfilledText', {
+      id: 'ember-bootstrap.bs-button-resolved-text',
+      until: '3.0.0'
+    }),
+
+    /**
+     * Label of the button used if `onClick` event has returned a Promise which failed.
+     * Not considered if used as a block component.
+     *
+     * @property rejectedText
+     * @type string
+     * @public
+     */
+    rejectedText: undefined,
+
+    /**
+     * Property to disable the button
+     *
+     * @property disabled
+     * @type boolean
+     * @default false
+     * @public
+     */
+    disabled: false,
+
+    /**
+     * Set the type of the button, either 'button' or 'submit'
+     *
+     * @property buttonType
+     * @type String
+     * @default 'button'
+     * @public
+     */
+    buttonType: 'button',
+
+    /**
+     * Set the 'active' class to apply active/pressed CSS styling
+     *
+     * @property active
+     * @type boolean
+     * @default false
+     * @public
+     */
+    active: false,
+
+    /**
+     * Property for block level buttons
+     *
+     * See the [Bootstrap docs](http://getbootstrap.com/css/#buttons-sizes)
+     * @property block
+     * @type boolean
+     * @default false
+     * @public
+     */
+    block: false,
+
+    /**
+     * A click event on a button will not bubble up the DOM tree if it has an `onClick` action handler. Set to true to
+     * enable the event to bubble
+     *
+     * @property bubble
+     * @type boolean
+     * @default false
+     * @public
+     */
+    bubble: false,
+
+    /**
+     * If button is active and this is set, the icon property will match this property
+     *
+     * @property iconActive
+     * @type String
+     * @public
+     */
+    iconActive: null,
+
+    /**
+     * If button is inactive and this is set, the icon property will match this property
+     *
+     * @property iconInactive
+     * @type String
+     * @public
+     */
+    iconInactive: null,
+
+    /**
+     * Class(es) (e.g. glyphicons or font awesome) to use as a button icon
+     * This will render a <i class="{{icon}}"></i> element in front of the button's label
+     *
+     * @property icon
+     * @type String
+     * @readonly
+     * @protected
+     */
+    icon: Ember.computed('active', function () {
+      if (this.get('active')) {
+        return this.get('iconActive');
+      } else {
+        return this.get('iconInactive');
+      }
+    }),
+
+    /**
+     * Supply a value that will be associated with this button. This will be send
+     * as a parameter of the default action triggered when clicking the button
+     *
+     * @property value
+     * @type any
+     * @public
+     */
+    value: null,
+
+    /**
+     * Controls if `onClick` action is fired concurrently. If `true` clicking button multiple times will not trigger
+     * `onClick` action if a Promise returned by previous click is not settled yet.
+     *
+     * This does not affect event bubbling.
+     *
+     * @property preventConcurrency
+     * @type Boolean
+     * @default false
+     * @public
+     */
+    preventConcurrency: false,
+
+    /**
+     * State of the button. The button's label (if not used as a block component) will be set to the
+     * `<state>Text` property.
+     * This property will automatically be set when using a click action that supplies the callback with a promise.
+     * Possible values are: "default" > "pending" > "fulfilled" / "rejected".
+     * It could be reseted by `reset` property.
+     *
+     * @property state
+     * @type String
+     * @default 'default'
+     * @private
+     */
+    state: 'default',
+
+    /**
+     * Promise returned by `onClick` event is pending.
+     *
+     * @property isPending
+     * @type Boolean
+     * @private
+     */
+    isPending: Ember.computed.equal('state', 'pending'),
+
+    /**
+     * Promise returned by `onClick` event has been succeeded.
+     *
+     * @property isFulfilled
+     * @type Boolean
+     * @private
+     */
+    isFulfilled: Ember.computed.equal('state', 'fulfilled'),
+
+    /**
+     * Promise returned by `onClick` event has been rejected.
+     *
+     * @property isRejected
+     * @type Boolean
+     * @private
+     */
+    isRejected: Ember.computed.equal('state', 'rejected'),
+
+    /**
+     * Promise returned by `onClick` event has been succeeded or rejected.
+     *
+     * @property isFulfilled
+     * @type Boolean
+     * @private
+     */
+    isSettled: Ember.computed.or('isFulfilled', 'isRejected'),
+
+    /**
+     * Set this to `true` to reset the `state`. A typical use case is to bind this attribute with ember-data isDirty flag.
+     *
+     * The old value is not taken into consideration. Setting a `true` value to `true` again will also reset `state`.
+     * In that case it's even to notify the observer system that the property has changed by calling
+     * [`notifyPropertyChange()`](https://www.emberjs.com/api/ember/3.2/classes/EmberObject/methods/notifyPropertyChange?anchor=notifyPropertyChange).
+     *
+     * @property reset
+     * @type boolean
+     * @public
+     */
+    reset: null,
+
+    /**
+     * The HTML title attribute
+     *
+     * @property title
+     * @type string
+     * @public
+     */
+    title: null,
+
+    /**
+     * When clicking the button this action is called with the value of the button (that is the value of the "value" property).
+     *
+     * Return a promise object, and the buttons state will automatically set to "pending", "resolved" and/or "rejected".
+     * This could be used to automatically set the button's text depending on promise state (`defaultText`, `pendingText`,
+     * `fulfilledText`, `rejectedText`) and for futher customization using the yielded `isPending`, `isFulfilled`,
+     * `isRejected` properties.
+     *
+     * The click event will not bubble up, unless you set `bubble` to true.
+     *
+     * @event onClick
+     * @param {*} value
+     * @public
+     */
+    onClick: null,
+
+    /**
+     * This will reset the state property to 'default', and with that the button's label to defaultText
+     *
+     * @method resetState
+     * @private
+     */
+    resetState() {
+      this.set('state', 'default');
+    },
+
+    resetObserver: Ember.observer('reset', function () {
+      if (this.get('reset')) {
+        Ember.run.scheduleOnce('actions', this, 'resetState');
+      }
+    }),
+
+    text: Ember.computed('state', 'defaultText', 'pendingText', 'fulfilledText', 'rejectedText', function () {
+      return this.getWithDefault(`${this.get('state')}Text`, this.get('defaultText'));
+    }),
+
+    /**
+     * @method click
+     * @private
+     */
+    click() {
+      let action = this.get('onClick');
+      let preventConcurrency = this.get('preventConcurrency');
+
+      if (action === null) {
+        return;
+      }
+
+      if (!preventConcurrency || !this.get('isPending')) {
+        let promise = action(this.get('value'));
+        if (promise && typeof promise.then === 'function' && !this.get('isDestroyed')) {
+          this.set('state', 'pending');
+          promise.then(() => {
+            if (!this.get('isDestroyed')) {
+              this.set('state', 'fulfilled');
+            }
+          }, () => {
+            if (!this.get('isDestroyed')) {
+              this.set('state', 'rejected');
+            }
+          });
+        }
+      }
+
+      return this.get('bubble');
+    },
+
+    init() {
+      this._super(...arguments);
+      this.get('reset');
+    }
+
+  });
+});
+;define('ember-bootstrap/components/base/bs-carousel', ['exports', 'ember-bootstrap/components/bs-carousel/slide', 'ember-bootstrap/mixins/component-parent', 'ember-bootstrap/templates/components/bs-carousel', 'ember-concurrency'], function (exports, _slide, _componentParent, _bsCarousel, _emberConcurrency) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend(_componentParent.default, {
+    attributeBindings: ['tabindex'],
+    classNames: ['carousel', 'slide'],
+    layout: _bsCarousel.default,
+    tabindex: '1',
+
+    /**
+     * @property slideComponent
+     * @type {String}
+     * @private
+     */
+    slideComponent: 'bs-carousel/slide',
+
+    /**
+     * If a slide can turn to left, including corners.
+     *
+     * @private
+     * @property canTurnToLeft
+     */
+    canTurnToLeft: Ember.computed('wrap', 'currentIndex', function () {
+      return this.get('wrap') || this.get('currentIndex') > 0;
+    }),
+
+    /**
+     * If a slide can turn to right, including corners.
+     *
+     * @private
+     * @property canTurnToRight
+     */
+    canTurnToRight: Ember.computed('childSlides.length', 'wrap', 'currentIndex', function () {
+      return this.get('wrap') || this.get('currentIndex') < this.get('childSlides.length') - 1;
+    }),
+
+    /**
+     * All `CarouselSlide` child components.
+     *
+     * @private
+     * @property childSlides
+     * @readonly
+     * @type array
+     */
+    childSlides: Ember.computed.filter('children', function (view) {
+      return view instanceof _slide.default;
+    }).readOnly(),
+
+    /**
+     * This observer is the entry point for real time insertion and removing of slides.
+     *
+     * @private
+     * @property childSlidesObserver
+     */
+    childSlidesObserver: Ember.observer('childSlides.[]', 'autoPlay', function () {
+      Ember.run.scheduleOnce('actions', () => {
+        let childSlides = this.get('childSlides');
+        if (childSlides.length === 0) {
+          return;
+        }
+        // Sets new current index
+        let currentIndex = this.get('currentIndex');
+        if (currentIndex >= childSlides.length) {
+          currentIndex = childSlides.length - 1;
+          this.set('currentIndex', currentIndex);
+        }
+        // Automatic sliding
+        if (this.get('autoPlay')) {
+          this.get('waitIntervalToInitCycle').perform();
+        }
+        // Initial slide state
+        this.set('presentationState', null);
+      });
+    }),
+
+    /**
+     * Indicates the current index of the current slide.
+     *
+     * @property currentIndex
+     * @private
+     */
+    currentIndex: null,
+
+    /**
+     * The current slide object that is going to be used by the nested slides components.
+     *
+     * @property currentSlide
+     * @private
+     *
+     */
+    currentSlide: Ember.computed('childSlides', 'currentIndex', function () {
+      return this.get('childSlides').objectAt(this.get('currentIndex'));
+    }).readOnly(),
+
+    /**
+     * Bootstrap style to indicate that a given slide should be moving to left/right.
+     *
+     * @property directionalClassName
+     * @private
+     * @type string
+     */
+    directionalClassName: null,
+
+    /**
+     * Indicates the next slide index to move into.
+     *
+     * @property followingIndex
+     * @private
+     * @type number
+     */
+    followingIndex: null,
+
+    /**
+     * The following slide object that is going to be used by the nested slides components.
+     *
+     * @property followingIndex
+     * @private
+     */
+    followingSlide: Ember.computed('childSlides', 'followingIndex', function () {
+      return this.get('childSlides').objectAt(this.get('followingIndex'));
+    }).readOnly(),
+
+    /**
+     * @private
+     * @property hasInterval
+     * @type boolean
+     */
+    hasInterval: Ember.computed.gt('interval', 0).readOnly(),
+
+    /**
+     * This observer is the entry point for programmatically slide changing.
+     *
+     * @property indexObserver
+     * @private
+     */
+    indexObserver: Ember.observer('index', function () {
+      this.send('toSlide', this.get('index'));
+    }),
+
+    /**
+     * @property indicators
+     * @private
+     */
+    indicators: Ember.computed('childSlides.length', function () {
+      return [...Array(this.get('childSlides.length'))];
+    }),
+
+    /**
+     * If user is hovering its cursor on component.
+     * This property is only manipulated when 'pauseOnMouseEnter' is true.
+     *
+     * @property isMouseHovering
+     * @private
+     * @type boolean
+     */
+    isMouseHovering: false,
+
+    /**
+     * The class name to append to the next control link element.
+     *
+     * @property nextControlClassName
+     * @type string
+     * @private
+     */
+    nextControlClassName: null,
+
+    /**
+     * Bootstrap style to indicate the next/previous slide.
+     *
+     * @property orderClassName
+     * @private
+     * @type string
+     */
+    orderClassName: null,
+
+    /**
+     * The current state of the current presentation, can be either "didTransition"
+     * or "willTransit".
+     *
+     * @private
+     * @property presentationState
+     * @type string
+     */
+    presentationState: null,
+
+    /**
+     * The class name to append to the previous control link element.
+     *
+     * @property prevControlClassName
+     * @type string
+     * @private
+     */
+    prevControlClassName: null,
+
+    /**
+     * @private
+     * @property shouldNotDoPresentation
+     * @type boolean
+     */
+    shouldNotDoPresentation: Ember.computed.lte('childSlides.length', 1),
+
+    /**
+     * @private
+     * @property shouldRunAutomatically
+     * @type boolean
+     */
+    shouldRunAutomatically: Ember.computed.readOnly('hasInterval'),
+
+    /**
+     * Starts automatic sliding on page load.
+     * This parameter has no effect if interval is less than or equal to zero.
+     *
+     * @default false
+     * @property autoPlay
+     * @public
+     * @type boolean
+     */
+    autoPlay: false,
+
+    /**
+     * If false will hard stop on corners, i.e., first slide won't make a transition to the
+     * last slide and vice versa.
+     *
+     * @default true
+     * @property wrap
+     * @public
+     * @type boolean
+     */
+    wrap: true,
+
+    /**
+     * Index of starting slide.
+     *
+     * @default 0
+     * @property index
+     * @public
+     * @type number
+     */
+    index: 0,
+
+    /**
+     * Waiting time before automatically show another slide.
+     * Automatic sliding is canceled if interval is less than or equal to zero.
+     *
+     * @default 5000
+     * @property interval
+     * @public
+     * @type number
+     */
+    interval: 5000,
+
+    /**
+     * Should bind keyboard events into sliding.
+     *
+     * @default true
+     * @property keyboard
+     * @public
+     * @type boolean
+     */
+    keyboard: true,
+
+    /**
+     * If automatic sliding should be left-to-right or right-to-left.
+     * This parameter has no effect if interval is less than or equal to zero.
+     *
+     * @default true
+     * @property ltr
+     * @public
+     * @type boolean
+     */
+    ltr: true,
+
+    /**
+     * The next control icon to be displayed.
+     *
+     * @default null
+     * @property nextControlIcon
+     * @type string
+     * @public
+     */
+    nextControlIcon: null,
+
+    /**
+     * Label for screen readers, defaults to 'Next'.
+     *
+     * @default 'Next'
+     * @property nextControlLabel
+     * @type string
+     * @public
+     */
+    nextControlLabel: 'Next',
+
+    /**
+     * Pauses automatic sliding if mouse cursor is hovering the component.
+     * This parameter has no effect if interval is less than or equal to zero.
+     *
+     * @default true
+     * @property pauseOnMouseEnter
+     * @public
+     * @type boolean
+     */
+    pauseOnMouseEnter: true,
+
+    /**
+     * The previous control icon to be displayed.
+     *
+     * @default null
+     * @property prevControlIcon
+     * @type string
+     * @public
+     */
+    prevControlIcon: null,
+
+    /**
+     * Label for screen readers, defaults to 'Previous'.
+     *
+     * @default 'Previous'
+     * @property prevControlLabel
+     * @type string
+     * @public
+     */
+    prevControlLabel: 'Previous',
+
+    /**
+     * Show or hide controls.
+     *
+     * @default true
+     * @property showControls
+     * @public
+     * @type boolean
+     */
+    showControls: true,
+
+    /**
+     * Show or hide indicators.
+     *
+     * @default true
+     * @property showIndicators
+     * @public
+     * @type boolean
+     */
+    showIndicators: true,
+
+    /**
+     * The duration of the slide transition.
+     * You should also change this parameter in Bootstrap CSS file.
+     *
+     * @default 600
+     * @property transitionDuration
+     * @public
+     * @type number
+     */
+    transitionDuration: 600,
+
+    /**
+     * The type slide transition to perform.
+     * Options are 'fade' or 'slide'. Note: BS4 only
+     *
+     * @default 'slide'
+     * @property transition
+     * @public
+     * @type string
+     */
+    transition: 'slide',
+
+    /**
+     * Do a presentation and calls itself to perform a cycle.
+     *
+     * @method cycle
+     * @private
+     */
+    cycle: (0, _emberConcurrency.task)(function* () {
+      yield this.get('transitioner').perform();
+      yield (0, _emberConcurrency.timeout)(this.get('interval'));
+      this.toAppropriateSlide();
+    }).restartable(),
+
+    /**
+     * @method transitioner
+     * @private
+     */
+    transitioner: (0, _emberConcurrency.task)(function* () {
+      this.set('presentationState', 'willTransit');
+      yield (0, _emberConcurrency.timeout)(this.get('transitionDuration'));
+      this.set('presentationState', 'didTransition');
+      // Must change current index after execution of 'presentationStateObserver' method
+      // from child components.
+      yield new Ember.RSVP.Promise(resolve => {
+        Ember.run.schedule('afterRender', this, function () {
+          this.set('currentIndex', this.get('followingIndex'));
+          resolve();
+        });
+      });
+    }).drop(),
+
+    /**
+     * Waits an interval time to start a cycle.
+     *
+     * @method waitIntervalToInitCycle
+     * @private
+     */
+    waitIntervalToInitCycle: (0, _emberConcurrency.task)(function* () {
+      if (this.get('shouldRunAutomatically') === false) {
+        return;
+      }
+      yield (0, _emberConcurrency.timeout)(this.get('interval'));
+      this.toAppropriateSlide();
+    }).restartable(),
+
+    actions: {
+      toSlide(toIndex) {
+        if (this.get('currentIndex') === toIndex || this.get('shouldNotDoPresentation')) {
+          return;
+        }
+        this.assignClassNameControls(toIndex);
+        this.setFollowingIndex(toIndex);
+        if (this.get('shouldRunAutomatically') === false || this.get('isMouseHovering')) {
+          this.get('transitioner').perform();
+        } else {
+          this.get('cycle').perform();
+        }
+      },
+
+      toNextSlide() {
+        if (this.get('canTurnToRight')) {
+          this.send('toSlide', this.get('currentIndex') + 1);
+        }
+      },
+
+      toPrevSlide() {
+        if (this.get('canTurnToLeft')) {
+          this.send('toSlide', this.get('currentIndex') - 1);
+        }
+      }
+    },
+
+    /**
+     * Indicates what class names should be applicable to the current transition slides.
+     *
+     * @method assignClassNameControls
+     * @private
+     */
+    assignClassNameControls(toIndex) {
+      if (toIndex < this.get('currentIndex')) {
+        this.set('directionalClassName', 'right');
+        this.set('orderClassName', 'prev');
+      } else {
+        this.set('directionalClassName', 'left');
+        this.set('orderClassName', 'next');
+      }
+    },
+
+    /**
+     * Initial page loading configuration.
+     */
+    didInsertElement() {
+      this._super(...arguments);
+      this.registerEvents();
+      this.set('currentIndex', this.get('index'));
+      this.triggerChildSlidesObserver();
+    },
+
+    /**
+     * mouseEnter() and mouseLeave() doesn't work with ember-native-dom-event-dispatcher.
+     *
+     * @method registerEvents
+     * @private
+     */
+    registerEvents() {
+      let self = this;
+      this.element.addEventListener('mouseenter', function () {
+        if (self.get('pauseOnMouseEnter')) {
+          self.set('isMouseHovering', true);
+          self.get('cycle').cancelAll();
+          self.get('waitIntervalToInitCycle').cancelAll();
+        }
+      });
+      this.element.addEventListener('mouseleave', function () {
+        if (self.get('pauseOnMouseEnter') && (self.get('transitioner.last') !== null || self.get('waitIntervalToInitCycle.last') !== null)) {
+          self.set('isMouseHovering', false);
+          self.get('waitIntervalToInitCycle').perform();
+        }
+      });
+    },
+
+    keyDown: function (e) {
+      let code = e.keyCode || e.which;
+      if (this.get('keyboard') === false || /input|textarea/i.test(e.target.tagName)) {
+        return;
+      }
+      switch (code) {
+        case 37:
+          this.send('toPrevSlide');
+          break;
+        case 39:
+          this.send('toNextSlide');
+          break;
+        default:
+          break;
+      }
+    },
+
+    /**
+     * Sets the following slide index within the lower and upper bounds.
+     *
+     * @method setFollowingIndex
+     * @private
+     */
+    setFollowingIndex(toIndex) {
+      let slidesLengthMinusOne = this.get('childSlides').length - 1;
+      if (toIndex > slidesLengthMinusOne) {
+        this.set('followingIndex', 0);
+      } else if (toIndex < 0) {
+        this.set('followingIndex', slidesLengthMinusOne);
+      } else {
+        this.set('followingIndex', toIndex);
+      }
+    },
+
+    /**
+     * Coordinates the correct slide movement direction.
+     *
+     * @method toAppropriateSlide
+     * @private
+     */
+    toAppropriateSlide() {
+      if (this.get('ltr')) {
+        this.send('toNextSlide');
+      } else {
+        this.send('toPrevSlide');
+      }
+    },
+
+    /**
+     * @method triggerChildSlidesObserver
+     * @private
+     */
+    triggerChildSlidesObserver() {
+      this.get('childSlides');
+    }
+  });
+});
+;define('ember-bootstrap/components/base/bs-carousel/slide', ['exports', 'ember-bootstrap/mixins/component-child', 'ember-bootstrap/templates/components/bs-carousel/slide'], function (exports, _componentChild, _slide) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend(_componentChild.default, {
+    classNameBindings: ['active'],
+    layout: _slide.default,
+
+    /**
+     * Defines slide visibility.
+     *
+     * @property active
+     * @type boolean
+     * @private
+     */
+    active: Ember.computed('isCurrentSlide', 'presentationState', function () {
+      return this.get('isCurrentSlide') && this.get('presentationState') === null;
+    }),
+
+    /**
+     * @private
+     * @property isCurrentSlide
+     * @type boolean
+     */
+    isCurrentSlide: Ember.computed('currentSlide', function () {
+      return this.get('currentSlide') === this;
+    }).readOnly(),
+
+    /**
+     * @private
+     * @property isFollowingSlide
+     * @type boolean
+     */
+    isFollowingSlide: Ember.computed('followingSlide', function () {
+      return this.get('followingSlide') === this;
+    }).readOnly(),
+
+    /**
+     * Slide is moving to the left.
+     *
+     * @property left
+     * @type boolean
+     * @private
+     */
+    left: false,
+
+    /**
+     * Next to appear in a left sliding.
+     *
+     * @property next
+     * @type boolean
+     * @private
+     */
+    next: false,
+
+    /**
+     * Next to appear in a right sliding.
+     *
+     * @property prev
+     * @type boolean
+     * @private
+     */
+    prev: false,
+
+    /**
+     * Slide is moving to the right.
+     *
+     * @property right
+     * @type boolean
+     * @private
+     */
+    right: false,
+
+    /**
+     * Coordinates the execution of a presentation.
+     *
+     * @method presentationStateObserver
+     * @private
+     */
+    presentationStateObserver: Ember.observer('presentationState', function () {
+      let presentationState = this.get('presentationState');
+      if (this.get('isCurrentSlide')) {
+        switch (presentationState) {
+          case 'didTransition':
+            this.currentSlideDidTransition();
+            break;
+          case 'willTransit':
+            this.currentSlideWillTransit();
+            break;
+        }
+      }
+      if (this.get('isFollowingSlide')) {
+        switch (presentationState) {
+          case 'didTransition':
+            this.followingSlideDidTransition();
+            break;
+          case 'willTransit':
+            this.followingSlideWillTransit();
+            break;
+        }
+      }
+    }),
+
+    /**
+     * @method currentSlideDidTransition
+     * @private
+     */
+    currentSlideDidTransition() {
+      this.set(this.get('directionalClassName'), false);
+      this.set('active', false);
+    },
+
+    /**
+     * @method currentSlideWillTransit
+     * @private
+     */
+    currentSlideWillTransit() {
+      this.set('active', true);
+      Ember.run.next(this, function () {
+        this.set(this.get('directionalClassName'), true);
+      });
+    },
+
+    /**
+     * @method followingSlideDidTransition
+     * @private
+     */
+    followingSlideDidTransition() {
+      this.set('active', true);
+      this.set(this.get('directionalClassName'), false);
+      this.set(this.get('orderClassName'), false);
+    },
+
+    /**
+     * @method followingSlideWillTransit
+     * @private
+     */
+    followingSlideWillTransit() {
+      this.set(this.get('orderClassName'), true);
+      Ember.run.next(this, function () {
+        this.reflow();
+        this.set(this.get('directionalClassName'), true);
+      });
+    },
+
+    /**
+     * Makes things more stable, especially when fast changing.
+     */
+    reflow() {
+      this.element.offsetHeight;
+    }
+  });
+});
+;define('ember-bootstrap/components/base/bs-collapse', ['exports', 'ember-bootstrap/utils/transition-end'], function (exports, _transitionEnd) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend({
+
+    classNameBindings: ['collapse', 'collapsing'],
+    attributeBindings: ['style'],
+
+    /**
+     * Collapsed/expanded state
+     *
+     * @property collapsed
+     * @type boolean
+     * @default true
+     * @public
+     */
+    collapsed: true,
+
+    /**
+     * True if this item is expanded
+     *
+     * @property active
+     * @private
+     */
+    active: false,
+
+    collapse: Ember.computed.not('transitioning'),
+    collapsing: Ember.computed.alias('transitioning'),
+    showContent: Ember.computed.and('collapse', 'active'),
+
+    /**
+     * true if the component is currently transitioning
+     *
+     * @property transitioning
+     * @type boolean
+     * @private
+     */
+    transitioning: false,
+
+    /**
+     * @property collapseSize
+     * @type number
+     * @private
+     */
+    collapseSize: null,
+
+    /**
+     * The size of the element when collapsed. Defaults to 0.
+     *
+     * @property collapsedSize
+     * @type number
+     * @default 0
+     * @public
+     */
+    collapsedSize: 0,
+
+    /**
+     * The size of the element when expanded. When null the value is calculated automatically to fit the containing elements.
+     *
+     * @property expandedSize
+     * @type number
+     * @default null
+     * @public
+     */
+    expandedSize: null,
+
+    /**
+     * Usually the size (height) of the element is only set while transitioning, and reseted afterwards. Set to true to always set a size.
+     *
+     * @property resetSizeWhenNotCollapsing
+     * @type boolean
+     * @default true
+     * @private
+     */
+    resetSizeWhenNotCollapsing: true,
+
+    /**
+     * The direction (height/width) of the collapse animation.
+     * When setting this to 'width' you should also define custom CSS transitions for the width property, as the Bootstrap
+     * CSS does only support collapsible elements for the height direction.
+     *
+     * @property collapseDimension
+     * @type string
+     * @default 'height'
+     * @public
+     */
+    collapseDimension: 'height',
+
+    /**
+     * The duration of the fade transition
+     *
+     * @property transitionDuration
+     * @type number
+     * @default 350
+     * @public
+     */
+    transitionDuration: 350,
+
+    style: Ember.computed('collapseSize', function () {
+      let size = this.get('collapseSize');
+      let dimension = this.get('collapseDimension');
+      if (Ember.isEmpty(size)) {
+        return Ember.String.htmlSafe('');
+      }
+      return Ember.String.htmlSafe(`${dimension}: ${size}px`);
+    }),
+
+    /**
+     * The action to be sent when the element is about to be hidden.
+     *
+     * @event onHide
+     * @public
+     */
+    onHide() {},
+
+    /**
+     * The action to be sent after the element has been completely hidden (including the CSS transition).
+     *
+     * @event onHidden
+     * @public
+     */
+    onHidden() {},
+
+    /**
+     * The action to be sent when the element is about to be shown.
+     *
+     * @event onShow
+     * @public
+     */
+    onShow() {},
+
+    /**
+     * The action to be sent after the element has been completely shown (including the CSS transition).
+     *
+     * @event onShown
+     * @public
+     */
+    onShown() {},
+
+    /**
+     * Triggers the show transition
+     *
+     * @method show
+     * @protected
+     */
+    show() {
+      this.get('onShow')();
+
+      this.setProperties({
+        transitioning: true,
+        collapseSize: this.get('collapsedSize'),
+        active: true
+      });
+
+      (0, _transitionEnd.default)(this.get('element'), this.get('transitionDuration')).then(() => {
+        if (this.get('isDestroyed')) {
+          return;
+        }
+        this.set('transitioning', false);
+        if (this.get('resetSizeWhenNotCollapsing')) {
+          this.set('collapseSize', null);
+        }
+        this.get('onShown')();
+      });
+
+      Ember.run.next(this, function () {
+        if (!this.get('isDestroyed')) {
+          this.set('collapseSize', this.getExpandedSize('show'));
+        }
+      });
+    },
+
+    /**
+     * Get the size of the element when expanded
+     *
+     * @method getExpandedSize
+     * @param action
+     * @return {Number}
+     * @private
+     */
+    getExpandedSize(action) {
+      let expandedSize = this.get('expandedSize');
+      if (Ember.isPresent(expandedSize)) {
+        return expandedSize;
+      }
+
+      let collapseElement = this.get('element');
+      let prefix = action === 'show' ? 'scroll' : 'offset';
+      let measureProperty = Ember.String.camelize(`${prefix}-${this.get('collapseDimension')}`);
+      return collapseElement[measureProperty];
+    },
+
+    /**
+     * Triggers the hide transition
+     *
+     * @method hide
+     * @protected
+     */
+    hide() {
+      this.get('onHide')();
+
+      this.setProperties({
+        transitioning: true,
+        collapseSize: this.getExpandedSize('hide'),
+        active: false
+      });
+
+      (0, _transitionEnd.default)(this.get('element'), this.get('transitionDuration')).then(() => {
+        if (this.get('isDestroyed')) {
+          return;
+        }
+        this.set('transitioning', false);
+        if (this.get('resetSizeWhenNotCollapsing')) {
+          this.set('collapseSize', null);
+        }
+        this.get('onHidden')();
+      });
+
+      Ember.run.next(this, function () {
+        if (!this.get('isDestroyed')) {
+          this.set('collapseSize', this.get('collapsedSize'));
+        }
+      });
+    },
+
+    _onCollapsedChange: Ember.observer('collapsed', function () {
+      let collapsed = this.get('collapsed');
+      let active = this.get('active');
+      if (collapsed !== active) {
+        return;
+      }
+      if (collapsed === false) {
+        this.show();
+      } else {
+        this.hide();
+      }
+    }),
+
+    init() {
+      this._super(...arguments);
+      this.set('active', !this.get('collapsed'));
+    },
+
+    _updateCollapsedSize: Ember.observer('collapsedSize', function () {
+      if (!this.get('resetSizeWhenNotCollapsing') && this.get('collapsed') && !this.get('collapsing')) {
+        this.set('collapseSize', this.get('collapsedSize'));
+      }
+    }),
+
+    _updateExpandedSize: Ember.observer('expandedSize', function () {
+      if (!this.get('resetSizeWhenNotCollapsing') && !this.get('collapsed') && !this.get('collapsing')) {
+        this.set('collapseSize', this.get('expandedSize'));
+      }
+    })
+  });
+});
+;define('ember-bootstrap/components/base/bs-contextual-help', ['exports', 'ember-bootstrap/mixins/transition-support', 'ember-bootstrap/utils/get-parent', 'ember-bootstrap/utils/transition-end'], function (exports, _transitionSupport, _getParent, _transitionEnd) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+
+
+  const InState = Ember.Object.extend({
+    hover: false,
+    focus: false,
+    click: false,
+    showHelp: Ember.computed.or('hover', 'focus', 'click')
+  });
+
+  function noop() {}
+
+  /**
+  
+   @class Components.ContextualHelp
+   @namespace Components
+   @extends Ember.Component
+   @uses Mixins.TransitionSupport
+   @private
+   */
+  exports.default = Ember.Component.extend(_transitionSupport.default, {
+    tagName: '',
+
+    /**
+     * @property title
+     * @type string
+     * @public
+     */
+    title: null,
+
+    /**
+     * How to position the tooltip/popover - top | bottom | left | right
+     *
+     * @property title
+     * @type string
+     * @default 'top'
+     * @public
+     */
+    placement: 'top',
+
+    /**
+     * By default it will dynamically reorient the tooltip/popover based on the available space in the viewport. For
+     * example, if `placement` is "left", the tooltip/popover will display to the left when possible, otherwise it will
+     * display right. Set to `false` to force placement according to the `placement` property
+     *
+     * @property autoPlacement
+     * @type boolean
+     * @default true
+     * @public
+     */
+    autoPlacement: true,
+
+    /**
+     * You can programmatically show the tooltip/popover by setting this to `true`
+     *
+     * @property visible
+     * @type boolean
+     * @default false
+     * @public
+     */
+    visible: false,
+
+    /**
+     * @property inDom
+     * @type boolean
+     * @private
+     */
+    inDom: Ember.computed.and('visible', 'triggerTargetElement'),
+
+    /**
+     * Set to false to disable fade animations.
+     *
+     * @property fade
+     * @type boolean
+     * @default true
+     * @public
+     */
+    fade: true,
+
+    /**
+     * Used to apply Bootstrap's visibility class
+     *
+     * @property showHelp
+     * @type boolean
+     * @default false
+     * @private
+     */
+    showHelp: Ember.computed.reads('visible'),
+
+    /**
+     * Delay showing and hiding the tooltip/popover (ms). Individual delays for showing and hiding can be specified by using the
+     * `delayShow` and `delayHide` properties.
+     *
+     * @property delay
+     * @type number
+     * @default 0
+     * @public
+     */
+    delay: 0,
+
+    /**
+     * Delay showing the tooltip/popover. This property overrides the general delay set with the `delay` property.
+     *
+     * @property delayShow
+     * @type number
+     * @default 0
+     * @public
+     */
+    delayShow: Ember.computed.reads('delay'),
+
+    /**
+     * Delay hiding the tooltip/popover. This property overrides the general delay set with the `delay` property.
+     *
+     * @property delayHide
+     * @type number
+     * @default 0
+     * @public
+     */
+    delayHide: Ember.computed.reads('delay'),
+
+    hasDelayShow: Ember.computed.gt('delayShow', 0),
+    hasDelayHide: Ember.computed.gt('delayHide', 0),
+
+    /**
+     * The duration of the fade transition
+     *
+     * @property transitionDuration
+     * @type number
+     * @default 150
+     * @public
+     */
+    transitionDuration: 150,
+
+    /**
+     * Keeps the tooltip/popover within the bounds of this element when `autoPlacement` is true. Can be any valid CSS selector.
+     *
+     * @property viewportSelector
+     * @type string
+     * @default 'body'
+     * @see viewportPadding
+     * @see autoPlacement
+     * @public
+     */
+    viewportSelector: 'body',
+
+    /**
+     * Take a padding into account for keeping the tooltip/popover within the bounds of the element given by `viewportSelector`.
+     *
+     * @property viewportPadding
+     * @type number
+     * @default 0
+     * @see viewportSelector
+     * @see autoPlacement
+     * @public
+     */
+    viewportPadding: 0,
+
+    /**
+     * The id of the overlay element.
+     *
+     * @property overlayId
+     * @type string
+     * @readonly
+     * @private
+     */
+    overlayId: Ember.computed(function () {
+      return `overlay-${Ember.guidFor(this)}`;
+    }),
+
+    /**
+     * The DOM element of the overlay element.
+     *
+     * @property overlayElement
+     * @type object
+     * @readonly
+     * @private
+     */
+    overlayElement: Ember.computed('overlayId', function () {
+      return document.getElementById(this.get('overlayId'));
+    }).volatile(),
+
+    /**
+     * The DOM element of the arrow element.
+     *
+     * @property arrowElement
+     * @type object
+     * @readonly
+     * @private
+     */
+    arrowElement: null,
+
+    /**
+     * The DOM element of the viewport element.
+     *
+     * @property viewportElement
+     * @type object
+     * @readonly
+     * @private
+     */
+    viewportElement: Ember.computed('viewportSelector', function () {
+      return document.querySelector(this.get('viewportSelector'));
+    }),
+
+    /**
+     * The DOM element that triggers the tooltip/popover. By default it is the parent element of this component.
+     * You can set this to any CSS selector to have any other element trigger the tooltip/popover.
+     * With the special value of "parentView" you can attach the tooltip/popover to the parent component's element.
+     *
+     * @property triggerElement
+     * @type string
+     * @public
+     */
+    triggerElement: null,
+
+    /**
+     * @property triggerTargetElement
+     * @type {object}
+     * @private
+     */
+    triggerTargetElement: Ember.computed('triggerElement', function () {
+      let triggerElement = this.get('triggerElement');
+      let el;
+
+      if (Ember.isBlank(triggerElement)) {
+        try {
+          el = (0, _getParent.default)(this);
+        } catch (e) {
+          return null;
+        }
+      } else if (triggerElement === 'parentView') {
+        el = this.get('parentView.element');
+      } else {
+        el = document.querySelector(triggerElement);
+      }
+      return el;
+    }).volatile(),
+
+    /**
+     * The event(s) that should trigger the tooltip/popover - click | hover | focus.
+     * You can set this to a single event or multiple events, given as an array or a string separated by spaces.
+     *
+     * @property triggerEvents
+     * @type array|string
+     * @default 'hover focus'
+     * @public
+     */
+    triggerEvents: 'hover focus',
+
+    _triggerEvents: Ember.computed('triggerEvents', function () {
+      let events = this.get('triggerEvents');
+      if (!Ember.isArray(events)) {
+        events = events.split(' ');
+      }
+
+      return events.map(event => {
+        switch (event) {
+          case 'hover':
+            return ['mouseenter', 'mouseleave'];
+          case 'focus':
+            return ['focusin', 'focusout'];
+          default:
+            return event;
+        }
+      });
+    }),
+
+    /**
+     * If true component will render in place, rather than be wormholed.
+     *
+     * @property renderInPlace
+     * @type boolean
+     * @default false
+     * @public
+     */
+    renderInPlace: false,
+
+    /**
+     * @property _renderInPlace
+     * @type boolean
+     * @private
+     */
+    _renderInPlace: Ember.computed('renderInPlace', function () {
+      return this.get('renderInPlace') || typeof document === 'undefined' || !document.getElementById('ember-bootstrap-wormhole');
+    }),
+
+    /**
+     * Current hover state, 'in', 'out' or null
+     *
+     * @property hoverState
+     * @type string
+     * @private
+     */
+    hoverState: null,
+
+    /**
+     * Current state for events
+     *
+     * @property inState
+     * @type {InState}
+     * @private
+     */
+    inState: Ember.computed(function () {
+      return InState.create();
+    }),
+
+    /**
+     * Ember.run timer
+     *
+     * @property timer
+     * @private
+     */
+    timer: null,
+
+    /**
+     * This action is called immediately when the tooltip/popover is about to be shown.
+     *
+     * @event onShow
+     * @public
+     */
+    onShow() {},
+
+    /**
+     * This action will be called when the tooltip/popover has been made visible to the user (will wait for CSS transitions to complete).
+     *
+     * @event onShown
+     * @public
+     */
+    onShown() {},
+
+    /**
+     * This action is called immediately when the tooltip/popover is about to be hidden.
+     *
+     * @event onHide
+     * @public
+     */
+    onHide() {},
+
+    /**
+     * This action is called when the tooltip/popover has finished being hidden from the user (will wait for CSS transitions to complete).
+     *
+     * @event onHidden
+     * @public
+     */
+    onHidden() {},
+
+    /**
+     * Called when a show event has been received
+     *
+     * @method enter
+     * @param e
+     * @private
+     */
+    enter(e) {
+      if (e) {
+        let eventType = e.type === 'focusin' ? 'focus' : 'hover';
+        this.get('inState').set(eventType, true);
+      }
+
+      if (this.get('showHelp') || this.get('hoverState') === 'in') {
+        this.set('hoverState', 'in');
+        return;
+      }
+
+      Ember.run.cancel(this.timer);
+
+      this.set('hoverState', 'in');
+
+      if (!this.get('hasDelayShow')) {
+        return this.show();
+      }
+
+      this.timer = Ember.run.later(this, function () {
+        if (this.get('hoverState') === 'in') {
+          this.show();
+        }
+      }, this.get('delayShow'));
+    },
+
+    /**
+     * Called when a hide event has been received
+     *
+     * @method leave
+     * @param e
+     * @private
+     */
+    leave(e) {
+      if (e) {
+        let eventType = e.type === 'focusout' ? 'focus' : 'hover';
+        this.get('inState').set(eventType, false);
+      }
+
+      if (this.get('inState.showHelp')) {
+        return;
+      }
+
+      Ember.run.cancel(this.timer);
+
+      this.set('hoverState', 'out');
+
+      if (!this.get('hasDelayHide')) {
+        return this.hide();
+      }
+
+      this.timer = Ember.run.later(this, function () {
+        if (this.get('hoverState') === 'out') {
+          this.hide();
+        }
+      }, this.get('delayHide'));
+    },
+
+    /**
+     * Called for a click event
+     *
+     * @method toggle
+     * @param e
+     * @private
+     */
+    toggle(e) {
+      if (e) {
+        this.get('inState').toggleProperty('click');
+        if (this.get('inState.showHelp')) {
+          this.enter();
+        } else {
+          this.leave();
+        }
+      } else {
+        if (this.get('showHelp')) {
+          this.leave();
+        } else {
+          this.enter();
+        }
+      }
+    },
+
+    /**
+     * Show the tooltip/popover
+     *
+     * @method show
+     * @private
+     */
+    show() {
+      if (this.get('isDestroyed') || this.get('isDestroying')) {
+        return;
+      }
+
+      if (false === this.get('onShow')(this)) {
+        return;
+      }
+
+      // this waits for the tooltip/popover element to be created. when animating a wormholed tooltip/popover we need to wait until
+      // ember-wormhole has moved things in the DOM for the animation to be correct, so use Ember.run.next in this case
+      let delayFn = !this.get('_renderInPlace') && this.get('fade') ? Ember.run.next : function (target, fn) {
+        Ember.run.schedule('afterRender', target, fn);
+      };
+
+      this.set('inDom', true);
+      delayFn(this, this._show);
+    },
+
+    _show(skipTransition = false) {
+      this.set('showHelp', true);
+
+      // If this is a touch-enabled device we add extra
+      // empty mouseover listeners to the body's immediate children;
+      // only needed because of broken event delegation on iOS
+      // https://www.quirksmode.org/blog/archives/2014/02/mouse_event_bub.html
+
+      // See https://github.com/twbs/bootstrap/pull/22481
+      if ('ontouchstart' in document.documentElement) {
+        let { children } = document.body;
+        for (let i = 0; i < children.length; i++) {
+          children[i].addEventListener('mouseover', noop);
+        }
+      }
+
+      let tooltipShowComplete = () => {
+        if (this.get('isDestroyed')) {
+          return;
+        }
+        let prevHoverState = this.get('hoverState');
+
+        this.get('onShown')(this);
+        this.set('hoverState', null);
+
+        if (prevHoverState === 'out') {
+          this.leave();
+        }
+      };
+
+      if (skipTransition === false && this.get('usesTransition')) {
+        (0, _transitionEnd.default)(this.get('overlayElement'), this.get('transitionDuration')).then(tooltipShowComplete);
+      } else {
+        tooltipShowComplete();
+      }
+    },
+
+    /**
+     * Position the tooltip/popover's arrow
+     *
+     * @method replaceArrow
+     * @param delta
+     * @param dimension
+     * @param isVertical
+     * @private
+     */
+    replaceArrow(delta, dimension, isVertical) {
+      let el = this.get('arrowElement');
+      el.style[isVertical ? 'left' : 'top'] = `${50 * (1 - delta / dimension)}%`;
+      el.style[isVertical ? 'top' : 'left'] = null;
+    },
+
+    /**
+     * Hide the tooltip/popover
+     *
+     * @method hide
+     * @private
+     */
+    hide() {
+      if (this.get('isDestroyed')) {
+        return;
+      }
+
+      if (false === this.get('onHide')(this)) {
+        return;
+      }
+
+      let tooltipHideComplete = () => {
+        if (this.get('isDestroyed')) {
+          return;
+        }
+        if (this.get('hoverState') !== 'in') {
+          this.set('inDom', false);
+        }
+        this.get('onHidden')(this);
+      };
+
+      this.set('showHelp', false);
+
+      // if this is a touch-enabled device we remove the extra
+      // empty mouseover listeners we added for iOS support
+      if ('ontouchstart' in document.documentElement) {
+        let { children } = document.body;
+        for (let i = 0; i < children.length; i++) {
+          children[i].removeEventListener('mouseover', noop);
+        }
+      }
+
+      if (this.get('usesTransition')) {
+        (0, _transitionEnd.default)(this.get('overlayElement'), this.get('transitionDuration')).then(tooltipHideComplete);
+      } else {
+        tooltipHideComplete();
+      }
+
+      this.set('hoverState', null);
+    },
+
+    /**
+     * @method addListeners
+     * @private
+     */
+    addListeners() {
+      let target = this.get('triggerTargetElement');
+
+      this.get('_triggerEvents').forEach(event => {
+        if (Ember.isArray(event)) {
+          let [inEvent, outEvent] = event;
+          target.addEventListener(inEvent, this._handleEnter);
+          target.addEventListener(outEvent, this._handleLeave);
+        } else {
+          target.addEventListener(event, this._handleToggle);
+        }
+      });
+    },
+
+    /**
+     * @method removeListeners
+     * @private
+     */
+    removeListeners() {
+      try {
+        let target = this.get('triggerTargetElement');
+        this.get('_triggerEvents').forEach(event => {
+          if (Ember.isArray(event)) {
+            let [inEvent, outEvent] = event;
+            target.removeEventListener(inEvent, this._handleEnter);
+            target.removeEventListener(outEvent, this._handleLeave);
+          } else {
+            target.removeEventListener(event, this._handleToggle);
+          }
+        });
+      } catch (e) {} // eslint-disable-line no-empty
+    },
+
+    actions: {
+      close() {
+        this.hide();
+      }
+    },
+
+    init() {
+      this._super(...arguments);
+      this._handleEnter = Ember.run.bind(this, this.enter);
+      this._handleLeave = Ember.run.bind(this, this.leave);
+      this._handleToggle = Ember.run.bind(this, this.toggle);
+    },
+
+    didInsertElement() {
+      this._super(...arguments);
+      this.addListeners();
+      if (this.get('visible')) {
+        Ember.run.next(this, this.show, true);
+      }
+    },
+
+    willDestroyElement() {
+      this._super(...arguments);
+      this.removeListeners();
+    },
+
+    _watchVisible: Ember.observer('visible', function () {
+      if (this.get('visible')) {
+        this.show();
+      } else {
+        this.hide();
+      }
+    })
+
+  });
+});
+;define('ember-bootstrap/components/base/bs-contextual-help/element', ['exports', 'ember-bootstrap/templates/components/bs-tooltip/element'], function (exports, _element) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend({
+    layout: _element.default,
+    tagName: '',
+    ariaRole: 'tooltip',
+
+    /**
+     * @property placement
+     * @type string
+     * @default 'top'
+     * @public
+     */
+    placement: 'top',
+
+    actualPlacement: Ember.computed.reads('placement'),
+
+    /**
+     * @property fade
+     * @type boolean
+     * @default true
+     * @public
+     */
+    fade: true,
+
+    /**
+     * @property showHelp
+     * @type boolean
+     * @default false
+     * @public
+     */
+    showHelp: false,
+
+    /**
+     * If true component will render in place, rather than be wormholed.
+     *
+     * @property renderInPlace
+     * @type boolean
+     * @default true
+     * @public
+     */
+    renderInPlace: true,
+
+    /**
+     * Which element to align to
+     *
+     * @property popperTarget
+     * @type {string|HTMLElement}
+     * @public
+     */
+    popperTarget: null,
+
+    /**
+     * @property autoPlacement
+     * @type boolean
+     * @default true
+     * @public
+     */
+    autoPlacement: true,
+
+    /**
+     * The DOM element of the viewport element.
+     *
+     * @property viewportElement
+     * @type object
+     * @public
+     */
+    viewportElement: null,
+
+    /**
+     * Take a padding into account for keeping the tooltip/popover within the bounds of the element given by `viewportElement`.
+     *
+     * @property viewportPadding
+     * @type number
+     * @default 0
+     * @public
+     */
+    viewportPadding: 0,
+
+    /**
+     * @property arrowClass
+     * @private
+     */
+    arrowClass: 'arrow',
+
+    /**
+     * @property popperClassNames
+     * @type {array}
+     * @private
+     */
+    popperClassNames: null,
+
+    /**
+     * @property popperClass
+     * @type {string}
+     * @private
+     */
+    popperClass: Ember.computed('popperClassNames.[]', 'class', function () {
+      let classes = this.get('popperClassNames');
+      let classProperty = this.get('class');
+      if (typeof classProperty === 'string') {
+        classes = classes.concat(classProperty.split(' '));
+      }
+      return classes.join(' ');
+    }),
+
+    /**
+     * popper.js modifier config
+     *
+     * @property popperModifiers
+     * @type {object}
+     * @private
+     */
+    popperModifiers: Ember.computed('arrowClass', 'autoPlacement', 'viewportElement', 'viewportPadding', function () {
+      let self = this;
+      return {
+        arrow: {
+          element: `.${this.get('arrowClass')}`
+        },
+        offset: {
+          fn(data) {
+            let tip = document.getElementById(self.get('id'));
+            (true && !(tip) && Ember.assert('Contextual help element needs existing popper element', tip));
+
+            // manually read margins because getBoundingClientRect includes difference
+
+            let marginTop = parseInt(window.getComputedStyle(tip).marginTop, 10);
+            let marginLeft = parseInt(window.getComputedStyle(tip).marginLeft, 10);
+
+            // we must check for NaN for ie 8/9
+            if (isNaN(marginTop) || marginTop > 0) {
+              marginTop = 0;
+            }
+            if (isNaN(marginLeft) || marginLeft > 0) {
+              marginLeft = 0;
+            }
+
+            data.offsets.popper.top += marginTop;
+            data.offsets.popper.left += marginLeft;
+
+            return window.Popper.Defaults.modifiers.offset.fn.apply(this, arguments);
+          }
+        },
+        preventOverflow: {
+          enabled: this.get('autoPlacement'),
+          boundariesElement: this.get('viewportElement'),
+          padding: this.get('viewportPadding')
+        },
+        hide: {
+          enabled: this.get('autoPlacement')
+        },
+        flip: {
+          enabled: this.get('autoPlacement')
+        }
+      };
+    }),
+
+    didReceiveAttrs() {
+      (true && !(this.get('id')) && Ember.assert('Contextual help element needs id for popper element', this.get('id')));
+    },
+
+    actions: {
+      updatePlacement(popperDataObject) {
+        if (this.get('actualPlacement') === popperDataObject.placement) {
+          return;
+        }
+        this.set('actualPlacement', popperDataObject.placement);
+        Ember.run.scheduleOnce('afterRender', popperDataObject.instance, popperDataObject.instance.scheduleUpdate);
+      }
+    }
+  });
+});
+;define('ember-bootstrap/components/base/bs-dropdown', ['exports', 'ember-bootstrap/templates/components/bs-dropdown'], function (exports, _bsDropdown) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend({
+    layout: _bsDropdown.default,
+    classNameBindings: ['containerClass'],
+
+    /**
+     * This property reflects the state of the dropdown, whether it is open or closed.
+     *
+     * @property isOpen
+     * @default false
+     * @type boolean
+     * @private
+     */
+    isOpen: false,
+
+    /**
+     * By default clicking on an open dropdown menu will close it. Set this property to false for the menu to stay open.
+     *
+     * @property closeOnMenuClick
+     * @default true
+     * @type boolean
+     * @public
+     */
+    closeOnMenuClick: true,
+
+    /**
+     * By default the dropdown menu will expand downwards. Other options include, 'up', 'left' and 'right'
+     *
+     * @property direction
+     * @type string
+     * @default 'down'
+     * @public
+     */
+    direction: 'down',
+
+    /**
+     * Indicates the dropdown is being used as a navigation item dropdown.
+     *
+     * @property inNav
+     * @type boolean
+     * @default false
+     * @private
+     */
+    inNav: false,
+
+    /**
+     * A computed property to generate the suiting class for the dropdown container, either "dropdown", "dropup" or "btn-group".
+     * BS4 only: "dropleft", "dropright"
+     *
+     * @property containerClass
+     * @type string
+     * @readonly
+     * @private
+     */
+    containerClass: Ember.computed('toggle.tagName', 'direction', function () {
+      if (this.get('toggle.tagName') === 'button' && !this.get('toggle.block')) {
+        return this.get('direction') !== 'down' ? `btn-group drop${this.get('direction')}` : 'btn-group';
+      } else {
+        return `drop${this.get('direction')}`;
+      }
+    }),
+
+    /**
+     * @property menuElement
+     * @private
+     */
+    menuElement: Ember.computed(function () {
+      return document.getElementById(`${this.get('elementId')}__menu`);
+    }).volatile(),
+
+    /**
+     * @property toggleElement
+     * @private
+     */
+    toggleElement: Ember.computed('toggle', function () {
+      return typeof FastBoot === 'undefined' ? this.get('toggle.element') || null : null;
+    }),
+
+    /**
+     * Reference to the child toggle (Toggle or Button)
+     *
+     * @property toggle
+     * @private
+     */
+    toggle: null,
+
+    /**
+     * Action is called when dropdown is about to be shown
+     *
+     * @event onShow
+     * @param {*} value
+     * @public
+     */
+    onShow(value) {}, // eslint-disable-line no-unused-vars
+
+    /**
+     * Action is called when dropdown is about to be hidden
+     *
+     * @event onHide
+     * @param {*} value
+     * @public
+     */
+    onHide(value) {}, // eslint-disable-line no-unused-vars
+
+    actions: {
+      toggleDropdown() {
+        if (this.get('isOpen')) {
+          this.send('closeDropdown');
+        } else {
+          this.send('openDropdown');
+        }
+      },
+
+      openDropdown() {
+        this.set('isOpen', true);
+        this.addClickListener();
+        this.get('onShow')();
+      },
+
+      closeDropdown() {
+        this.set('isOpen', false);
+        this.removeClickListener();
+        this.get('onHide')();
+      }
+    },
+
+    addClickListener() {
+      if (!this.clickListener) {
+        this.clickListener = Ember.run.bind(this, this.closeOnClickHandler);
+        document.addEventListener('click', this.clickListener, true);
+      }
+    },
+
+    removeClickListener() {
+      if (this.clickListener) {
+        document.removeEventListener('click', this.clickListener, true);
+        this.clickListener = null;
+      }
+    },
+
+    willDestroyElement() {
+      this._super(...arguments);
+      this.removeClickListener();
+    },
+
+    /**
+     * Handler for click events to close the dropdown
+     *
+     * @method closeOnClickHandler
+     * @param e
+     * @protected
+     */
+    closeOnClickHandler(e) {
+      let { target } = e;
+      let { toggleElement, menuElement } = this.getProperties('toggleElement', 'menuElement');
+
+      if (!this.get('isDestroyed') && toggleElement && !toggleElement.contains(target) && (menuElement && !menuElement.contains(target) || this.get('closeOnMenuClick'))) {
+        this.send('closeDropdown');
+      }
+    },
+
+    /**
+     * @property buttonComponent
+     * @type {String}
+     * @private
+     */
+    buttonComponent: 'bs-dropdown/button',
+
+    /**
+     * @property toggleComponent
+     * @type {String}
+     * @private
+     */
+    toggleComponent: 'bs-dropdown/toggle',
+
+    /**
+     * @property menuComponent
+     * @type {String}
+     * @private
+     */
+    menuComponent: 'bs-dropdown/menu'
+  });
+});
+;define('ember-bootstrap/components/base/bs-dropdown/button', ['exports', 'ember-bootstrap/components/bs-button', 'ember-bootstrap/mixins/dropdown-toggle'], function (exports, _bsButton, _dropdownToggle) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _bsButton.default.extend(_dropdownToggle.default);
+});
+;define('ember-bootstrap/components/base/bs-dropdown/menu', ['exports', 'ember-bootstrap/templates/components/bs-dropdown/menu'], function (exports, _menu) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend({
+    layout: _menu.default,
+
+    /**
+     * Defaults to a `<ul>` tag in BS3 and a `<div>` tag in BS4. Change for other types of dropdown menus.
+     *
+     * @property tagName
+     * @type string
+     * @default ul
+     * @public
+     */
+    tagName: '',
+
+    /**
+     * @property ariaRole
+     * @default menu
+     * @type string
+     * @protected
+     */
+    ariaRole: 'menu',
+
+    /**
+     * Alignment of the menu, either "left" or "right"
+     *
+     * @property align
+     * @type string
+     * @default left
+     * @public
+     */
+    align: 'left',
+
+    /**
+     * @property direction
+     * @default 'down'
+     * @type string
+     * @private
+     */
+    direction: 'down',
+
+    /**
+     * @property inNav
+     * @type {boolean}
+     * @private
+     */
+    inNav: false,
+
+    /**
+     * By default the menu is rendered in the same place the dropdown. If you experience clipping
+     * issues, you can set this to false to render the menu in a wormhole at the top of the DOM.
+     *
+     * @property renderInPlace
+     * @type boolean
+     * @default true
+     * @public
+     */
+    renderInPlace: true,
+
+    /**
+     * @property _renderInPlace
+     * @type boolean
+     * @private
+     */
+    _renderInPlace: Ember.computed('renderInPlace', function () {
+      return this.get('renderInPlace') || typeof document === 'undefined' || !document.getElementById('ember-bootstrap-wormhole');
+    }),
+
+    alignClass: Ember.computed('align', function () {
+      if (this.get('align') !== 'left') {
+        return `dropdown-menu-${this.get('align')}`;
+      }
+    }),
+
+    isOpen: Ember.computed({
+      get() {
+        return false;
+      },
+      set(key, value) {
+        // delay removing the menu from DOM to allow (delegated Ember) event to fire for the menu's children
+        // Fixes https://github.com/kaliber5/ember-bootstrap/issues/660
+        Ember.run.next(() => {
+          if (this.get('isDestroying') || this.get('isDestroyed')) {
+            return;
+          }
+          this.set('_isOpen', value);
+        });
+        return value;
+      }
+    }),
+
+    _isOpen: false,
+
+    flip: true,
+
+    _popperApi: null,
+
+    popperPlacement: Ember.computed('direction', 'align', function () {
+      let placement = 'bottom-start';
+      let { direction, align } = this.getProperties('direction', 'align');
+
+      if (direction === 'up') {
+        placement = 'top-start';
+        if (align === 'right') {
+          placement = 'top-end';
+        }
+      } else if (direction === 'left') {
+        placement = 'left-start';
+      } else if (direction === 'right') {
+        placement = 'right-start';
+      } else if (align === 'right') {
+        placement = 'bottom-end';
+      }
+      return placement;
+    }),
+
+    popperModifiers: Ember.computed('inNav', 'flip', function () {
+      return {
+        // @todo add offset config
+        applyStyle: {
+          enabled: !this.get('inNav')
+        },
+        flip: {
+          enabled: this.get('flip')
+        }
+      };
+    }),
+
+    /**
+     * @property itemComponent
+     * @type {String}
+     * @private
+     */
+    itemComponent: 'bs-dropdown/menu/item',
+
+    /**
+     * @property linkToComponent
+     * @type {String}
+     * @private
+     */
+    linkToComponent: 'bs-dropdown/menu/link-to',
+
+    /**
+     * @property dividerComponent
+     * @type {String}
+     * @private
+     */
+    dividerComponent: 'bs-dropdown/menu/divider'
+  });
+});
+;define('ember-bootstrap/components/base/bs-dropdown/menu/divider', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend({});
+});
+;define('ember-bootstrap/components/base/bs-dropdown/menu/item', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend({});
+});
+;define('ember-bootstrap/components/base/bs-dropdown/menu/link-to', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.LinkComponent.extend({});
+});
+;define('ember-bootstrap/components/base/bs-dropdown/toggle', ['exports', 'ember-bootstrap/mixins/dropdown-toggle'], function (exports, _dropdownToggle) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend(_dropdownToggle.default, {
+    /**
+     * Defaults to a `<a>` tag. Change for other types of dropdown toggles.
+     *
+     * @property tagName
+     * @type string
+     * @default a
+     * @public
+     */
+    tagName: 'a',
+
+    attributeBindings: ['href'],
+
+    /**
+     * @property inNav
+     * @type {boolean}
+     * @private
+     */
+    inNav: false,
+
+    /**
+     * Computed property to generate a `href="#"` attribute when `tagName` is "a".
+     *
+     * @property href
+     * @type string
+     * @readonly
+     * @private
+     */
+    href: Ember.computed('tagName', function () {
+      if (this.get('tagName').toUpperCase() === 'A') {
+        return '#';
+      }
+    }),
+
+    /**
+     * When clicking the toggle this action is called.
+     *
+     * @event onClick
+     * @param {*} value
+     * @public
+     */
+    onClick() {},
+
+    click(e) {
+      e.preventDefault();
+      this.get('onClick')();
+    }
+
+  });
+});
+;define('ember-bootstrap/components/base/bs-form', ['exports', 'ember-bootstrap/templates/components/bs-form'], function (exports, _bsForm) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend({
+    layout: _bsForm.default,
+    tagName: 'form',
+    classNameBindings: ['layoutClass'],
+    attributeBindings: ['_novalidate:novalidate'],
+    ariaRole: 'form',
+
+    /**
+     * Bootstrap form class name (computed)
+     *
+     * @property layoutClass
+     * @type string
+     * @readonly
+     * @protected
+     *
+     */
+
+    /**
+     * Set a model that this form should represent. This serves several purposes:
+     *
+     * * child `Components.FormElement`s can access and bind to this model by their `property`
+     * * when the model supports validation by using the [ember-validations](https://github.com/dockyard/ember-validations) mixin,
+     * child `Components.FormElement`s will look at the validation information of their `property` and render their form group accordingly.
+     * Moreover the form's `submit` event handler will validate the model and deny submitting if the model is not validated successfully.
+     *
+     * @property model
+     * @type Ember.Object
+     * @public
+     */
+    model: null,
+
+    /**
+     * Set the layout of the form to either "vertical", "horizontal" or "inline". See http://getbootstrap.com/css/#forms-inline and http://getbootstrap.com/css/#forms-horizontal
+     *
+     * @property formLayout
+     * @type string
+     * @public
+     */
+    formLayout: 'vertical',
+
+    /**
+     * Check if validating the model is supported. This needs to be implemented by another addon.
+     *
+     * @property hasValidator
+     * @type boolean
+     * @readonly
+     * @protected
+     */
+    hasValidator: false,
+
+    /**
+     * The Bootstrap grid class for form labels. This is used by the `Components.FormElement` class as a default for the
+     * whole form.
+     *
+     * @property horizontalLabelGridClass
+     * @type string
+     * @default 'col-md-4'
+     * @public
+     */
+    horizontalLabelGridClass: 'col-md-4',
+
+    /**
+     * @property elementComponent
+     * @type {String}
+     * @private
+     */
+    elementComponent: 'bs-form/element',
+
+    /**
+     * @property groupComponent
+     * @type {String}
+     * @private
+     */
+    groupComponent: 'bs-form/group',
+
+    /**
+     * `isSubmitting` is `true` after `submit` event has been triggered and until Promise returned by `onSubmit` is
+     * fulfilled. If `validate` returns a Promise that one is also taken into consideration.
+     *
+     * If multiple concurrent submit events are fired, it stays `true` until all submit events have been fulfilled.
+     *
+     * @property isSubmitting
+     * @type {Boolean}
+     * @readonly
+     * @private
+     */
+    isSubmitting: false,
+
+    /**
+     * Count of pending submissions.
+     *
+     * @property pendingSubmissions
+     * @type {Integer}
+     * @private
+     */
+    pendingSubmissions: 0,
+
+    /**
+     * If set to true pressing enter will submit the form, even if no submit button is present
+     *
+     * @property submitOnEnter
+     * @type boolean
+     * @default false
+     * @public
+     */
+    submitOnEnter: false,
+
+    /**
+     * Controls if `onSubmit` action is fired concurrently. If `true` submitting form multiple
+     * times will not trigger `onSubmit` action if a Promise returned by previous submission is
+     * not settled yet.
+     *
+     * Droping a submission also prevents rerunning validation and `onBefore` hook.
+     *
+     * @property preventConcurrency
+     * @type Boolean
+     * @default false
+     * @public
+     */
+    preventConcurrency: false,
+
+    /**
+     * If set to true novalidate attribute is present on form element
+     *
+     * @property novalidate
+     * @type boolean
+     * @default null
+     * @public
+     */
+    novalidate: false,
+
+    _novalidate: Ember.computed('novalidate', function () {
+      return this.get('novalidate') === true ? '' : undefined;
+    }),
+
+    /**
+     * Validate hook which will return a promise that will either resolve if the model is valid
+     * or reject if it's not. This should be overridden to add validation support.
+     *
+     * @method validate
+     * @param {Object} model
+     * @return {Promise}
+     * @public
+     */
+    validate(model) {}, // eslint-disable-line no-unused-vars
+
+    /**
+     * @property showAllValidations
+     * @type boolean
+     * @default false
+     * @private
+     */
+    showAllValidations: false,
+
+    /**
+     * Action is called before the form is validated (if possible) and submitted.
+     *
+     * @event onBefore
+     * @param { Object } model  The form's `model`
+     * @public
+     */
+    onBefore(model) {}, // eslint-disable-line no-unused-vars
+
+    /**
+     * Action is called when submit has been triggered and the model has passed all validations (if present).
+     *
+     * @event onSubmit
+     * @param { Object } model  The form's `model`
+     * @param { Object } result The returned result from the validate method, if validation is available
+     * @public
+     */
+    onSubmit(model, result) {}, // eslint-disable-line no-unused-vars
+
+    /**
+     * Action is called when validation of the model has failed.
+     *
+     * @event onInvalid
+     * @param { Object } model  The form's `model`
+     * @param { Object } error
+     * @public
+     */
+    onInvalid(model, error) {}, // eslint-disable-line no-unused-vars
+
+    /**
+     * Submit handler that will send the default action ("action") to the controller when submitting the form.
+     *
+     * If there is a supplied `model` that supports validation (`hasValidator`) the model will be validated before, and
+     * only if validation is successful the default action will be sent. Otherwise an "invalid" action will be sent, and
+     * all the `showValidation` property of all child `Components.FormElement`s will be set to true, so error state and
+     * messages will be shown automatically.
+     *
+     * @method submit
+     * @private
+     */
+    submit(e) {
+      if (e) {
+        e.preventDefault();
+      }
+
+      if (this.get('preventConcurrency') && this.get('isSubmitting')) {
+        return;
+      }
+
+      this.set('isSubmitting', true);
+      this.incrementProperty('pendingSubmissions');
+
+      let model = this.get('model');
+
+      this.get('onBefore')(model);
+
+      Ember.RSVP.resolve(this.get('hasValidator') ? this.validate(this.get('model')) : null).then(r => {
+        Ember.RSVP.resolve(this.get('onSubmit')(model, r)).finally(() => {
+          if (!this.get('isDestroyed')) {
+            if (this.get('pendingSubmissions') === 1) {
+              this.set('isSubmitting', false);
+            }
+            this.decrementProperty('pendingSubmissions');
+          }
+        });
+      }).catch(err => {
+        if (!this.get('isDestroyed')) {
+          this.set('showAllValidations', true);
+
+          if (this.get('pendingSubmissions') === 1) {
+            this.set('isSubmitting', false);
+          }
+          this.decrementProperty('pendingSubmissions');
+
+          this.get('onInvalid')(model, err);
+        }
+      });
+    },
+
+    keyPress(e) {
+      let code = e.keyCode || e.which;
+      if (code === 13 && this.get('submitOnEnter')) {
+        this.triggerSubmit();
+      }
+    },
+
+    triggerSubmit() {
+      let event = document.createEvent('Event');
+      event.initEvent('submit', true, true);
+      this.get('element').dispatchEvent(event);
+    },
+
+    actions: {
+      change(value, model, property) {
+        (true && !(Ember.isPresent(model) && Ember.isPresent(property)) && Ember.assert('You cannot use the form element\'s default onChange action for form elements if not using a model or setting the value directly on a form element. You must add your own onChange action to the form element in this case!', Ember.isPresent(model) && Ember.isPresent(property)));
+
+        Ember.set(model, property, value);
+      }
+    }
+  });
+});
+;define('ember-bootstrap/components/base/bs-form/element', ['exports', 'ember-bootstrap/templates/components/bs-form/element', 'ember-bootstrap/components/bs-form/group'], function (exports, _element, _group) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+
+
+  const nonDefaultLayouts = Ember.A(['checkbox']);
+
+  /**
+   Sub class of `Components.FormGroup` that adds automatic form layout markup and form validation features.
+  
+   ### Form layout
+  
+   The appropriate Bootstrap markup for the given `formLayout` and `controlType` is automatically generated to easily
+   create forms without coding the default Bootstrap form markup by hand:
+  
+   ```hbs
+   {{#bs-form formLayout="horizontal" onSubmit=(action "submit") as |form|}}
+     {{form.element controlType="email" label="Email" placeholder="Email" value=email}}
+     {{form.element controlType="password" label="Password" placeholder="Password" value=password}}
+     {{form.element controlType="checkbox" label="Remember me" value=rememberMe}}
+     {{bs-button defaultText="Submit" type="primary" buttonType="submit"}}
+   {{/bs-form}}
+   ```
+  
+   ### Control types
+  
+   The following control types are supported out of the box:
+  
+   * Inputs (simple `text`, or any other HTML5 supported input types like `password`, `email` etc.)
+   * Checkbox (single)
+   * Radio Button (group)
+   * Textarea
+  
+   #### Radio Buttons
+  
+   For a group of mutually exclusive radio buttons to work, you must supply the `options` property with an array of
+   options, each of which will be rendered with an appropriate radio button and its label. It can be either a simple array
+   of strings or objects. In the latter case, you would have to set `optionLabelPath` to the property, that contains the
+   label on these objects.
+  
+   ```hbs
+   {{#bs-form model=this onSubmit=(action "submit") as |form|}}
+     {{form.element label="Gender" options=genderOptions optionLabelPath="title" property="gender"}}
+   {{/bs-form}}
+   ```
+  
+   The default layout for radios is stacked, but Bootstrap's inline layout is also supported using the `inline` property
+   of the yielded control component:
+  
+   ```hbs
+   {{#bs-form model=this onSubmit=(action "submit") as |form|}}
+     {{#form.element label="Gender" options=genderOptions property="gender" as |el|}}
+       {{el.control inline=true}}
+     {{/form.element}}
+   {{/bs-form}}
+   ```
+  
+   #### Custom controls
+  
+   Apart from the standard built-in browser controls (see the `controlType` property), you can use any custom control simply
+   by invoking the component with a block template. Use whatever control you might want, for example a select-2 component
+   (from the [ember-select-2 addon](https://istefo.github.io/ember-select-2)):
+  
+   ```hbs
+   {{#bs-form model=this onSubmit=(action "submit") as |form|}}
+   {{#form.element label="Select-2" property="gender" useIcons=false as |el|}}
+   {{select-2 id=el.id content=genderChoices optionLabelPath="label" value=el.value searchEnabled=false}}
+   {{/form.element}}
+   {{/bs-form}}
+   ```
+  
+   The component yields a hash with the following properties:
+   * `control`: the component that would be used for rendering the form control based on the given `controlType`
+   * `id`: id to be used for the form control, so it matches the labels `for` attribute
+   * `value`: the value of the form element
+   * `validation`: the validation state of the element, `null` if no validation is to be shown, otherwise 'success', 'error' or 'warning'
+  
+   If your custom control does not render an input element, you should set `useIcons` to `false` since bootstrap only supports
+   feedback icons with textual `<input class="form-control">` elements.
+  
+   If you just want to customize the existing control component, you can use the aforementioned yielded `control` component
+   to customize that existing component:
+  
+   ```hbs
+   {{#bs-form model=this onSubmit=(action "submit") as |form|}}
+   {{#form.element label="Email" placeholder="Email" property="email" as |el|}}
+   {{el.control class="input-lg"}}
+   {{/form.element}}
+   {{/bs-form}}
+   ```
+  
+   If you are using the custom control quite often, you should consider writing an integration plugin like
+   [`ember-bootstrap-power-select`](https://github.com/kaliber5/ember-bootstrap-power-select).
+   To do so, you need to provide a component `{{bs-form/element/control/my-custom-control}}` which extends
+   [`Components.FormElementControl`](Components.FormElementControl.html).
+  
+   ### Form validation
+  
+   In the following example the control elements of the three form elements value will be bound to the properties
+   (given by `property`) of the form's `model`, which in this case is its controller (see `model=this`):
+  
+   ```hbs
+   {{#bs-form formLayout="horizontal" model=this onSubmit=(action "submit") as |form|}}
+     {{form.element controlType="email" label="Email" placeholder="Email" property="email"}}
+     {{form.element controlType="password" label="Password" placeholder="Password" property="password"}}
+     {{form.element controlType="checkbox" label="Remember me" property="rememberMe"}}
+     {{bs-button defaultText="Submit" type="primary" buttonType="submit"}}
+   {{/bs-form}}
+   ```
+  
+   By using this indirection in comparison to directly binding the `value` property, you get the benefit of automatic
+   form validation, given that your `model` has a supported means of validating itself.
+   See [Components.Form](Components.Form.html) for details on how to enable form validation.
+  
+   In the example above the `model` was our controller itself, so the control elements were bound to the appropriate
+   properties of our controller. A controller implementing validations on those properties could look like this:
+  
+   ```js
+   import Ember from 'ember';
+   import EmberValidations from 'ember-validations';
+  
+   export default Ember.Controller.extend(EmberValidations,{
+     email: null,
+     password: null,
+     rememberMe: false,
+     validations: {
+       email: {
+         presence: true,
+         format: {
+           with: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$/
+         }
+       },
+       password: {
+         presence: true,
+         length: { minimum: 6, maximum: 10}
+       },
+       comments: {
+         length: { minimum: 5, maximum: 20}
+       }
+     }
+   });
+   ```
+  
+   If the `showValidation` property is `true` (which is automatically the case if a `focusOut` event is captured from the
+   control element or the containing `Components.Form` was submitted with its `model` failing validation) and there are
+   validation errors for the `model`'s `property`, the appropriate Bootstrap validation markup (see
+   http://getbootstrap.com/css/#forms-control-validation) is applied:
+  
+   * `validation` is set to 'error', which will set the `has-error` CSS class
+   * the `errorIcon` feedback icon is displayed if `controlType` is a text field
+   * the validation messages are displayed as Bootstrap `help-block`s in BS3 and `form-control-feedback` in BS4
+  
+   The same applies for warning messages, if the used validation library supports this. (Currently only
+   [ember-cp-validations](https://github.com/offirgolan/ember-cp-validations))
+  
+   As soon as the validation is successful again...
+  
+   * `validation` is set to 'success', which will set the `has-success` CSS class
+   * the `successIcon` feedback icon is displayed if `controlType` is a text field
+   * the validation messages are removed
+  
+   In case you want to display some error or warning message that is independent of the model's validation, for
+   example to display a failure message on a login form after a failed authentication attempt (so not coming from
+   the validation library), you can use the `customError` or `customWarning` properties to do so.
+  
+   ### HTML attributes
+  
+   To set HTML attributes on the control element provided by this component, set them as properties of this component:
+  
+   ```hbs
+   {{#bs-form formLayout="horizontal" model=this onSubmit=(action "submit") as |form|}}
+   {{form.element controlType="email" label="Email" property="email"
+     placeholder="Email"
+     required=true
+     multiple=true
+     tabIndex=5
+   }}
+   ...
+   {{/bs-form}}
+   ```
+  
+   The following attributes are supported depending on the `controlType`:
+  
+   <table class="table table-striped">
+   <thead>
+   <tr>
+   <th></th>
+   <th>textarea</th>
+   <th>checkbox/radio</th>
+   <th>all others</th>
+   </tr>
+   </thead>
+   <tbody>
+   <tr>
+   <td>accept</td>
+   <td></td>
+   <td></td>
+   <td>✔︎</td>
+   </tr>
+   <tr>
+   <td>autocapitalize</td>
+   <td>✔︎</td>
+   <td></td>
+   <td>✔︎</td>
+   </tr>
+   <tr>
+   <td>autocomplete</td>
+   <td>✔︎</td>
+   <td></td>
+   <td>✔︎</td>
+   </tr>
+   <tr>
+   <td>autocorrect</td>
+   <td>✔︎</td>
+   <td></td>
+   <td>✔︎</td>
+   </tr>
+   <tr>
+   <td>autofocus</td>
+   <td>✔︎</td>
+   <td>✔︎</td>
+   <td>✔︎</td>
+   </tr>
+   <tr>
+   <td>autosave</td>
+   <td></td>
+   <td></td>
+   <td>✔︎</td>
+   </tr>
+   <tr>
+   <td>cols</td>
+   <td>✔︎</td>
+   <td></td>
+   <td></td>
+   </tr>
+   <tr>
+   <td>disabled</td>
+   <td></td>
+   <td>✔︎</td>
+   <td>✔︎</td>
+   </tr>
+   <tr>
+   <td>form</td>
+   <td>✔︎</td>
+   <td>✔︎</td>
+   <td>✔︎</td>
+   </tr>
+   <tr>
+   <td>inputmode</td>
+   <td></td>
+   <td></td>
+   <td>✔︎</td>
+   </tr>
+   <tr>
+   <td>max</td>
+   <td></td>
+   <td></td>
+   <td>✔︎</td>
+   </tr>
+   <tr>
+   <td>maxlength</td>
+   <td>✔︎</td>
+   <td></td>
+   <td>✔︎</td>
+   </tr>
+   <tr>
+   <td>min</td>
+   <td></td>
+   <td></td>
+   <td>✔︎</td>
+   </tr>
+   <tr>
+   <td>minlength</td>
+   <td>✔︎</td>
+   <td></td>
+   <td>✔︎</td>
+   </tr>
+   <tr>
+   <td>multiple</td>
+   <td></td>
+   <td></td>
+   <td>✔︎</td>
+   </tr>
+   <tr>
+   <td>name</td>
+   <td>✔︎</td>
+   <td>✔︎</td>
+   <td>✔︎</td>
+   </tr>
+   <tr>
+   <td>pattern</td>
+   <td></td>
+   <td></td>
+   <td>✔︎</td>
+   </tr>
+   <tr>
+   <td>placeholder</td>
+   <td>✔︎</td>
+   <td></td>
+   <td>✔︎</td>
+   </tr>
+   <tr>
+   <td>readonly</td>
+   <td>✔︎</td>
+   <td>︎</td>
+   <td>✔︎</td>
+   </tr>
+   <tr>
+   <td>required</td>
+   <td>✔︎</td>
+   <td>✔︎</td>
+   <td>✔︎</td>
+   </tr>
+   <tr>
+   <td>rows</td>
+   <td>✔︎</td>
+   <td></td>
+   <td></td>
+   </tr>
+   <tr>
+   <td>size<br>via <code>controlSize</code> property</td>
+   <td></td>
+   <td></td>
+   <td>✔︎</td>
+   </tr>
+   <tr>
+   <td>spellcheck</td>
+   <td>✔︎</td>
+   <td></td>
+   <td>✔︎</td>
+   </tr>
+   <tr>
+   <td>step</td>
+   <td></td>
+   <td></td>
+   <td>✔︎</td>
+   </tr>
+   <tr>
+   <td>tabindex</td>
+   <td>✔︎</td>
+   <td>✔︎</td>
+   <td>✔︎</td>
+   </tr>
+   <tr>
+   <td>title</td>
+   <td>✔︎</td>
+   <td>✔︎</td>
+   <td>✔︎</td>
+   </tr>
+   <tr>
+   <td>wrap</td>
+   <td>✔︎</td>
+   <td></td>
+   <td></td>
+   </tr>
+   </tbody>
+   </table>
+  
+   @class FormElement
+   @namespace Components
+   @extends Components.FormGroup
+   @public
+   */
+  exports.default = _group.default.extend({
+    layout: _element.default,
+    classNameBindings: ['disabled:disabled', 'required:is-required', 'isValidating'],
+
+    /**
+     * Text to display within a `<label>` tag.
+     *
+     * You should include a label for every form input cause otherwise screen readers
+     * will have trouble with your forms. Use `invisibleLabel` property if you want
+     * to hide them.
+     *
+     * @property label
+     * @type string
+     * @public
+     */
+    label: null,
+
+    /**
+     * Controls label visibility by adding 'sr-only' class.
+     *
+     * @property invisibleLabel
+     * @type boolean
+     * @default false
+     * @public
+     */
+    invisibleLabel: false,
+
+    /**
+     * @property hasLabel
+     * @type boolean
+     * @readonly
+     * @private
+     */
+    hasLabel: Ember.computed.notEmpty('label'),
+
+    /**
+     * The type of the control widget.
+     * Supported types:
+     *
+     * * 'text'
+     * * 'checkbox'
+     * * 'radio'
+     * * 'textarea'
+     * * any other type will use an input tag with the `controlType` value as the type attribute (for e.g. HTML5 input
+     * types like 'email'), and the same layout as the 'text' type
+     *
+     * @property controlType
+     * @type string
+     * @default 'text'
+     * @public
+     */
+    controlType: 'text',
+
+    /**
+     * The value of the control element is bound to this property. You can bind it to some controller property to
+     * get/set the control element's value:
+     *
+     * ```hbs
+     * {{form.element controlType="email" label="Email" placeholder="Email" value=email}}
+     * ```
+     *
+     * Note: you lose the ability to validate this form element by directly binding to its value. It is recommended
+     * to use the `property` feature instead.
+     *
+     *
+     * @property value
+     * @public
+     */
+    value: null,
+
+    /**
+     The property name of the form element's `model` (by default the `model` of its parent `Components.Form`) that this
+     form element should represent. The control element's value will automatically be bound to the model property's
+     value.
+      Using this property enables form validation on this element.
+      @property property
+     @type string
+     @public
+     */
+    property: null,
+
+    /**
+     * The model used for validation. Defaults to the parent `Components.Form`'s `model`
+     *
+     * @property model
+     * @public
+     */
+    model: null,
+
+    /**
+     * Show a help text next to the control
+     *
+     * @property helpText
+     * @type {string}
+     * @public
+     */
+    helpText: null,
+
+    /**
+     * Only if there is a validator, this property makes all errors to be displayed at once
+     * inside a scrollable container.
+     *
+     * @default false
+     * @property showMultipleErrors
+     * @public
+     * @type {Boolean}
+     */
+    showMultipleErrors: false,
+
+    /**
+     * Array of options for control types that show a selection (e.g. radio button groups)
+     * Can be an array of simple strings or objects. For objects use `optionLabelPath` to specify the path containing the
+     * label.
+     *
+     * @property options
+     * @type {Array}
+     * @public
+     */
+    options: null,
+
+    /**
+     * Property path (e.g. 'title' or 'related.name') to render the label of an selection option. See `options`.s
+     *
+     * @property optionLabelPath
+     * @type {String}
+     * @public
+     */
+    optionLabelPath: null,
+
+    /**
+     * @property hasHelpText
+     * @type boolean
+     * @readonly
+     * @private
+     */
+    hasHelpText: Ember.computed.notEmpty('helpText').readOnly(),
+
+    /**
+     * The array of error messages from the `model`'s validation.
+     *
+     * @property errors
+     * @type array
+     * @protected
+     */
+    errors: null,
+
+    /**
+     * @property hasErrors
+     * @type boolean
+     * @readonly
+     * @private
+     */
+    hasErrors: Ember.computed.gt('errors.length', 0),
+
+    /**
+     * The array of warning messages from the `model`'s validation.
+     *
+     * @property errors
+     * @type array
+     * @protected
+     */
+    warnings: null,
+
+    /**
+     * @property hasWarnings
+     * @type boolean
+     * @readonly
+     * @private
+     */
+    hasWarnings: Ember.computed.gt('warnings.length', 0),
+
+    /**
+     * Show a custom error message that does not come from the model's validation. Will be immediately shown, regardless
+     * of any user interaction (i.e. no `focusOut` event required)
+     *
+     * @property customError
+     * @type string
+     * @public
+     */
+    customError: null,
+
+    /**
+     * @property hasCustomError
+     * @type boolean
+     * @readonly
+     * @private
+     */
+    hasCustomError: Ember.computed.notEmpty('customError'),
+
+    /**
+     * Show a custom warning message that does not come from the model's validation. Will be immediately shown, regardless
+     * of any user interaction (i.e. no `focusOut` event required). If the model's validation has an error then the error
+     * will be shown in place of this warning.
+     *
+     * @property customWarning
+     * @type string
+     * @public
+     */
+    customWarning: null,
+
+    /**
+     * @property hasCustomWarning
+     * @type boolean
+     * @readonly
+     * @private
+     */
+    hasCustomWarning: Ember.computed.notEmpty('customWarning'),
+
+    /**
+     * Property for size styling, set to 'lg', 'sm' or 'xs' (the latter only for BS3)
+     *
+     * @property size
+     * @type String
+     * @public
+     */
+    size: null,
+
+    /**
+     * The array of validation messages (either errors or warnings) from either custom error/warnings or , if we are showing model validation messages, the model's validation
+     *
+     * @property validationMessages
+     * @type array
+     * @private
+     */
+    validationMessages: Ember.computed('hasCustomError', 'customError', 'hasErrors', 'hasCustomWarning', 'customWarning', 'hasWarnings', 'errors.[]', 'warnings.[]', 'showModelValidation', function () {
+      if (this.get('hasCustomError')) {
+        return Ember.A([this.get('customError')]);
+      }
+      if (this.get('hasErrors') && this.get('showModelValidation')) {
+        return Ember.A(this.get('errors'));
+      }
+      if (this.get('hasCustomWarning')) {
+        return Ember.A([this.get('customWarning')]);
+      }
+      if (this.get('hasWarnings') && this.get('showModelValidation')) {
+        return Ember.A(this.get('warnings'));
+      }
+      return null;
+    }),
+
+    /**
+     * @property hasValidationMessages
+     * @type boolean
+     * @readonly
+     * @private
+     */
+    hasValidationMessages: Ember.computed.gt('validationMessages.length', 0),
+
+    /**
+     * @property hasValidator
+     * @type boolean
+     * @default false
+     * @protected
+     */
+    hasValidator: false,
+
+    /**
+     * Set a validating state for async validations
+     *
+     * @property isValidating
+     * @type boolean
+     * @default false
+     * @protected
+     */
+    isValidating: false,
+
+    /**
+     * If `true` form validation markup is rendered (requires a validatable `model`).
+     *
+     * @property showValidation
+     * @type boolean
+     * @default false
+     * @private
+     */
+    showValidation: Ember.computed.or('showOwnValidation', 'showAllValidations', 'hasCustomError', 'hasCustomWarning'),
+
+    /**
+     * @property showOwnValidation
+     * @type boolean
+     * @default false
+     * @private
+     */
+    showOwnValidation: false,
+
+    /**
+     * @property showAllValidations
+     * @type boolean
+     * @default false
+     * @private
+     */
+    showAllValidations: false,
+
+    /**
+     * @property showModelValidations
+     * @type boolean
+     * @readonly
+     * @private
+     */
+    showModelValidation: Ember.computed.or('showOwnValidation', 'showAllValidations'),
+
+    /**
+     * @property showValidationMessages
+     * @type boolean
+     * @readonly
+     * @private
+     */
+    showValidationMessages: Ember.computed.and('showValidation', 'hasValidationMessages'),
+
+    /**
+     * Event or list of events which enable form validation markup rendering.
+     * Supported events: ['focusOut', 'change', 'input']
+     *
+     * @property showValidationOn
+     * @type string|array
+     * @default ['focusOut']
+     * @public
+     */
+    showValidationOn: null,
+
+    /**
+     * @property _showValidationOn
+     * @type array
+     * @readonly
+     * @private
+     */
+    _showValidationOn: Ember.computed('showValidationOn.[]', function () {
+      let showValidationOn = this.get('showValidationOn');
+
+      (true && !(Ember.isArray(showValidationOn) || Ember.typeOf(showValidationOn) === 'string') && Ember.assert('showValidationOn must be a String or an Array', Ember.isArray(showValidationOn) || Ember.typeOf(showValidationOn) === 'string'));
+
+      if (Ember.isArray(showValidationOn)) {
+        return showValidationOn;
+      }
+
+      if (typeof showValidationOn.toString === 'function') {
+        return [showValidationOn];
+      }
+      return [];
+    }),
+
+    /**
+     * @method showValidationOnHandler
+     * @private
+     */
+    showValidationOnHandler(event) {
+      if (this.get('_showValidationOn').indexOf(event) !== -1) {
+        this.set('showOwnValidation', true);
+      }
+    },
+
+    /**
+     * The validation ("error" (BS3)/"danger" (BS4), "warning", or "success") or null if no validation is to be shown. Automatically computed from the
+     * models validation state.
+     *
+     * @property validation
+     * @readonly
+     * @type string
+     * @private
+     */
+    validation: Ember.computed('hasCustomError', 'hasErrors', 'hasCustomWarning', 'hasWarnings', 'hasValidator', 'showValidation', 'showModelValidation', 'isValidating', 'disabled', function () {
+      if (!this.get('showValidation') || !this.get('hasValidator') || this.get('isValidating') || this.get('disabled')) {
+        return null;
+      } else if (this.get('showModelValidation')) {
+        /* The display of model validation messages has been triggered */
+        return this.get('hasErrors') || this.get('hasCustomError') ? 'error' : this.get('hasWarnings') || this.get('hasCustomWarning') ? 'warning' : 'success';
+      } else {
+        /* If there are custom errors or warnings these should always be shown */
+        return this.get('hasCustomError') ? 'error' : 'warning';
+      }
+    }),
+
+    /**
+     * True for text field `controlType`s
+     *
+     * @property useIcons
+     * @type boolean
+     * @readonly
+     * @public
+     */
+    useIcons: Ember.computed.equal('controlComponent', 'bs-form/element/control/input'),
+
+    /**
+     * The form layout used for the markup generation (see http://getbootstrap.com/css/#forms):
+     *
+     * * 'horizontal'
+     * * 'vertical'
+     * * 'inline'
+     *
+     * Defaults to the parent `form`'s `formLayout` property.
+     *
+     * @property formLayout
+     * @type string
+     * @default 'vertical'
+     * @public
+     */
+    formLayout: 'vertical',
+
+    /**
+     * The Bootstrap grid class for form labels within a horizontal layout form. Defaults to the value of the same
+     * property of the parent form. The corresponding grid class for form controls is automatically computed.
+     *
+     * @property horizontalLabelGridClass
+     * @type string
+     * @public
+     */
+    horizontalLabelGridClass: null,
+
+    /**
+     * ID for input field and the corresponding label's "for" attribute
+     *
+     * @property formElementId
+     * @type string
+     * @private
+     */
+    formElementId: Ember.computed('elementId', function () {
+      return `${this.get('elementId')}-field`;
+    }),
+
+    /**
+     * ID of the helpText, used for aria-describedby attribute of the control element
+     *
+     * @property ariaDescribedBy
+     * @type string
+     * @private
+     */
+    ariaDescribedBy: Ember.computed('elementId', function () {
+      return `${this.get('elementId')}-help`;
+    }),
+
+    /**
+     * @property formComponent
+     * @type {String}
+     * @private
+     */
+    formComponent: 'bs-form',
+
+    /**
+     * @property layoutComponent
+     * @type {String}
+     * @private
+     */
+    layoutComponent: Ember.computed('formLayout', 'controlType', function () {
+      const formComponent = this.get('formComponent');
+      const formLayout = this.get('formLayout');
+      const controlType = this.get('controlType');
+
+      if (nonDefaultLayouts.includes(controlType)) {
+        return `${formComponent}/element/layout/${formLayout}/${controlType}`;
+      } else {
+        return `${formComponent}/element/layout/${formLayout}`;
+      }
+    }),
+
+    /**
+     * @property controlComponent
+     * @type {String}
+     * @private
+     */
+    controlComponent: Ember.computed('controlType', function () {
+      const formComponent = this.get('formComponent');
+      const controlType = this.get('controlType');
+      const componentName = `${formComponent}/element/control/${controlType}`;
+
+      if (Ember.getOwner(this).hasRegistration(`component:${componentName}`)) {
+        return componentName;
+      }
+
+      return `${formComponent}/element/control/input`;
+    }),
+
+    /**
+     * @property errorsComponent
+     * @type {String}
+     * @private
+     */
+    errorsComponent: 'bs-form/element/errors',
+
+    /**
+     * @property feedbackIconComponent
+     * @type {String}
+     * @private
+     */
+    feedbackIconComponent: 'bs-form/element/feedback-icon',
+
+    /**
+     * @property labelComponent
+     * @type {String}
+     * @private
+     */
+    labelComponent: 'bs-form/element/label',
+
+    /**
+     * @property helpTextComponent
+     * @type {String}
+     * @private
+     */
+    helpTextComponent: 'bs-form/element/help-text',
+
+    /**
+     * Setup validation properties. This method acts as a hook for external validation
+     * libraries to overwrite. In case of failed validations the `errors` property should contain an array of error messages.
+     *
+     * @method setupValidations
+     * @private
+     */
+    setupValidations() {},
+
+    /**
+     * Listen for focusOut events from the control element to automatically set `showOwnValidation` to true to enable
+     * form validation markup rendering if `showValidationsOn` contains `focusOut`.
+     *
+     * @event focusOut
+     * @private
+     */
+    focusOut() {
+      this.showValidationOnHandler('focusOut');
+    },
+
+    /**
+     * Listen for change events from the control element to automatically set `showOwnValidation` to true to enable
+     * form validation markup rendering if `showValidationsOn` contains `change`.
+     *
+     * @event change
+     * @private
+     */
+    change() {
+      this.showValidationOnHandler('change');
+    },
+
+    /**
+     * Listen for input events from the control element to automatically set `showOwnValidation` to true to enable
+     * form validation markup rendering if `showValidationsOn` contains `input`.
+     *
+     * @event input
+     * @private
+     */
+    input() {
+      this.showValidationOnHandler('input');
+    },
+
+    /**
+     * The action is called whenever the input value is changed, e.g. by typing text
+     *
+     * @event onChange
+     * @param {String} value The new value of the form control
+     * @param {Object} model The form element's model
+     * @param {String} property The value of `property`
+     * @public
+     */
+    onChange() {},
+
+    init() {
+      this._super(...arguments);
+      if (this.get('showValidationOn') === null) {
+        this.set('showValidationOn', ['focusOut']);
+      }
+      if (!Ember.isBlank(this.get('property'))) {
+        Ember.defineProperty(this, 'value', Ember.computed.alias(`model.${this.get('property')}`));
+        this.setupValidations();
+      }
+    },
+
+    /*
+     * adjust feedback icon position
+     *
+     * Bootstrap documentation:
+     *  Manual positioning of feedback icons is required for [...] input groups
+     *  with an add-on on the right. [...] For input groups, adjust the right
+     *  value to an appropriate pixel value depending on the width of your addon.
+     */
+    adjustFeedbackIcons: Ember.observer('hasFeedback', 'formLayout', function () {
+      Ember.run.scheduleOnce('afterRender', () => {
+        let el = this.get('element');
+        let feedbackIcon;
+        // validation state icons are only shown if form element has feedback
+        if (!this.get('isDestroying') && this.get('hasFeedback')
+        // and form group element has
+        // an input-group
+        && el.querySelector('.input-group')
+        // an addon or button on right side
+        && el.querySelector('.input-group input + .input-group-addon, .input-group input + .input-group-btn')
+        // an icon showing validation state
+        && (feedbackIcon = el.querySelector('.form-control-feedback'))) {
+          // clear existing adjustment
+          feedbackIcon.style.right = '';
+
+          let defaultPosition = 0;
+          let match = getComputedStyle(feedbackIcon).right.match(/^(\d+)px$/);
+          if (match) {
+            defaultPosition = parseInt(match[1]);
+          }
+          // Bootstrap documentation:
+          //  We do not support multiple add-ons (.input-group-addon or .input-group-btn) on a single side.
+          // therefore we could rely on having only one input-group-addon or input-group-btn
+          let inputGroupWidth = el.querySelector('input + .input-group-addon, input + .input-group-btn').offsetWidth;
+          let adjustedPosition = defaultPosition + inputGroupWidth;
+
+          feedbackIcon.style.right = `${adjustedPosition}px`;
+        }
+      });
+    }),
+
+    didInsertElement() {
+      this._super(...arguments);
+      this.adjustFeedbackIcons();
+    },
+
+    actions: {
+      change(value) {
+        let { onChange, model, property } = this.getProperties('onChange', 'model', 'property');
+        onChange(value, model, property);
+      }
+    }
+  });
+});
+;define('ember-bootstrap/components/base/bs-form/element/control', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend({
+
+    /**
+     * @property value
+     * @public
+     */
+    value: null,
+
+    /**
+     * @property ariaDescribedBy
+     * @type {string}
+     * @public
+     */
+    ariaDescribedBy: null,
+
+    /**
+     * This action is called whenever the `value` changes
+     *
+     * @event onChange
+     * @param {*} value
+     * @public
+     */
+    onChange() {}
+  });
+});
+;define('ember-bootstrap/components/base/bs-form/element/control/checkbox', ['exports', 'ember-bootstrap/components/base/bs-form/element/control', 'ember-bootstrap/mixins/control-attributes'], function (exports, _control, _controlAttributes) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _control.default.extend(_controlAttributes.default, {
+    attributeBindings: ['value:checked', 'type'],
+
+    /**
+     * @property type
+     * @type {String}
+     * @readonly
+     * @private
+     */
+    type: 'checkbox',
+
+    click(event) {
+      this.get('onChange')(event.target.checked);
+    }
+  });
+});
+;define('ember-bootstrap/components/base/bs-form/element/control/input', ['exports', 'ember-bootstrap/components/base/bs-form/element/control', 'ember-bootstrap/mixins/control-attributes'], function (exports, _control, _controlAttributes) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _control.default.extend(_controlAttributes.default, {
+    attributeBindings: ['value', 'type', 'placeholder', 'controlSize:size', 'minlength', 'maxlength', 'min', 'max', 'pattern', 'accept', 'autocomplete', 'autocapitalize', 'autocorrect', 'autosave', 'inputmode', 'multiple', 'step', 'spellcheck'],
+    classNames: ['form-control'],
+
+    /**
+     * @property type
+     * @type {String}
+     * @public
+     */
+    type: 'text',
+
+    change(event) {
+      this.get('onChange')(event.target.value);
+    },
+
+    input(event) {
+      this.get('onChange')(event.target.value);
+    }
+
+  });
+});
+;define('ember-bootstrap/components/base/bs-form/element/control/radio', ['exports', 'ember-bootstrap/components/base/bs-form/element/control', 'ember-bootstrap/templates/components/bs-form/element/control/radio'], function (exports, _control, _radio) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _control.default.extend({
+    layout: _radio.default,
+    tagName: '',
+
+    /**
+     * @property inline
+     * @type {Boolean}
+     * @default false
+     * @public
+     */
+    inline: false
+  });
+});
+;define('ember-bootstrap/components/base/bs-form/element/control/textarea', ['exports', 'ember-bootstrap/components/base/bs-form/element/control', 'ember-bootstrap/mixins/control-attributes'], function (exports, _control, _controlAttributes) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _control.default.extend(_controlAttributes.default, {
+    attributeBindings: ['value', 'placeholder', 'minlength', 'maxlength', 'autocomplete', 'autocapitalize', 'autocorrect', 'spellcheck', 'rows', 'cols', 'wrap'],
+    tagName: 'textarea',
+    classNames: ['form-control'],
+
+    change(event) {
+      this.get('onChange')(event.target.value);
+    },
+
+    input(event) {
+      this.get('onChange')(event.target.value);
+    }
+  });
+});
+;define('ember-bootstrap/components/base/bs-form/element/errors', ['exports', 'ember-bootstrap/templates/components/bs-form/element/errors'], function (exports, _errors) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend({
+    layout: _errors.default,
+    tagName: '',
+
+    /**
+     * @property show
+     * @type {Boolean}
+     * @public
+     */
+    show: false,
+
+    /**
+     * @property messages
+     * @type {Ember.Array}
+     * @public
+     */
+    messages: null,
+
+    /**
+     * Whether or not should display several errors at the same time.
+     *
+     * @default false
+     * @property showMultipleErrors
+     * @public
+     * @type {Boolean}
+     */
+    showMultipleErrors: false
+  });
+});
+;define('ember-bootstrap/components/base/bs-form/element/feedback-icon', ['exports', 'ember-bootstrap/templates/components/bs-form/element/feedback-icon'], function (exports, _feedbackIcon) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend({
+    layout: _feedbackIcon.default,
+    tagName: '',
+
+    /**
+     * @property show
+     * @type {Boolean}
+     * @public
+     */
+    show: false,
+
+    /**
+     * @property iconName
+     * @type {String}
+     * @public
+     */
+    iconName: null
+  });
+});
+;define('ember-bootstrap/components/base/bs-form/element/help-text', ['exports', 'ember-bootstrap/templates/components/bs-form/element/help-text'], function (exports, _helpText) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend({
+    layout: _helpText.default,
+
+    /**
+     * @property text
+     * @type {string}
+     * @public
+     */
+    text: null
+  });
+});
+;define('ember-bootstrap/components/base/bs-form/element/label', ['exports', 'ember-bootstrap/templates/components/bs-form/element/label'], function (exports, _label) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend({
+    layout: _label.default,
+    tagName: '',
+
+    /**
+     * @property label
+     * @type string
+     * @public
+     */
+    label: null,
+
+    /**
+     * @property invisibleLabel
+     * @type boolean
+     * @public
+     */
+    invisibleLabel: false,
+
+    /**
+     * @property formElementId
+     * @type {String}
+     * @public
+     */
+    formElementId: null,
+
+    /**
+     * @property labelClass
+     * @type {String}
+     * @public
+     */
+    labelClass: null,
+
+    /**
+     * The form layout used for the markup generation (see http://getbootstrap.com/css/#forms):
+     *
+     * * 'horizontal'
+     * * 'vertical'
+     * * 'inline'
+     *
+     * Defaults to the parent `form`'s `formLayout` property.
+     *
+     * @property formLayout
+     * @type string
+     * @default 'vertical'
+     * @public
+     */
+    formLayout: 'vertical',
+
+    /**
+     * The type of the control widget.
+     * Supported types:
+     *
+     * * 'text'
+     * * 'checkbox'
+     * * 'textarea'
+     * * any other type will use an input tag with the `controlType` value as the type attribute (for e.g. HTML5 input
+     * types like 'email'), and the same layout as the 'text' type
+     *
+     * @property controlType
+     * @type string
+     * @default 'text'
+     * @public
+     */
+    controlType: 'text',
+
+    /**
+     * Indicates whether the type of the control widget equals `checkbox`
+     *
+     * @property isCheckbox
+     * @type boolean
+     * @private
+     */
+    isCheckbox: Ember.computed.equal('controlType', 'checkbox').readOnly(),
+
+    /**
+     * Indicates whether the form type equals `horizontal`
+     *
+     * @property isHorizontal
+     * @type boolean
+     * @private
+     */
+    isHorizontal: Ember.computed.equal('formLayout', 'horizontal').readOnly()
+  });
+});
+;define('ember-bootstrap/components/base/bs-form/element/layout', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend({
+    tagName: '',
+
+    /**
+     * @property formElementId
+     * @type {String}
+     * @public
+     */
+    formElementId: null,
+
+    /**
+     * @property hasLabel
+     * @type boolean
+     * @public
+     */
+    hasLabel: true,
+
+    /**
+     * @property errorsComponent
+     * @type {Ember.Component}
+     * @public
+     */
+    errorsComponent: null,
+
+    /**
+     * @property feedbackIconComponent
+     * @type {Ember.Component}
+     * @public
+     */
+    feedbackIconComponent: null,
+
+    /**
+     * @property labelComponent
+     * @type {Ember.Component}
+     * @public
+     */
+    labelComponent: null,
+
+    /**
+     * @property helpTextComponent
+     * @type {Ember.Component}
+     * @public
+     */
+    helpTextComponent: null
+  });
+});
+;define('ember-bootstrap/components/base/bs-form/element/layout/horizontal', ['exports', 'ember-bootstrap/components/base/bs-form/element/layout', 'ember-bootstrap/templates/components/bs-form/element/layout/horizontal'], function (exports, _layout, _horizontal) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _layout.default.extend({
+    layout: _horizontal.default,
+
+    /**
+     * The Bootstrap grid class for form labels within a horizontal layout form.
+     *
+     * @property horizontalLabelGridClass
+     * @type string
+     * @public
+     */
+    horizontalLabelGridClass: null,
+
+    /**
+     * Computed property that specifies the Bootstrap grid class for form controls within a horizontal layout form.
+     *
+     * @property horizontalInputGridClass
+     * @type string
+     * @readonly
+     * @private
+     */
+    horizontalInputGridClass: Ember.computed('horizontalLabelGridClass', function () {
+      if (Ember.isBlank(this.get('horizontalLabelGridClass'))) {
+        return;
+      }
+      let parts = this.get('horizontalLabelGridClass').split('-');
+      (true && !(parts.length === 3) && Ember.assert('horizontalInputGridClass must match format bootstrap grid column class', parts.length === 3));
+
+      parts[2] = 12 - parts[2];
+      return parts.join('-');
+    }).readOnly()
+
+  });
+});
+;define('ember-bootstrap/components/base/bs-form/element/layout/inline', ['exports', 'ember-bootstrap/components/base/bs-form/element/layout', 'ember-bootstrap/templates/components/bs-form/element/layout/vertical'], function (exports, _layout, _vertical) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _layout.default.extend({
+    layout: _vertical.default
+  });
+});
+;define('ember-bootstrap/components/base/bs-form/element/layout/inline/checkbox', ['exports', 'ember-bootstrap/components/base/bs-form/element/layout/inline', 'ember-bootstrap/templates/components/bs-form/element/layout/vertical/checkbox'], function (exports, _inline, _checkbox) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _inline.default.extend({
+    layout: _checkbox.default
+  });
+});
+;define('ember-bootstrap/components/base/bs-form/element/layout/vertical', ['exports', 'ember-bootstrap/components/base/bs-form/element/layout', 'ember-bootstrap/templates/components/bs-form/element/layout/vertical'], function (exports, _layout, _vertical) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _layout.default.extend({
+    layout: _vertical.default
+  });
+});
+;define('ember-bootstrap/components/base/bs-form/element/layout/vertical/checkbox', ['exports', 'ember-bootstrap/components/base/bs-form/element/layout/vertical', 'ember-bootstrap/templates/components/bs-form/element/layout/vertical/checkbox'], function (exports, _vertical, _checkbox) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _vertical.default.extend({
+    layout: _checkbox.default
+  });
+});
+;define('ember-bootstrap/components/base/bs-form/group', ['exports', 'ember-bootstrap/templates/components/bs-form/group'], function (exports, _group) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend({
+    layout: _group.default,
+
+    /**
+     * @property classTypePrefix
+     * @type String
+     * @default 'form-group' (BS3) or 'form-control' (BS4)
+     * @private
+     */
+
+    /**
+     * Computed property which is true if the form group is in a validation state
+     *
+     * @property hasValidation
+     * @type boolean
+     * @private
+     * @readonly
+     */
+    hasValidation: Ember.computed.notEmpty('validation').readOnly(),
+
+    /**
+     * Set to a validation state to render the form-group with a validation style (only for BS3).
+     * See http://getbootstrap.com/css/#forms-control-validation
+     *
+     * The default states of "success", "warning" and "error" are supported by Bootstrap out-of-the-box.
+     * But you can use custom states as well. This will set a has-<state> class, and (if `useIcons`is true)
+     * a feedback whose class is taken from the <state>Icon property
+     *
+     * @property validation
+     * @type string
+     * @public
+     */
+    validation: null
+  });
+});
+;define('ember-bootstrap/components/base/bs-modal-simple', ['exports', 'ember-bootstrap/components/bs-modal', 'ember-bootstrap/templates/components/bs-modal-simple'], function (exports, _bsModal, _bsModalSimple) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _bsModal.default.extend({
+    layout: _bsModalSimple.default,
+
+    /**
+     * The title of the modal, visible in the modal header. Is ignored if `header` is false.
+     *
+     * @property title
+     * @type string
+     * @public
+     */
+    title: null,
+
+    /**
+     * Display a close button (x icon) in the corner of the modal header.
+     *
+     * @property closeButton
+     * @type boolean
+     * @default true
+     * @public
+     */
+    closeButton: true,
+
+    /**
+     * The title of the default close button.
+     *
+     * @property closeTitle
+     * @type string
+     * @default 'Ok'
+     * @public
+     */
+    closeTitle: 'Ok',
+
+    /**
+     * The type of the submit button (primary button).
+     *
+     * @property submitButtonType
+     * @type string
+     * @default 'primary'
+     * @public
+     */
+    submitButtonType: 'primary',
+
+    /**
+     * The title of the submit button (primary button). Will be ignored (i.e. no button) if set to null.
+     *
+     * @property submitTitle
+     * @type string
+     * @default null
+     * @public
+     */
+    submitTitle: null
+
+  });
+});
+;define('ember-bootstrap/components/base/bs-modal', ['exports', 'ember-bootstrap/templates/components/bs-modal', 'ember-bootstrap/mixins/transition-support', 'ember-bootstrap/utils/listen-to-cp', 'ember-bootstrap/utils/transition-end', 'ember-bootstrap/utils/dom'], function (exports, _bsModal, _transitionSupport, _listenToCp, _transitionEnd, _dom) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend(_transitionSupport.default, {
+    layout: _bsModal.default,
+
+    /**
+     * Visibility of the modal. Toggle to show/hide with CSS transitions.
+     *
+     * When the modal is closed by user interaction this property will not update by using two-way bindings in order
+     * to follow DDAU best practices. If you want to react to such changes, subscribe to the `onHide` action
+     *
+     * @property open
+     * @type boolean
+     * @default true
+     * @public
+     */
+    open: true,
+
+    /**
+     * @property isOpen
+     * @private
+     */
+    isOpen: (0, _listenToCp.default)('open'),
+
+    /**
+     * @property _isOpen
+     * @private
+     */
+    _isOpen: false,
+
+    /**
+     * Set to false to disable fade animations.
+     *
+     * @property fade
+     * @type boolean
+     * @default true
+     * @public
+     */
+    fade: Ember.computed.not('isFastBoot'),
+
+    /**
+     * @property notFade
+     * @type boolean
+     * @private
+     */
+    notFade: Ember.computed.not('fade'),
+
+    /**
+     * Used to apply Bootstrap's visibility classes.
+     *
+     * @property showModal
+     * @type boolean
+     * @default false
+     * @private
+     */
+    showModal: false,
+
+    /**
+     * Render modal markup?
+     *
+     * @property inDom
+     * @type boolean
+     * @default false
+     * @private
+     */
+    inDom: false,
+
+    /**
+     * @property paddingLeft
+     * @type number|null
+     * @default null
+     * @private
+     */
+    paddingLeft: null,
+
+    /**
+     * @property paddingRight
+     * @type number|null
+     * @default null
+     * @private
+     */
+    paddingRight: null,
+
+    /**
+     * Use a semi-transparent modal background to hide the rest of the page.
+     *
+     * @property backdrop
+     * @type boolean
+     * @default true
+     * @public
+     */
+    backdrop: true,
+
+    /**
+     * @property showBackdrop
+     * @type boolean
+     * @default false
+     * @private
+     */
+    showBackdrop: false,
+
+    /**
+     * Closes the modal when escape key is pressed.
+     *
+     * @property keyboard
+     * @type boolean
+     * @default true
+     * @public
+     */
+    keyboard: true,
+
+    /**
+     * [BS4 only!] Vertical position, either 'top' (default) or 'center'
+     * 'center' will apply the `modal-dialog-centered` class
+     *
+     * @property position
+     * @type {string}
+     * @default 'top'
+     * @public
+     */
+    position: 'top',
+
+    /**
+     * @property dialogComponent
+     * @type {String}
+     * @private
+     */
+    dialogComponent: 'bs-modal/dialog',
+
+    /**
+     * @property headerComponent
+     * @type {String}
+     * @private
+     */
+    headerComponent: 'bs-modal/header',
+
+    /**
+     * @property bodyComponent
+     * @type {String}
+     * @private
+     */
+    bodyComponent: 'bs-modal/body',
+
+    /**
+     * @property footerComponent
+     * @type {String}
+     * @private
+     */
+    footerComponent: 'bs-modal/footer',
+
+    /**
+     * The id of the `.modal` element.
+     *
+     * @property modalId
+     * @type string
+     * @readonly
+     * @private
+     */
+    modalId: Ember.computed('elementId', function () {
+      return `${this.get('elementId')}-modal`;
+    }),
+
+    /**
+     * The DOM element of the `.modal` element.
+     *
+     * @property modalElement
+     * @type object
+     * @readonly
+     * @private
+     */
+    modalElement: Ember.computed('modalId', function () {
+      return document.getElementById(this.get('modalId'));
+    }).volatile(),
+
+    /**
+     * The id of the backdrop element.
+     *
+     * @property backdropId
+     * @type string
+     * @readonly
+     * @private
+     */
+    backdropId: Ember.computed('elementId', function () {
+      return `${this.get('elementId')}-backdrop`;
+    }),
+
+    /**
+     * The DOM element of the backdrop element.
+     *
+     * @property backdropElement
+     * @type object
+     * @readonly
+     * @private
+     */
+    backdropElement: Ember.computed('backdropId', function () {
+      return document.getElementById(this.get('backdropId'));
+    }).volatile(),
+
+    /**
+     * The destination DOM element for ember-popper.
+     *
+     * @property destinationElement
+     * @type object
+     * @readonly
+     * @private
+     */
+    destinationElement: Ember.computed(function () {
+      let dom = (0, _dom.getDOM)(this);
+      return (0, _dom.findElementById)(dom, 'ember-bootstrap-wormhole');
+    }).volatile(),
+
+    /**
+     * Property for size styling, set to null (default), 'lg' or 'sm'
+     *
+     * Also see the [Bootstrap docs](http://getbootstrap.com/javascript/#modals-sizes)
+     *
+     * @property size
+     * @type String
+     * @public
+     */
+    size: null,
+
+    /**
+     * If true clicking on the backdrop will close the modal.
+     *
+     * @property backdropClose
+     * @type boolean
+     * @default true
+     * @public
+     */
+    backdropClose: true,
+
+    /**
+     * If true component will render in place, rather than be wormholed.
+     *
+     * @property renderInPlace
+     * @type boolean
+     * @default false
+     * @public
+     */
+    renderInPlace: false,
+
+    /**
+     * @property _renderInPlace
+     * @type boolean
+     * @private
+     */
+    _renderInPlace: Ember.computed('renderInPlace', 'destinationElement', function () {
+      return this.get('renderInPlace') || !this.get('destinationElement');
+    }),
+
+    /**
+     * The duration of the fade transition
+     *
+     * @property transitionDuration
+     * @type number
+     * @default 300
+     * @public
+     */
+    transitionDuration: 300,
+
+    /**
+     * The duration of the backdrop fade transition
+     *
+     * @property backdropTransitionDuration
+     * @type number
+     * @default 150
+     * @public
+     */
+    backdropTransitionDuration: 150,
+
+    /**
+     * @property isFastBoot
+     * @type {Boolean}
+     * @private
+     */
+    isFastBoot: Ember.computed(function () {
+      if (!Ember.getOwner) {
+        // Ember.getOwner is available as of Ember 2.3, while FastBoot requires 2.4. So just return false...
+        return false;
+      }
+
+      let owner = Ember.getOwner(this);
+      if (!owner) {
+        return false;
+      }
+
+      let fastboot = owner.lookup('service:fastboot');
+      if (!fastboot) {
+        return false;
+      }
+
+      return Ember.get(fastboot, 'isFastBoot');
+    }),
+
+    /**
+     * The action to be sent when the modal footer's submit button (if present) is pressed.
+     * Note that if your modal body contains a form (e.g. [Components.Form](Components.Form.html)) this action will
+     * not be triggered. Instead a submit event will be triggered on the form itself. See the class description for an
+     * example.
+     *
+     * @property onSubmit
+     * @type function
+     * @public
+     */
+    onSubmit() {},
+
+    /**
+     * The action to be sent when the modal is closing.
+     * This will be triggered by pressing the modal header's close button (x button) or the modal footer's close button.
+     * Note that this will happen before the modal is hidden from the DOM, as the fade transitions will still need some
+     * time to finish. Use the `onHidden` if you need the modal to be hidden when the action triggers.
+     *
+     * You can return false to prevent closing the modal automatically, and do that in your action by
+     * setting `open` to false.
+     *
+     * @property onHide
+     * @type function
+     * @public
+     */
+    onHide() {},
+
+    /**
+     * The action to be sent after the modal has been completely hidden (including the CSS transition).
+     *
+     * @property onHidden
+     * @type function
+     * @default null
+     * @public
+     */
+    onHidden() {},
+
+    /**
+     * The action to be sent when the modal is opening.
+     * This will be triggered immediately after the modal is shown (so it's safe to access the DOM for
+     * size calculations and the like). This means that if fade=true, it will be shown in between the
+     * backdrop animation and the fade animation.
+     *
+     * @property onShow
+     * @type function
+     * @default null
+     * @public
+     */
+    onShow() {},
+
+    /**
+     * The action to be sent after the modal has been completely shown (including the CSS transition).
+     *
+     * @property onShown
+     * @type function
+     * @public
+     */
+    onShown() {},
+
+    actions: {
+      close() {
+        if (this.get('onHide')() !== false) {
+          this.set('isOpen', false);
+        }
+      },
+      submit() {
+        // replace modalId by :scope selector if supported by all target browsers
+        let modalId = this.get('modalId');
+        let forms = this.get('modalElement').querySelectorAll(`#${modalId} .modal-body form`);
+        if (forms.length > 0) {
+          // trigger submit event on body forms
+          let event = document.createEvent('Events');
+          event.initEvent('submit', true, true);
+          Array.prototype.slice.call(forms).forEach(form => form.dispatchEvent(event));
+        } else {
+          // if we have no form, we send a submit action
+          this.get('onSubmit')();
+        }
+      }
+    },
+
+    /**
+     * Give the modal (or its autofocus element) focus
+     *
+     * @method takeFocus
+     * @private
+     */
+    takeFocus() {
+      let modalEl = this.get('modalElement');
+      let focusElement = modalEl && modalEl.querySelector('[autofocus]');
+      if (!focusElement) {
+        focusElement = modalEl;
+      }
+      if (focusElement) {
+        focusElement.focus();
+      }
+    },
+
+    /**
+     * Show the modal
+     *
+     * @method show
+     * @private
+     */
+    show() {
+      if (this._isOpen) {
+        return;
+      }
+      this._isOpen = true;
+
+      document.body.classList.add('modal-open');
+
+      this.resize();
+
+      let callback = () => {
+        if (this.get('isDestroyed')) {
+          return;
+        }
+
+        this.checkScrollbar();
+        this.setScrollbar();
+
+        Ember.run.schedule('afterRender', () => {
+          let modalEl = this.get('modalElement');
+          if (!modalEl) {
+            return;
+          }
+
+          modalEl.scrollTop = 0;
+          this.handleUpdate();
+          this.set('showModal', true);
+          this.get('onShow')();
+
+          if (this.get('usesTransition')) {
+            (0, _transitionEnd.default)(this.get('modalElement'), this.get('transitionDuration')).then(() => {
+              this.takeFocus();
+              this.get('onShown')();
+            });
+          } else {
+            this.takeFocus();
+            this.get('onShown')();
+          }
+        });
+      };
+      this.set('inDom', true);
+      this.handleBackdrop(callback);
+    },
+
+    /**
+     * Hide the modal
+     *
+     * @method hide
+     * @private
+     */
+    hide() {
+      if (!this._isOpen) {
+        return;
+      }
+      this._isOpen = false;
+
+      this.resize();
+      this.set('showModal', false);
+
+      if (this.get('usesTransition')) {
+        (0, _transitionEnd.default)(this.get('modalElement'), this.get('transitionDuration')).then(() => this.hideModal());
+      } else {
+        this.hideModal();
+      }
+    },
+
+    /**
+     * Clean up after modal is hidden and call onHidden
+     *
+     * @method hideModal
+     * @private
+     */
+    hideModal() {
+      if (this.get('isDestroyed')) {
+        return;
+      }
+
+      this.handleBackdrop(() => {
+        document.body.classList.remove('modal-open');
+        this.resetAdjustments();
+        this.resetScrollbar();
+        this.set('inDom', false);
+        this.get('onHidden')();
+      });
+    },
+
+    /**
+     * SHow/hide the backdrop
+     *
+     * @method handleBackdrop
+     * @param callback
+     * @private
+     */
+    handleBackdrop(callback) {
+      let doAnimate = this.get('usesTransition');
+
+      if (this.get('isOpen') && this.get('backdrop')) {
+        this.set('showBackdrop', true);
+
+        if (!callback) {
+          return;
+        }
+
+        Ember.run.schedule('afterRender', this, function () {
+          let backdrop = this.get('backdropElement');
+          (true && !(backdrop) && Ember.assert('Backdrop element should be in DOM', backdrop));
+
+          if (doAnimate) {
+            (0, _transitionEnd.default)(backdrop, this.get('backdropTransitionDuration')).then(callback);
+          } else {
+            callback();
+          }
+        });
+      } else if (!this.get('isOpen') && this.get('backdrop')) {
+        let backdrop = this.get('backdropElement');
+        (true && !(backdrop) && Ember.assert('Backdrop element should be in DOM', backdrop));
+
+
+        let callbackRemove = () => {
+          if (this.get('isDestroyed')) {
+            return;
+          }
+          this.set('showBackdrop', false);
+          if (callback) {
+            callback.call(this);
+          }
+        };
+        if (doAnimate) {
+          (0, _transitionEnd.default)(backdrop, this.get('backdropTransitionDuration')).then(callbackRemove);
+        } else {
+          callbackRemove();
+        }
+      } else if (callback) {
+        Ember.run.next(this, callback);
+      }
+    },
+
+    /**
+     * Attach/Detach resize event listeners
+     *
+     * @method resize
+     * @private
+     */
+    resize() {
+      if (this.get('isOpen')) {
+        this._handleUpdate = Ember.run.bind(this, this.handleUpdate);
+        window.addEventListener('resize', this._handleUpdate, false);
+      } else {
+        window.removeEventListener('resize', this._handleUpdate, false);
+      }
+    },
+
+    /**
+     * @method handleUpdate
+     * @private
+     */
+    handleUpdate() {
+      this.adjustDialog();
+    },
+
+    /**
+     * @method adjustDialog
+     * @private
+     */
+    adjustDialog() {
+      let modalIsOverflowing = this.get('modalElement').scrollHeight > document.documentElement.clientHeight;
+      this.setProperties({
+        paddingLeft: !this.bodyIsOverflowing && modalIsOverflowing ? this.get('scrollbarWidth') : null,
+        paddingRight: this.bodyIsOverflowing && !modalIsOverflowing ? this.get('scrollbarWidth') : null
+      });
+    },
+
+    /**
+     * @method resetAdjustments
+     * @private
+     */
+    resetAdjustments() {
+      this.setProperties({
+        paddingLeft: null,
+        paddingRight: null
+      });
+    },
+
+    /**
+     * @method checkScrollbar
+     * @private
+     */
+    checkScrollbar() {
+      let fullWindowWidth = window.innerWidth;
+      if (!fullWindowWidth) {
+        // workaround for missing window.innerWidth in IE8
+        let documentElementRect = document.documentElement.getBoundingClientRect();
+        fullWindowWidth = documentElementRect.right - Math.abs(documentElementRect.left);
+      }
+
+      this.bodyIsOverflowing = document.body.clientWidth < fullWindowWidth;
+    },
+
+    /**
+     * @method setScrollbar
+     * @private
+     */
+    setScrollbar() {
+      let bodyPad = parseInt(document.body.style.paddingRight || 0, 10);
+      this._originalBodyPad = document.body.style.paddingRight || '';
+      if (this.bodyIsOverflowing) {
+        document.body.style.paddingRight = bodyPad + this.get('scrollbarWidth');
+      }
+    },
+
+    /**
+     * @method resetScrollbar
+     * @private
+     */
+    resetScrollbar() {
+      document.body.style.paddingRight = this._originalBodyPad;
+    },
+
+    /**
+     * @property scrollbarWidth
+     * @type number
+     * @readonly
+     * @private
+     */
+    scrollbarWidth: Ember.computed(function () {
+      let scrollDiv = document.createElement('div');
+      scrollDiv.className = 'modal-scrollbar-measure';
+      let modalEl = this.get('modalElement');
+      modalEl.parentNode.insertBefore(scrollDiv, modalEl.nextSibling);
+      let scrollbarWidth = scrollDiv.offsetWidth - scrollDiv.clientWidth;
+      scrollDiv.parentNode.removeChild(scrollDiv);
+      return scrollbarWidth;
+    }),
+
+    didInsertElement() {
+      this._super(...arguments);
+      if (this.get('isOpen')) {
+        this.show();
+      }
+    },
+
+    willDestroyElement() {
+      this._super(...arguments);
+      window.removeEventListener('resize', this._handleUpdate, false);
+      document.body.classList.remove('modal-open');
+      this.resetScrollbar();
+    },
+
+    _observeOpen: Ember.observer('isOpen', function () {
+      if (this.get('isOpen')) {
+        this.show();
+      } else {
+        this.hide();
+      }
+    }),
+
+    init() {
+      this._super(...arguments);
+      let { isOpen, backdrop, fade, isFastBoot } = this.getProperties('isOpen', 'backdrop', 'fade', 'isFastBoot');
+      this.setProperties({
+        showModal: isOpen && (!fade || isFastBoot),
+        showBackdrop: isOpen && backdrop,
+        inDom: isOpen
+      });
+    }
+  });
+});
+;define('ember-bootstrap/components/base/bs-modal/body', ['exports', 'ember-bootstrap/templates/components/bs-modal/body'], function (exports, _body) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend({
+    layout: _body.default,
+    classNames: ['modal-body']
+  });
+});
+;define('ember-bootstrap/components/base/bs-modal/dialog', ['exports', 'ember-bootstrap/templates/components/bs-modal/dialog'], function (exports, _dialog) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend({
+    layout: _dialog.default,
+    classNames: ['modal'],
+    classNameBindings: ['fade'],
+    attributeBindings: ['tabindex', 'style', 'aria-labelledby'],
+    ariaRole: 'dialog',
+    tabindex: '-1',
+    "aria-labelledby": Ember.computed.readOnly('titleId'),
+
+    /**
+     * Set to false to disable fade animations.
+     *
+     * @property fade
+     * @type boolean
+     * @default true
+     * @public
+     */
+    fade: true,
+
+    /**
+     * Used to apply Bootstrap's visibility classes
+     *
+     * @property showModal
+     * @type boolean
+     * @default false
+     * @private
+     */
+    showModal: false,
+
+    /**
+     * Render modal markup?
+     *
+     * @property inDom
+     * @type boolean
+     * @default false
+     * @private
+     */
+    inDom: false,
+
+    /**
+     * @property paddingLeft
+     * @type number|null
+     * @default null
+     * @private
+     */
+    paddingLeft: null,
+
+    /**
+     * @property paddingRight
+     * @type number|null
+     * @default null
+     * @private
+     */
+    paddingRight: null,
+
+    /**
+     * Closes the modal when escape key is pressed.
+     *
+     * @property keyboard
+     * @type boolean
+     * @default true
+     * @public
+     */
+    keyboard: true,
+
+    /**
+     * Property for size styling, set to null (default), 'lg' or 'sm'
+     *
+     * Also see the [Bootstrap docs](http://getbootstrap.com/javascript/#modals-sizes)
+     *
+     * @property size
+     * @type String
+     * @public
+     */
+    size: null,
+
+    /**
+     * If true clicking on the backdrop will close the modal.
+     *
+     * @property backdropClose
+     * @type boolean
+     * @default true
+     * @public
+     */
+    backdropClose: true,
+
+    /**
+     * @property style
+     * @type string
+     * @readOnly
+     * @private
+     */
+    style: Ember.computed('inDom', 'paddingLeft', 'paddingRight', function () {
+      let styles = [];
+      let { inDom, paddingLeft, paddingRight } = this.getProperties('inDom', 'paddingLeft', 'paddingRight');
+
+      if (inDom) {
+        styles.push('display: block');
+      }
+      if (paddingLeft) {
+        styles.push(`padding-left: ${paddingLeft}px`);
+      }
+      if (paddingRight) {
+        styles.push(`padding-right: ${paddingRight}px`);
+      }
+
+      return Ember.String.htmlSafe(styles.join(';'));
+    }),
+
+    /**
+     * Name of the size class
+     *
+     * @property sizeClass
+     * @type string
+     * @readOnly
+     * @private
+     */
+    sizeClass: Ember.computed('size', function () {
+      let size = this.get('size');
+      return Ember.isBlank(size) ? null : `modal-${size}`;
+    }).readOnly(),
+
+    /**
+    * The id of the `.modal-title` element
+    *
+    * @property titleId
+    * @type string
+    * @default null
+    * @private
+    */
+    titleId: null,
+
+    /**
+       * Gets or sets the id of the title element for aria accessibility tags
+       *
+       * @method getSetTitleID
+       * @private
+       */
+    getOrSetTitleId() {
+      //Title element may be set by user so we have to try and find it to set the id
+      const modalNode = this.get('element');
+      let nodeId = null;
+
+      if (modalNode) {
+        const titleNode = modalNode.querySelector('.modal-title');
+        if (titleNode) {
+          //Get title id of .modal-title
+          nodeId = titleNode.id;
+          if (!nodeId) {
+            //no title id so we set one
+            nodeId = `${this.get('id')}-title`;
+            titleNode.id = nodeId;
+          }
+        }
+      }
+      this.set('titleId', nodeId);
+    },
+
+    /**
+     * @event onClose
+     * @public
+     */
+    onClose() {},
+
+    keyDown(e) {
+      let code = e.keyCode || e.which;
+      if (code === 27 && this.get('keyboard')) {
+        this.get('onClose')();
+      }
+    },
+
+    _click(e) {
+      if (!e.target.classList.contains('modal') || !this.get('backdropClose')) {
+        return;
+      }
+      this.get('onClose')();
+    },
+
+    didInsertElement() {
+      this._super(...arguments);
+      // Ember events use event delegation, but we need to add an `onclick` handler directly on the modal element for
+      // iOS to allow clicking the div. So a `click(){}` method here won't work, we need to attach an event listener
+      // directly to the element
+      this.element.onclick = Ember.run.bind(this, this._click);
+      this.getOrSetTitleId();
+    },
+
+    willDestroyElement() {
+      this.element.onclick = null;
+    }
+
+  });
+});
+;define('ember-bootstrap/components/base/bs-modal/footer', ['exports', 'ember-bootstrap/templates/components/bs-modal/footer'], function (exports, _footer) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend({
+    layout: _footer.default,
+    tagName: 'form',
+    classNames: ['modal-footer'],
+
+    /**
+     * The title of the default close button. Will be ignored (i.e. no close button) if you provide your own block
+     * template.
+     *
+     * @property closeTitle
+     * @type string
+     * @default 'Ok'
+     * @public
+     */
+    closeTitle: 'Ok',
+
+    /**
+     * The title of the submit button (primary button). Will be ignored (i.e. no button) if set to null or if you provide
+     * your own block template.
+     *
+     * @property submitTitle
+     * @type string
+     * @default null
+     * @public
+     */
+    submitTitle: null,
+
+    hasSubmitButton: Ember.computed.notEmpty('submitTitle'),
+
+    /**
+     * Set to true to disable the submit button. If you bind this to some property that indicates if submitting is allowed
+     * (form validation for example) this can be used to prevent the user from pressing the submit button.
+     *
+     * @property submitDisabled
+     * @type boolean
+     * @default false
+     * @public
+     */
+    submitDisabled: false,
+
+    /**
+     * The type of the submit button (primary button).
+     *
+     * @property submitButtonType
+     * @type string
+     * @default 'primary'
+     * @public
+     */
+    submitButtonType: 'primary',
+
+    /**
+     * @property buttonComponent
+     * @type {String}
+     * @private
+     */
+    buttonComponent: 'bs-button',
+
+    /**
+     * The action to send to the parent modal component when the modal footer's form is submitted
+     *
+     * @event onSubmit
+     * @public
+     */
+    onSubmit() {},
+
+    /**
+     * @event onClose
+     * @public
+     */
+    onClose() {},
+
+    submit(e) {
+      e.preventDefault();
+      // send to parent bs-modal component
+      this.get('onSubmit')();
+    }
+
+  });
+});
+;define('ember-bootstrap/components/base/bs-modal/header', ['exports', 'ember-bootstrap/templates/components/bs-modal/header'], function (exports, _header) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend({
+    layout: _header.default,
+    classNames: ['modal-header'],
+
+    /**
+     * Show a close button (x icon)
+     *
+     * @property closeButton
+     * @type boolean
+     * @default true
+     * @public
+     */
+    closeButton: true,
+
+    /**
+     * The title to display in the modal header
+     *
+     * @property title
+     * @type string
+     * @default null
+     * @public
+     */
+    title: null,
+
+    /**
+     * @property titleComponent
+     * @type {String}
+     * @private
+     */
+    titleComponent: 'bs-modal/header/title',
+
+    /**
+     * @property closeComponent
+     * @type {String}
+     * @private
+     */
+    closeComponent: 'bs-modal/header/close',
+
+    /**
+     * @event onClose
+     * @public
+     */
+    onClose() {}
+
+  });
+});
+;define('ember-bootstrap/components/base/bs-modal/header/close', ['exports', 'ember-bootstrap/templates/components/bs-modal/header/close'], function (exports, _close) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend({
+    layout: _close.default,
+    tagName: 'button',
+    classNames: ['close'],
+    attributeBindings: ['type', 'aria-label'],
+    'aria-label': 'Close',
+    type: 'button',
+
+    /**
+     * @event onClick
+     * @public
+     */
+    onClick() {},
+
+    click() {
+      this.get('onClick')();
+    }
+  });
+});
+;define('ember-bootstrap/components/base/bs-modal/header/title', ['exports', 'ember-bootstrap/templates/components/bs-modal/header/title'], function (exports, _title) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend({
+    layout: _title.default,
+    tagName: 'h4',
+    classNames: ['modal-title']
+  });
+});
+;define('ember-bootstrap/components/base/bs-nav', ['exports', 'ember-bootstrap/templates/components/bs-nav'], function (exports, _bsNav) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend({
+    layout: _bsNav.default,
+
+    tagName: 'ul',
+    classNames: ['nav'],
+
+    classNameBindings: ['typeClass', 'justified:nav-justified'],
+
+    typeClass: Ember.computed('type', function () {
+      let type = this.get('type');
+      if (Ember.isPresent(type)) {
+        return `nav-${type}`;
+      }
+    }),
+
+    /**
+     * Special type of nav, either "pills" or "tabs"
+     *
+     * @property type
+     * @type String
+     * @default null
+     * @public
+     */
+    type: null,
+
+    /**
+     * Make the nav justified, see [bootstrap docs](http://getbootstrap.com/components/#nav-justified)
+     *
+     * @property justified
+     * @type boolean
+     * @default false
+     * @public
+     */
+    justified: false,
+
+    /**
+     * Make the nav pills stacked, see [bootstrap docs](http://getbootstrap.com/components/#nav-pills)
+     *
+     * @property stacked
+     * @type boolean
+     * @default false
+     * @public
+     */
+    stacked: false,
+
+    /**
+     * @property itemComponent
+     * @type {String}
+     * @private
+     */
+    itemComponent: 'bs-nav/item',
+
+    /**
+     * @property linkToComponent
+     * @type {String}
+     * @private
+     */
+    linkToComponent: 'bs-nav/link-to',
+
+    /**
+     * @property dropdownComponent
+     * @type {String}
+     * @private
+     */
+    dropdownComponent: 'bs-dropdown'
+  });
+});
+;define('ember-bootstrap/components/base/bs-nav/item', ['exports', 'ember-bootstrap/templates/components/bs-nav/item', 'ember-bootstrap/mixins/component-parent'], function (exports, _item, _componentParent) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend(_componentParent.default, {
+    layout: _item.default,
+    classNameBindings: ['disabled', 'active'],
+    tagName: 'li',
+    ariaRole: 'presentation',
+
+    /**
+     * Render the nav item as disabled (see [Bootstrap docs](http://getbootstrap.com/components/#nav-disabled-links)).
+     * By default it will look at any nested `link-to` components and make itself disabled if there is a disabled link.
+     * See the [link-to API](http://emberjs.com/api/classes/Ember.Templates.helpers.html#toc_disabling-the-code-link-to-code-component)
+     *
+     * @property disabled
+     * @type boolean
+     * @public
+     */
+    disabled: Ember.computed.reads('_disabled'),
+    _disabled: false,
+
+    /**
+     * Render the nav item as active.
+     * By default it will look at any nested `link-to` components and make itself active if there is an active link
+     * (i.e. the link points to the current route).
+     * See the [link-to API](http://emberjs.com/api/classes/Ember.Templates.helpers.html#toc_handling-current-route)
+     *
+     * @property active
+     * @type boolean
+     * @public
+     */
+    active: Ember.computed.reads('_active'),
+    _active: false,
+
+    /**
+     * Collection of all `Ember.LinkComponent`s that are children
+     *
+     * @property childLinks
+     * @private
+     */
+    childLinks: Ember.computed.filter('children', function (view) {
+      return view instanceof Ember.LinkComponent;
+    }),
+
+    activeChildLinks: Ember.computed.filterBy('childLinks', 'active'),
+    hasActiveChildLinks: Ember.computed.gt('activeChildLinks.length', 0),
+
+    disabledChildLinks: Ember.computed.filterBy('childLinks', 'disabled'),
+    hasDisabledChildLinks: Ember.computed.gt('disabledChildLinks.length', 0),
+
+    /**
+     * Called when clicking the nav item
+     *
+     * @event onClick
+     * @public
+     */
+    onClick() {},
+
+    click() {
+      this.onClick();
+    },
+
+    init() {
+      this._super(...arguments);
+      this.get('activeChildLinks');
+      this.get('disabledChildLinks');
+    },
+
+    _observeActive: Ember.observer('activeChildLinks.[]', function () {
+      Ember.run.scheduleOnce('afterRender', this, this._updateActive);
+    }),
+
+    _updateActive() {
+      this.set('_active', this.get('hasActiveChildLinks'));
+    },
+
+    _observeDisabled: Ember.observer('disabledChildLinks.[]', function () {
+      Ember.run.scheduleOnce('afterRender', this, this._updateDisabled);
+    }),
+
+    _updateDisabled() {
+      this.set('_disabled', this.get('hasDisabledChildLinks'));
+    }
+  });
+});
+;define('ember-bootstrap/components/base/bs-nav/link-to', ['exports', 'ember-bootstrap/mixins/component-child'], function (exports, _componentChild) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.LinkComponent.extend(_componentChild.default, {});
+});
+;define('ember-bootstrap/components/base/bs-navbar', ['exports', 'ember-bootstrap/mixins/type-class', 'ember-bootstrap/templates/components/bs-navbar', 'ember-bootstrap/utils/listen-to-cp'], function (exports, _typeClass, _bsNavbar, _listenToCp) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend(_typeClass.default, {
+    layout: _bsNavbar.default,
+
+    tagName: 'nav',
+    classNames: ['navbar'],
+    classNameBindings: ['positionClass'],
+
+    classTypePrefix: 'navbar',
+
+    /**
+     * Manages the state for the responsive menu between the toggle and the content.
+     *
+     * @property collapsed
+     * @type boolean
+     * @default true
+     * @public
+     */
+    collapsed: true,
+
+    /**
+     * @property _collapsed
+     * @private
+     */
+    _collapsed: (0, _listenToCp.default)('collapsed'),
+
+    /**
+     * Controls whether the wrapping div is a fluid container or not.
+     *
+     * @property fluid
+     * @type boolean
+     * @default true
+     * @public
+     */
+    fluid: true,
+
+    /**
+     * Specifies the position classes for the navbar, currently supporting none, "fixed-top", "fixed-bottom", and
+     * either "static-top" (BS3) or "sticky-top" (BS4).
+     * See the [bootstrap docs](http://getbootstrap.com/components/#navbar-fixed-top) for details.
+     *
+     * @property position
+     * @type String
+     * @default null
+     * @public
+     */
+    position: null,
+
+    positionClass: Ember.computed('position', function () {
+      let position = this.get('position');
+      let validPositions = this.get('_validPositions');
+      let positionPrefix = this.get('_positionPrefix');
+
+      if (validPositions.indexOf(position) === -1) {
+        return null;
+      }
+
+      return `${positionPrefix}${position}`;
+    }),
+
+    /**
+     * The action to be sent when the navbar is about to be collapsed.
+     *
+     * You can return false to prevent collapsing the navbar automatically, and do that in your action by
+     * setting `collapsed` to true.
+     *
+     * @event onCollapse
+     * @public
+     */
+    onCollapse() {},
+
+    /**
+     * The action to be sent after the navbar has been collapsed (including the CSS transition).
+     *
+     * @event onCollapsed
+     * @public
+     */
+    onCollapsed() {},
+
+    /**
+     * The action to be sent when the navbar is about to be expanded.
+     *
+     * You can return false to prevent expanding the navbar automatically, and do that in your action by
+     * setting `collapsed` to false.
+     *
+     * @event onExpand
+     * @public
+     */
+    onExpand() {},
+
+    /**
+     * The action to be sent after the navbar has been expanded (including the CSS transition).
+     *
+     * @event onExpanded
+     * @public
+     */
+    onExpanded() {},
+
+    _onCollapsedChange: Ember.observer('_collapsed', function () {
+      let collapsed = this.get('_collapsed');
+      let active = this.get('active');
+      if (collapsed !== active) {
+        return;
+      }
+      if (collapsed === false) {
+        this.show();
+      } else {
+        this.hide();
+      }
+    }),
+
+    /**
+     * @method expand
+     * @private
+     */
+    expand() {
+      if (this.onExpand() !== false) {
+        this.set('_collapsed', false);
+      }
+    },
+
+    /**
+     * @method collapse
+     * @private
+     */
+    collapse() {
+      if (this.onCollapse() !== false) {
+        this.set('_collapsed', true);
+      }
+    },
+
+    actions: {
+      expand() {
+        this.expand();
+      },
+      collapse() {
+        this.collapse();
+      },
+      toggleNavbar() {
+        if (this.get('_collapsed')) {
+          this.expand();
+        } else {
+          this.collapse();
+        }
+      }
+    },
+
+    /**
+     * Bootstrap 4 Only: Defines the responsive toggle breakpoint size. Options are the standard
+     * two character Bootstrap size abbreviations. Used to set the `navbar-expand-*`
+     * class. Set to `null` to disable collapsing.
+     *
+     * @property toggleBreakpoint
+     * @type String
+     * @default 'lg'
+     * @public
+     */
+
+    /**
+     * Bootstrap 4 Only: Sets the background color for the navbar. Can be any color
+     * in the set that composes the `bg-*` classes and can be extended by creating your
+     * own `bg-*` classes.
+     *
+     * @property backgroundColor
+     * @type String
+     * @default 'light'
+     * @public
+     */
+
+    /**
+     * @property toggleComponent
+     * @type {String}
+     * @private
+     */
+    toggleComponent: 'bs-navbar/toggle',
+
+    /**
+     * @property contentComponent
+     * @type {String}
+     * @private
+     */
+    contentComponent: 'bs-navbar/content',
+
+    /**
+     * @property navComponent
+     * @type {String}
+     * @private
+     */
+    navComponent: 'bs-navbar/nav',
+
+    /**
+     * @property linkToComponent
+     * @type {String}
+     * @private
+     */
+    linkToComponent: 'bs-navbar/link-to'
+  });
+});
+;define('ember-bootstrap/components/base/bs-navbar/content', ['exports', 'ember-bootstrap/templates/components/bs-navbar/content', 'ember-bootstrap/components/bs-collapse'], function (exports, _content, _bsCollapse) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _bsCollapse.default.extend({
+    layout: _content.default,
+
+    classNames: ['navbar-collapse']
+  });
+});
+;define('ember-bootstrap/components/base/bs-navbar/link-to', ['exports', 'ember-bootstrap/components/bs-nav/link-to'], function (exports, _linkTo) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _linkTo.default.extend({
+
+    /**
+     * @property collapseNavbar
+     * @type {Boolean}
+     * @default true
+     * @public
+     */
+    collapseNavbar: true,
+
+    /**
+     * @event onCollapse
+     * @private
+     */
+    onCollapse() {},
+
+    click() {
+      if (this.get('collapseNavbar')) {
+        this.onCollapse();
+      }
+    }
+  });
+});
+;define('ember-bootstrap/components/base/bs-navbar/nav', ['exports', 'ember-bootstrap/components/bs-nav'], function (exports, _bsNav) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _bsNav.default.extend({
+    classNames: ['navbar-nav'],
+
+    didReceiveAttrs() {
+      this._super(...arguments);
+      this.set('justified', false);
+    }
+  });
+});
+;define('ember-bootstrap/components/base/bs-navbar/toggle', ['exports', 'ember-bootstrap/templates/components/bs-navbar/toggle'], function (exports, _toggle) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend({
+    layout: _toggle.default,
+    tagName: 'button',
+
+    classNameBindings: ['collapsed'],
+    collapsed: true,
+
+    /**
+     * @event onClick
+     * @public
+     */
+    onClick() {},
+
+    click() {
+      this.onClick();
+    }
+
+  });
+});
+;define('ember-bootstrap/components/base/bs-popover', ['exports', 'ember-bootstrap/components/base/bs-contextual-help', 'ember-bootstrap/templates/components/bs-popover'], function (exports, _bsContextualHelp, _bsPopover) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _bsContextualHelp.default.extend({
+    layout: _bsPopover.default,
+
+    /**
+     * @property placement
+     * @type string
+     * @default 'right'
+     * @public
+     */
+    placement: 'right',
+
+    /**
+     * @property triggerEvents
+     * @type array|string
+     * @default 'click'
+     * @public
+     */
+    triggerEvents: 'click',
+
+    /**
+     * @property elementComponent
+     * @type {String}
+     * @private
+     */
+    elementComponent: 'bs-popover/element',
+
+    /**
+     * The DOM element of the arrow element.
+     *
+     * @property arrowElement
+     * @type object
+     * @readonly
+     * @private
+     */
+    arrowElement: Ember.computed('overlayElement', function () {
+      return this.get('overlayElement').querySelector('.arrow');
+    }).volatile()
+  });
+});
+;define('ember-bootstrap/components/base/bs-popover/element', ['exports', 'ember-bootstrap/components/base/bs-contextual-help/element', 'ember-bootstrap/templates/components/bs-popover/element'], function (exports, _element, _element2) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _element.default.extend({
+    layout: _element2.default,
+
+    /**
+     * @property title
+     * @type string
+     * @public
+     */
+    title: undefined,
+
+    /**
+     * @property hasTitle
+     * @type boolean
+     * @private
+     */
+    hasTitle: Ember.computed.notEmpty('title')
+  });
+});
+;define('ember-bootstrap/components/base/bs-progress', ['exports', 'ember-bootstrap/templates/components/bs-progress'], function (exports, _bsProgress) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend({
+    layout: _bsProgress.default,
+    classNames: ['progress'],
+
+    /**
+     * @property progressBarComponent
+     * @type {String}
+     * @private
+     */
+    progressBarComponent: 'bs-progress/bar'
+  });
+});
+;define('ember-bootstrap/components/base/bs-progress/bar', ['exports', 'ember-bootstrap/templates/components/bs-progress/bar', 'ember-bootstrap/mixins/type-class'], function (exports, _bar, _typeClass) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend(_typeClass.default, {
+    layout: _bar.default,
+    classNames: ['progress-bar'],
+    classNameBindings: ['progressBarStriped'],
+
+    attributeBindings: ['style', 'ariaValuenow', 'ariaValuemin', 'ariaValuemax'],
+
+    /**
+     * The lower limit of the value range
+     *
+     * @property minValue
+     * @type number
+     * @default 0
+     * @public
+     */
+    minValue: 0,
+
+    /**
+     * The upper limit of the value range
+     *
+     * @property maxValue
+     * @type number
+     * @default 100
+     * @public
+     */
+    maxValue: 100,
+
+    /**
+     * The value the progress bar should represent
+     *
+     * @property value
+     * @type number
+     * @default 0
+     * @public
+     */
+    value: 0,
+
+    /**
+     If true a label will be shown inside the progress bar.
+      By default it will be the percentage corresponding to the `value` property, rounded to `roundDigits` digits.
+     You can customize it by using the component with a block template, which the component yields the percentage
+     value to:
+      ```hbs
+     {{#bs-progress}}
+       {{#bs-progress-bar value=progressValue as |percent|}}{{progressValue}} ({{percent}}%){{/bs-progress-bar}}
+     {{/bs-progress}}
+     ```
+      @property showLabel
+     @type boolean
+     @default false
+     @public
+     */
+    showLabel: false,
+
+    /**
+     * Create a striped effect, see http://getbootstrap.com/components/#progress-striped
+     *
+     * @property striped
+     * @type boolean
+     * @default false
+     * @public
+     */
+    striped: false,
+
+    /**
+     * Animate the stripes, see http://getbootstrap.com/components/#progress-animated
+     *
+     * @property animate
+     * @type boolean
+     * @default false
+     * @public
+     */
+    animate: false,
+
+    /**
+     * Specify to how many digits the progress bar label should be rounded.
+     *
+     * @property roundDigits
+     * @type number
+     * @default 0
+     * @public
+     */
+    roundDigits: 0,
+
+    progressBarStriped: Ember.computed.readOnly('striped'),
+    progressBarAnimate: Ember.computed.readOnly('animate'),
+
+    ariaValuenow: Ember.computed.readOnly('value'),
+    ariaValuemin: Ember.computed.readOnly('minValue'),
+    ariaValuemax: Ember.computed.readOnly('maxValue'),
+
+    /**
+     * The percentage of `value`
+     *
+     * @property percent
+     * @type number
+     * @protected
+     * @readonly
+     */
+    percent: Ember.computed('value', 'minValue', 'maxValue', function () {
+      let value = parseFloat(this.get('value'));
+      let minValue = parseFloat(this.get('minValue'));
+      let maxValue = parseFloat(this.get('maxValue'));
+
+      return Math.min(Math.max((value - minValue) / (maxValue - minValue), 0), 1) * 100;
+    }).readOnly(),
+
+    /**
+     * The percentage of `value`, rounded to `roundDigits` digits
+     *
+     * @property percentRounded
+     * @type number
+     * @protected
+     * @readonly
+     */
+    percentRounded: Ember.computed('percent', 'roundDigits', function () {
+      let roundFactor = Math.pow(10, this.get('roundDigits'));
+      return Math.round(this.get('percent') * roundFactor) / roundFactor;
+    }).readOnly(),
+
+    /**
+     * @property style
+     * @type string
+     * @private
+     * @readonly
+     */
+    style: Ember.computed('percent', function () {
+      let percent = this.get('percent');
+      return Ember.String.htmlSafe(`width: ${percent}%`);
+    })
+
+  });
+});
+;define('ember-bootstrap/components/base/bs-tab', ['exports', 'ember-bootstrap/templates/components/bs-tab', 'ember-bootstrap/mixins/component-parent', 'ember-bootstrap/components/bs-tab/pane', 'ember-bootstrap/utils/listen-to-cp'], function (exports, _bsTab, _componentParent, _pane, _listenToCp) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend(_componentParent.default, {
+    layout: _bsTab.default,
+
+    /**
+     * Type of nav, either "pills" or "tabs"
+     *
+     * @property type
+     * @type String
+     * @default 'tabs'
+     * @public
+     */
+    type: 'tabs',
+
+    /**
+     * @property paneComponent
+     * @type {String}
+     * @private
+     */
+    paneComponent: 'bs-tab/pane',
+
+    /**
+     * @property navComponent
+     * @type {String}
+     * @private
+     */
+    navComponent: 'bs-nav',
+
+    /**
+     * By default the tabs will be automatically generated using the available [TabPane](Components.TabPane.html)
+     * components. If set to true, you can deactivate this and setup the tabs manually. See the example above.
+     *
+     * @property customTabs
+     * @type boolean
+     * @default false
+     * @public
+     */
+    customTabs: false,
+
+    /**
+     * The id (`elementId`) of the active [TabPane](Components.TabPane.html).
+     * By default the first tab will be active, but this can be changed by setting this property
+     *
+     * ```hbs
+     * {{#bs-tab activeId="pane2"}}
+     *   {{#tab.pane id="pane1" title="Tab 1"}}
+     *      ...
+     *   {{/tab.pane}}
+     *   {{#tab.pane id="pane1" title="Tab 1"}}
+     *     ...
+     *   {{/tab.pane}}
+     * {{/bs-tab}}
+     * ```
+     *
+     * When the selection is changed by user interaction this property will not update by using two-way bindings in order
+     * to follow DDAU best practices. If you want to react to such changes, subscribe to the `onChange` action
+     *
+     * @property activeId
+     * @type string
+     * @public
+     */
+    activeId: Ember.computed.oneWay('childPanes.firstObject.elementId'),
+
+    /**
+     * @property isActiveId
+     * @private
+     */
+    isActiveId: (0, _listenToCp.default)('activeId'),
+
+    /**
+     * Set to false to disable the fade animation when switching tabs.
+     *
+     * @property fade
+     * @type boolean
+     * @default true
+     * @public
+     */
+    fade: true,
+
+    /**
+     * The duration of the fade animation
+     *
+     * @property fadeDuration
+     * @type integer
+     * @default 150
+     * @public
+     */
+    fadeDuration: 150,
+
+    /**
+     * This action is called when switching the active tab, with the new and previous pane id
+     *
+     * You can return false to prevent changing the active tab automatically, and do that in your action by
+     * setting `activeId`.
+     *
+     * @event onChange
+     * @public
+     */
+    onChange() {},
+
+    /**
+     * All `TabPane` child components
+     *
+     * @property childPanes
+     * @type array
+     * @readonly
+     * @private
+     */
+    childPanes: Ember.computed.filter('children', function (view) {
+      return view instanceof _pane.default;
+    }),
+
+    /**
+     * Array of objects that define the tab structure
+     *
+     * @property navItems
+     * @type array
+     * @readonly
+     * @private
+     */
+    navItems: Ember.computed('childPanes.@each.{elementId,title,group}', function () {
+      let items = Ember.A();
+      this.get('childPanes').forEach(pane => {
+        let groupTitle = pane.get('groupTitle');
+        let item = pane.getProperties('elementId', 'title');
+        if (Ember.isPresent(groupTitle)) {
+          let group = items.findBy('groupTitle', groupTitle);
+          if (group) {
+            group.children.push(item);
+            group.childIds.push(item.elementId);
+          } else {
+            items.push({
+              isGroup: true,
+              groupTitle,
+              children: Ember.A([item]),
+              childIds: Ember.A([item.elementId])
+            });
+          }
+        } else {
+          items.push(item);
+        }
+      });
+      return items;
+    }),
+
+    actions: {
+      select(id) {
+        let previous = this.get('isActiveId');
+        if (this.get('onChange')(id, previous) !== false) {
+          // change active tab when `onChange` does not return false
+          this.set('isActiveId', id);
+        }
+      }
+    }
+  });
+});
+;define('ember-bootstrap/components/base/bs-tab/pane', ['exports', 'ember-bootstrap/templates/components/bs-tab/pane', 'ember-bootstrap/mixins/component-child', 'ember-bootstrap/mixins/transition-support', 'ember-bootstrap/utils/transition-end'], function (exports, _pane, _componentChild, _transitionSupport, _transitionEnd) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend(_componentChild.default, _transitionSupport.default, {
+    layout: _pane.default,
+    classNameBindings: ['active', 'usesTransition:fade'],
+    classNames: ['tab-pane'],
+    ariaRole: 'tabpanel',
+
+    /**
+     * @property activeId
+     * @private
+     */
+    activeId: null,
+
+    /**
+     * True if this pane is active (visible)
+     *
+     * @property isActive
+     * @type boolean
+     * @readonly
+     * @private
+     */
+    isActive: Ember.computed('activeId', 'elementId', function () {
+      return this.get('activeId') === this.get('elementId');
+    }).readOnly(),
+
+    /**
+     * Used to apply Bootstrap's "active" class
+     *
+     * @property active
+     * @type boolean
+     * @default false
+     * @private
+     */
+    active: false,
+
+    /**
+     * Used to trigger the Bootstrap visibility classes.
+     *
+     * @property showContent
+     * @type boolean
+     * @default false
+     * @private
+     */
+    showContent: false,
+
+    /**
+     * The title for this tab pane. This is used by the `bs-tab` component to automatically generate
+     * the tab navigation.
+     * See the [Components.Tab](Components.Tab.html) for examples.
+     *
+     * @property title
+     * @type string
+     * @default null
+     * @public
+     */
+    title: null,
+
+    /**
+     * An optional group title used by the `bs-tab` component to group all panes with the same group title
+     * under a common drop down in the tab navigation.
+     * See the [Components.Tab](Components.Tab.html) for examples.
+     *
+     * @property groupTitle
+     * @type string
+     * @default null
+     * @public
+     */
+    groupTitle: null,
+
+    /**
+     * Use fade animation when switching tabs.
+     *
+     * @property fade
+     * @type boolean
+     * @private
+     */
+    fade: true,
+
+    /**
+     * The duration of the fade out animation
+     *
+     * @property fadeDuration
+     * @type integer
+     * @default 150
+     * @private
+     */
+    fadeDuration: 150,
+
+    /**
+     * Show the pane
+     *
+     * @method show
+     * @protected
+     */
+    show() {
+      if (this.get('usesTransition')) {
+        (0, _transitionEnd.default)(this.get('element'), this.get('fadeDuration')).then(() => {
+          if (!this.get('isDestroyed')) {
+            this.setProperties({
+              active: true,
+              showContent: true
+            });
+          }
+        });
+      } else {
+        this.set('active', true);
+      }
+    },
+
+    /**
+     * Hide the pane
+     *
+     * @method hide
+     * @protected
+     */
+    hide() {
+      if (this.get('usesTransition')) {
+        (0, _transitionEnd.default)(this.get('element'), this.get('fadeDuration')).then(() => {
+          if (!this.get('isDestroyed')) {
+            this.set('active', false);
+          }
+        });
+        this.set('showContent', false);
+      } else {
+        this.set('active', false);
+      }
+    },
+
+    _showHide: Ember.observer('isActive', function () {
+      if (this.get('isActive')) {
+        this.show();
+      } else {
+        this.hide();
+      }
+    }),
+
+    init() {
+      this._super(...arguments);
+      Ember.run.scheduleOnce('afterRender', this, function () {
+        // isActive comes from parent component, so only available after render...
+        this.set('active', this.get('isActive'));
+        this.set('showContent', this.get('isActive') && this.get('fade'));
+      });
+    }
+
+  });
+});
+;define('ember-bootstrap/components/base/bs-tooltip', ['exports', 'ember-bootstrap/components/base/bs-contextual-help', 'ember-bootstrap/templates/components/bs-tooltip'], function (exports, _bsContextualHelp, _bsTooltip) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _bsContextualHelp.default.extend({
+    layout: _bsTooltip.default,
+
+    /**
+     * @property elementComponent
+     * @type {String}
+     * @private
+     */
+    elementComponent: 'bs-tooltip/element',
+
+    /**
+     * The DOM element of the arrow element.
+     *
+     * @property arrowElement
+     * @type object
+     * @readonly
+     * @private
+     */
+    arrowElement: Ember.computed('overlayElement', function () {
+      return this.get('overlayElement').querySelector('.tooltip-arrow');
+    }).volatile()
+  });
+});
+;define('ember-bootstrap/components/base/bs-tooltip/element', ['exports', 'ember-bootstrap/templates/components/bs-tooltip/element', 'ember-bootstrap/components/base/bs-contextual-help/element'], function (exports, _element, _element2) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _element2.default.extend({
+    layout: _element.default
+  });
+});
+;define('ember-bootstrap/components/bs-accordion', ['exports', 'ember-bootstrap/components/base/bs-accordion'], function (exports, _bsAccordion) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _bsAccordion.default.extend({
+    classNames: ['accordion']
+  });
+});
+;define('ember-bootstrap/components/bs-accordion/item', ['exports', 'ember-bootstrap/components/base/bs-accordion/item'], function (exports, _item) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _item.default.extend({
+    classNames: ['card'],
+
+    /**
+     * @property classTypePrefix
+     * @type String
+     * @default 'bg'
+     * @protected
+     */
+    classTypePrefix: 'bg'
+  });
+});
+;define('ember-bootstrap/components/bs-accordion/item/body', ['exports', 'ember-bootstrap/components/base/bs-accordion/item/body'], function (exports, _body) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  Object.defineProperty(exports, 'default', {
+    enumerable: true,
+    get: function () {
+      return _body.default;
+    }
+  });
+});
+;define('ember-bootstrap/components/bs-accordion/item/title', ['exports', 'ember-bootstrap/components/base/bs-accordion/item/title'], function (exports, _title) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _title.default.extend({
+    classNames: ['card-header']
+  });
+});
+;define('ember-bootstrap/components/bs-alert', ['exports', 'ember-bootstrap/components/base/bs-alert'], function (exports, _bsAlert) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _bsAlert.default.extend({
+    classNameBindings: ['showAlert:show']
+  });
+});
+;define('ember-bootstrap/components/bs-button-group', ['exports', 'ember-bootstrap/components/base/bs-button-group'], function (exports, _bsButtonGroup) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  Object.defineProperty(exports, 'default', {
+    enumerable: true,
+    get: function () {
+      return _bsButtonGroup.default;
+    }
+  });
+});
+;define('ember-bootstrap/components/bs-button-group/button', ['exports', 'ember-bootstrap/components/base/bs-button-group/button'], function (exports, _button) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  Object.defineProperty(exports, 'default', {
+    enumerable: true,
+    get: function () {
+      return _button.default;
+    }
+  });
+});
+;define('ember-bootstrap/components/bs-button', ['exports', 'ember-bootstrap/components/base/bs-button'], function (exports, _bsButton) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _bsButton.default.extend({
+    type: 'secondary',
+
+    /**
+     * Property to create outline buttons (BS4+ only)
+     *
+     * @property disabled
+     * @type boolean
+     * @default false
+     * @public
+     */
+    outline: false
+  });
+});
+;define('ember-bootstrap/components/bs-carousel', ['exports', 'ember-bootstrap/components/base/bs-carousel'], function (exports, _bsCarousel) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _bsCarousel.default.extend({
+    nextControlClassName: 'carousel-control-next',
+    nextControlIcon: 'carousel-control-next-icon',
+    prevControlClassName: 'carousel-control-prev',
+    prevControlIcon: 'carousel-control-prev-icon',
+    classNameBindings: ['carouselFade'],
+    carouselFade: Ember.computed.equal('transition', 'fade').readOnly()
+  });
+});
+;define('ember-bootstrap/components/bs-carousel/slide', ['exports', 'ember-bootstrap/components/base/bs-carousel/slide'], function (exports, _slide) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _slide.default.extend({
+    classNameBindings: ['left:carousel-item-left', 'next:carousel-item-next', 'prev:carousel-item-prev', 'right:carousel-item-right'],
+    classNames: ['carousel-item']
+  });
+});
+;define('ember-bootstrap/components/bs-collapse', ['exports', 'ember-bootstrap/components/base/bs-collapse'], function (exports, _bsCollapse) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _bsCollapse.default.extend({
+    classNameBindings: ['showContent:show']
+  });
+});
+;define('ember-bootstrap/components/bs-dropdown', ['exports', 'ember-bootstrap/components/base/bs-dropdown'], function (exports, _bsDropdown) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _bsDropdown.default.extend({
+    classNameBindings: ['inNav:nav-item', 'isOpen:show']
+  });
+});
+;define('ember-bootstrap/components/bs-dropdown/button', ['exports', 'ember-bootstrap/components/base/bs-dropdown/button'], function (exports, _button) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  Object.defineProperty(exports, 'default', {
+    enumerable: true,
+    get: function () {
+      return _button.default;
+    }
+  });
+});
+;define('ember-bootstrap/components/bs-dropdown/menu', ['exports', 'ember-bootstrap/components/base/bs-dropdown/menu'], function (exports, _menu) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  Object.defineProperty(exports, 'default', {
+    enumerable: true,
+    get: function () {
+      return _menu.default;
+    }
+  });
+});
+;define('ember-bootstrap/components/bs-dropdown/menu/divider', ['exports', 'ember-bootstrap/components/base/bs-dropdown/menu/divider'], function (exports, _divider) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _divider.default.extend({
+    classNames: ['dropdown-divider']
+  });
+});
+;define('ember-bootstrap/components/bs-dropdown/menu/item', ['exports', 'ember-bootstrap/components/base/bs-dropdown/menu/item'], function (exports, _item) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _item.default.extend({
+    tagName: ''
+  });
+});
+;define('ember-bootstrap/components/bs-dropdown/menu/link-to', ['exports', 'ember-bootstrap/components/base/bs-dropdown/menu/link-to'], function (exports, _linkTo) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _linkTo.default.extend({
+    classNames: ['dropdown-item']
+  });
+});
+;define('ember-bootstrap/components/bs-dropdown/toggle', ['exports', 'ember-bootstrap/components/base/bs-dropdown/toggle'], function (exports, _toggle) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _toggle.default.extend({
+    classNameBindings: ['inNav:nav-link']
+  });
+});
+;define('ember-bootstrap/components/bs-form', ['exports', 'ember-bootstrap/components/base/bs-form'], function (exports, _bsForm) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _bsForm.default.extend({
+    layoutClass: Ember.computed('formLayout', function () {
+      let layout = this.get('formLayout');
+      return layout === 'inline' ? 'form-inline' : null;
+    }).readOnly()
+  });
+});
+;define('ember-bootstrap/components/bs-form/element', ['exports', 'ember-bootstrap/components/base/bs-form/element'], function (exports, _element) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  Object.defineProperty(exports, 'default', {
+    enumerable: true,
+    get: function () {
+      return _element.default;
+    }
+  });
+});
+;define('ember-bootstrap/components/bs-form/element/control', ['exports', 'ember-bootstrap/components/base/bs-form/element/control'], function (exports, _control) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  Object.defineProperty(exports, 'default', {
+    enumerable: true,
+    get: function () {
+      return _control.default;
+    }
+  });
+});
+;define('ember-bootstrap/components/bs-form/element/control/checkbox', ['exports', 'ember-bootstrap/components/base/bs-form/element/control/checkbox', 'ember-bootstrap/mixins/control-validation'], function (exports, _checkbox, _controlValidation) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _checkbox.default.extend(_controlValidation.default, {
+    classNames: ['form-check-input']
+  });
+});
+;define('ember-bootstrap/components/bs-form/element/control/input', ['exports', 'ember-bootstrap/components/base/bs-form/element/control/input', 'ember-bootstrap/mixins/control-validation', 'ember-bootstrap/mixins/size-class'], function (exports, _input, _controlValidation, _sizeClass) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _input.default.extend(_controlValidation.default, _sizeClass.default, {
+    classTypePrefix: 'form-control'
+  });
+});
+;define('ember-bootstrap/components/bs-form/element/control/radio', ['exports', 'ember-bootstrap/components/base/bs-form/element/control/radio'], function (exports, _radio) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  Object.defineProperty(exports, 'default', {
+    enumerable: true,
+    get: function () {
+      return _radio.default;
+    }
+  });
+});
+;define('ember-bootstrap/components/bs-form/element/control/textarea', ['exports', 'ember-bootstrap/components/base/bs-form/element/control/textarea', 'ember-bootstrap/mixins/control-validation'], function (exports, _textarea, _controlValidation) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _textarea.default.extend(_controlValidation.default);
+});
+;define('ember-bootstrap/components/bs-form/element/errors', ['exports', 'ember-bootstrap/components/base/bs-form/element/errors'], function (exports, _errors) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _errors.default.extend({
+    feedbackClass: 'invalid-feedback d-block'
+  });
+});
+;define('ember-bootstrap/components/bs-form/element/feedback-icon', ['exports', 'ember-bootstrap/components/base/bs-form/element/feedback-icon'], function (exports, _feedbackIcon) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  Object.defineProperty(exports, 'default', {
+    enumerable: true,
+    get: function () {
+      return _feedbackIcon.default;
+    }
+  });
+});
+;define('ember-bootstrap/components/bs-form/element/help-text', ['exports', 'ember-bootstrap/components/base/bs-form/element/help-text'], function (exports, _helpText) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _helpText.default.extend({
+    classNames: ['form-text']
+  });
+});
+;define('ember-bootstrap/components/bs-form/element/label', ['exports', 'ember-bootstrap/components/base/bs-form/element/label'], function (exports, _label) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _label.default.extend({
+    tagName: 'label',
+
+    classNames: [],
+    classNameBindings: ['invisibleLabel:sr-only', 'isHorizontalAndNotCheckbox:col-form-label', 'isCheckbox:form-check-label', 'labelClass', 'sizeClass'],
+    attributeBindings: ['formElementId:for'],
+
+    isHorizontalAndNotCheckbox: Ember.computed('isHorizontal', 'isCheckbox', function () {
+      return this.get('isHorizontal') && !this.get('isCheckbox');
+    }),
+
+    sizeClass: Ember.computed('size', 'isHorizontal', function () {
+      if (!this.get('isHorizontal')) {
+        return;
+      }
+      let size = this.get('size');
+      return Ember.isBlank(size) ? null : `col-form-label-${size}`;
+    }),
+
+    /**
+     * Property for size styling, set to 'lg', 'sm'
+     *
+     * @property size
+     * @type String
+     * @public
+     */
+    size: null
+  });
+});
+;define('ember-bootstrap/components/bs-form/element/layout', ['exports', 'ember-bootstrap/components/base/bs-form/element/layout'], function (exports, _layout) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  Object.defineProperty(exports, 'default', {
+    enumerable: true,
+    get: function () {
+      return _layout.default;
+    }
+  });
+});
+;define('ember-bootstrap/components/bs-form/element/layout/horizontal', ['exports', 'ember-bootstrap/components/base/bs-form/element/layout/horizontal'], function (exports, _horizontal) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _horizontal.default.extend({
+    /**
+     * Computed property that specifies the Bootstrap offset grid class for form controls within a horizontal layout
+     * form, that have no label.
+     *
+     * @property horizontalInputOffsetGridClass
+     * @type string
+     * @readonly
+     * @private
+     */
+    horizontalInputOffsetGridClass: Ember.computed('horizontalLabelGridClass', function () {
+      if (Ember.isBlank(this.get('horizontalLabelGridClass'))) {
+        return;
+      }
+      let parts = this.get('horizontalLabelGridClass').split('-');
+      parts.splice(0, 1, 'offset');
+      return parts.join('-');
+    })
+  });
+});
+;define('ember-bootstrap/components/bs-form/element/layout/horizontal/checkbox', ['exports', 'ember-bootstrap/components/bs-form/element/layout/horizontal', 'ember-bootstrap/templates/components/bs-form/element/layout/horizontal/checkbox'], function (exports, _horizontal, _checkbox) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _horizontal.default.extend({
+    layout: _checkbox.default
+  });
+});
+;define('ember-bootstrap/components/bs-form/element/layout/inline', ['exports', 'ember-bootstrap/components/base/bs-form/element/layout/inline'], function (exports, _inline) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  Object.defineProperty(exports, 'default', {
+    enumerable: true,
+    get: function () {
+      return _inline.default;
+    }
+  });
+});
+;define('ember-bootstrap/components/bs-form/element/layout/inline/checkbox', ['exports', 'ember-bootstrap/components/base/bs-form/element/layout/inline/checkbox'], function (exports, _checkbox) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  Object.defineProperty(exports, 'default', {
+    enumerable: true,
+    get: function () {
+      return _checkbox.default;
+    }
+  });
+});
+;define('ember-bootstrap/components/bs-form/element/layout/vertical', ['exports', 'ember-bootstrap/components/base/bs-form/element/layout/vertical'], function (exports, _vertical) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  Object.defineProperty(exports, 'default', {
+    enumerable: true,
+    get: function () {
+      return _vertical.default;
+    }
+  });
+});
+;define('ember-bootstrap/components/bs-form/element/layout/vertical/checkbox', ['exports', 'ember-bootstrap/components/base/bs-form/element/layout/vertical/checkbox'], function (exports, _checkbox) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  Object.defineProperty(exports, 'default', {
+    enumerable: true,
+    get: function () {
+      return _checkbox.default;
+    }
+  });
+});
+;define('ember-bootstrap/components/bs-form/group', ['exports', 'ember-bootstrap/components/base/bs-form/group'], function (exports, _group) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _group.default.extend({
+    classNames: ['form-group'],
+    classNameBindings: ['isHorizontal:row'],
+
+    /**
+     * Indicates whether the form type equals `horizontal`
+     *
+     * @property isHorizontal
+     * @type boolean
+     * @private
+     */
+    isHorizontal: Ember.computed.equal('formLayout', 'horizontal').readOnly()
+  });
+});
+;define('ember-bootstrap/components/bs-modal-simple', ['exports', 'ember-bootstrap/components/base/bs-modal-simple'], function (exports, _bsModalSimple) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  Object.defineProperty(exports, 'default', {
+    enumerable: true,
+    get: function () {
+      return _bsModalSimple.default;
+    }
+  });
+});
+;define('ember-bootstrap/components/bs-modal', ['exports', 'ember-bootstrap/components/base/bs-modal'], function (exports, _bsModal) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _bsModal.default.extend({
+    showClass: 'show'
+  });
+});
+;define('ember-bootstrap/components/bs-modal/body', ['exports', 'ember-bootstrap/components/base/bs-modal/body'], function (exports, _body) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  Object.defineProperty(exports, 'default', {
+    enumerable: true,
+    get: function () {
+      return _body.default;
+    }
+  });
+});
+;define('ember-bootstrap/components/bs-modal/dialog', ['exports', 'ember-bootstrap/components/base/bs-modal/dialog'], function (exports, _dialog) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _dialog.default.extend({
+    classNameBindings: ['showModal:show'],
+    centered: false
+  });
+});
+;define('ember-bootstrap/components/bs-modal/footer', ['exports', 'ember-bootstrap/components/base/bs-modal/footer'], function (exports, _footer) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  Object.defineProperty(exports, 'default', {
+    enumerable: true,
+    get: function () {
+      return _footer.default;
+    }
+  });
+});
+;define('ember-bootstrap/components/bs-modal/header', ['exports', 'ember-bootstrap/components/base/bs-modal/header'], function (exports, _header) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  Object.defineProperty(exports, 'default', {
+    enumerable: true,
+    get: function () {
+      return _header.default;
+    }
+  });
+});
+;define('ember-bootstrap/components/bs-modal/header/close', ['exports', 'ember-bootstrap/components/base/bs-modal/header/close'], function (exports, _close) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  Object.defineProperty(exports, 'default', {
+    enumerable: true,
+    get: function () {
+      return _close.default;
+    }
+  });
+});
+;define('ember-bootstrap/components/bs-modal/header/title', ['exports', 'ember-bootstrap/components/base/bs-modal/header/title'], function (exports, _title) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _title.default.extend({
+    tagName: 'h5'
+  });
+});
+;define('ember-bootstrap/components/bs-nav', ['exports', 'ember-bootstrap/components/base/bs-nav'], function (exports, _bsNav) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _bsNav.default.extend({
+    classNameBindings: ['stacked:flex-column', 'fill:nav-fill'],
+
+    /**
+      * Make the nav flex fill, see [bootstrap docs](http://getbootstrap.com/docs/4.1/components/navs/#fill-and-justify)
+      *
+      * @property fill
+      * @type boolean
+      * @default false
+      * @public
+      */
+    fill: false
+
+  });
+});
+;define('ember-bootstrap/components/bs-nav/item', ['exports', 'ember-bootstrap/components/base/bs-nav/item'], function (exports, _item) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _item.default.extend({
+    classNames: ['nav-item']
+  });
+});
+;define('ember-bootstrap/components/bs-nav/link-to', ['exports', 'ember-bootstrap/components/base/bs-nav/link-to'], function (exports, _linkTo) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _linkTo.default.extend({
+    classNames: ['nav-link']
+  });
+});
+;define('ember-bootstrap/components/bs-navbar', ['exports', 'ember-bootstrap/components/base/bs-navbar'], function (exports, _bsNavbar) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _bsNavbar.default.extend({
+    classNameBindings: ['breakpointClass', 'backgroundClass'],
+
+    type: Ember.computed('appliedType', {
+      get() {
+        return this.get('appliedType');
+      },
+
+      set(key, value) {
+        let newValue = !value || value === 'default' ? 'light' : value;
+        this.set('appliedType', newValue);
+        return newValue;
+      }
+    }),
+
+    appliedType: 'light',
+
+    /**
+     * Defines the responsive toggle breakpoint size. Options are the standard
+     * two character Bootstrap size abbreviations. Used to set the `navbar-expand[-*]`
+     * class. Set to `null` to disable collapsing.
+     *
+     * @property toggleBreakpoint
+     * @type String
+     * @default 'lg'
+     * @public
+     */
+    toggleBreakpoint: 'lg',
+
+    /**
+     * Sets the background color for the navbar. Can be any color
+     * in the set that composes the `bg-*` classes.
+     *
+     * @property backgroundColor
+     * @type String
+     * @default 'light'
+     * @public
+     */
+    backgroundColor: 'light',
+
+    breakpointClass: Ember.computed('toggleBreakpoint', function () {
+      let toggleBreakpoint = this.get('toggleBreakpoint');
+
+      if (Ember.isBlank(toggleBreakpoint)) {
+        return 'navbar-expand';
+      } else {
+        return `navbar-expand-${toggleBreakpoint}`;
+      }
+    }),
+
+    backgroundClass: Ember.computed('backgroundColor', function () {
+      let backgroundColor = this.get('backgroundColor');
+
+      return `bg-${backgroundColor}`;
+    }),
+
+    _validPositions: null,
+
+    _positionPrefix: '',
+
+    init() {
+      this._super(...arguments);
+      this.set('_validPositions', ['fixed-top', 'fixed-bottom', 'sticky-top']);
+    }
+  });
+});
+;define('ember-bootstrap/components/bs-navbar/content', ['exports', 'ember-bootstrap/components/base/bs-navbar/content'], function (exports, _content) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  Object.defineProperty(exports, 'default', {
+    enumerable: true,
+    get: function () {
+      return _content.default;
+    }
+  });
+});
+;define('ember-bootstrap/components/bs-navbar/link-to', ['exports', 'ember-bootstrap/components/base/bs-navbar/link-to'], function (exports, _linkTo) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  Object.defineProperty(exports, 'default', {
+    enumerable: true,
+    get: function () {
+      return _linkTo.default;
+    }
+  });
+});
+;define('ember-bootstrap/components/bs-navbar/nav', ['exports', 'ember-bootstrap/components/base/bs-navbar/nav'], function (exports, _nav) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  Object.defineProperty(exports, 'default', {
+    enumerable: true,
+    get: function () {
+      return _nav.default;
+    }
+  });
+});
+;define('ember-bootstrap/components/bs-navbar/toggle', ['exports', 'ember-bootstrap/components/base/bs-navbar/toggle'], function (exports, _toggle) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _toggle.default.extend({
+    classNames: ['navbar-toggler']
+  });
+});
+;define('ember-bootstrap/components/bs-popover', ['exports', 'ember-bootstrap/components/base/bs-popover'], function (exports, _bsPopover) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  Object.defineProperty(exports, 'default', {
+    enumerable: true,
+    get: function () {
+      return _bsPopover.default;
+    }
+  });
+});
+;define('ember-bootstrap/components/bs-popover/element', ['exports', 'ember-bootstrap/components/base/bs-popover/element'], function (exports, _element) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _element.default.extend({
+    popperClassNames: Ember.computed('fade', 'actualPlacement', 'showHelp', function () {
+      let classes = ['popover', `bs-popover-${this.get('actualPlacement')}`];
+      if (this.get('fade')) {
+        classes.push('fade');
+      }
+      if (this.get('showHelp')) {
+        classes.push('show');
+      }
+      return classes;
+    }),
+
+    /**
+     * @property titleClass
+     * @private
+     */
+    titleClass: 'popover-header',
+
+    /**
+     * @property contentClass
+     * @private
+     */
+    contentClass: 'popover-body'
+  });
+});
+;define('ember-bootstrap/components/bs-progress', ['exports', 'ember-bootstrap/components/base/bs-progress'], function (exports, _bsProgress) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  Object.defineProperty(exports, 'default', {
+    enumerable: true,
+    get: function () {
+      return _bsProgress.default;
+    }
+  });
+});
+;define('ember-bootstrap/components/bs-progress/bar', ['exports', 'ember-bootstrap/components/base/bs-progress/bar'], function (exports, _bar) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _bar.default.extend({
+    classNameBindings: ['progressBarAnimate:progress-bar-animated'],
+
+    /**
+     * @property classTypePrefix
+     * @type String
+     * @default 'bg'
+     * @protected
+     */
+    classTypePrefix: 'bg'
+  });
+});
+;define('ember-bootstrap/components/bs-tab', ['exports', 'ember-bootstrap/components/base/bs-tab'], function (exports, _bsTab) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  Object.defineProperty(exports, 'default', {
+    enumerable: true,
+    get: function () {
+      return _bsTab.default;
+    }
+  });
+});
+;define('ember-bootstrap/components/bs-tab/pane', ['exports', 'ember-bootstrap/components/base/bs-tab/pane'], function (exports, _pane) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _pane.default.extend({
+    classNameBindings: ['showContent:show']
+  });
+});
+;define('ember-bootstrap/components/bs-tooltip', ['exports', 'ember-bootstrap/components/base/bs-tooltip'], function (exports, _bsTooltip) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  Object.defineProperty(exports, 'default', {
+    enumerable: true,
+    get: function () {
+      return _bsTooltip.default;
+    }
+  });
+});
+;define('ember-bootstrap/components/bs-tooltip/element', ['exports', 'ember-bootstrap/components/base/bs-tooltip/element'], function (exports, _element) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _element.default.extend({
+    popperClassNames: Ember.computed('fade', 'actualPlacement', 'showHelp', function () {
+      let classes = ['tooltip', `bs-tooltip-${this.get('actualPlacement')}`];
+      if (this.get('fade')) {
+        classes.push('fade');
+      }
+      if (this.get('showHelp')) {
+        classes.push('show');
+      }
+      return classes;
+    })
+  });
+});
+;define('ember-bootstrap/config', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+
+
+  const Config = Ember.Object.extend();
+
+  Config.reopenClass({
+    formValidationSuccessIcon: 'glyphicon glyphicon-ok',
+    formValidationErrorIcon: 'glyphicon glyphicon-remove',
+    formValidationWarningIcon: 'glyphicon glyphicon-warning-sign',
+    formValidationInfoIcon: 'glyphicon glyphicon-info-sign',
+    insertEmberWormholeElementToDom: true,
+
+    load(config = {}) {
+      for (let property in config) {
+        if (this.hasOwnProperty(property) && typeof this[property] !== 'function') {
+          this[property] = config[property];
+        }
+      }
+    }
+  });
+
+  exports.default = Config;
+});
+;define('ember-bootstrap/helpers/bs-contains', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.bsContains = bsContains;
+  function bsContains(params /* , hash*/) {
+    return Ember.isArray(params[0]) ? Ember.A(params[0]).includes(params[1]) : false;
+  }
+
+  exports.default = Ember.Helper.helper(bsContains);
+});
+;define('ember-bootstrap/helpers/bs-eq', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.eq = eq;
+  function eq(params) {
+    return params[0] === params[1];
+  }
+
+  exports.default = Ember.Helper.helper(eq);
+});
+;define('ember-bootstrap/mixins/component-child', ['exports', 'ember-bootstrap/mixins/component-parent'], function (exports, _componentParent) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Mixin.create({
+
+    /**
+     * The parent component
+     *
+     * @property _parent
+     * @private
+     */
+    _parent: Ember.computed(function () {
+      return this.nearestOfType(_componentParent.default);
+    }),
+
+    /**
+     * flag to check if component has already been registered
+     * @property _didRegister
+     * @type boolean
+     * @private
+     */
+    _didRegister: false,
+
+    /**
+     * Register ourself as a child at the parent component
+     * We use the `willRender` event here to also support the fastboot environment, where there is no `didInsertElement`
+     *
+     * @method _registerWithParent
+     * @private
+     */
+    _registerWithParent() {
+      if (!this._didRegister) {
+        let parent = this.get('_parent');
+        if (parent) {
+          parent.registerChild(this);
+          this._didRegister = true;
+        }
+      }
+    },
+
+    /**
+     * Unregister from the parent component
+     *
+     * @method _unregisterFromParent
+     * @private
+     */
+    _unregisterFromParent() {
+      let parent = this.get('_parent');
+      if (this._didRegister && parent) {
+        parent.removeChild(this);
+        this._didRegister = false;
+      }
+    },
+
+    didReceiveAttrs() {
+      this._super(...arguments);
+      this._registerWithParent();
+    },
+
+    willRender() {
+      this._super(...arguments);
+      this._registerWithParent();
+    },
+
+    willDestroyElement() {
+      this._super(...arguments);
+      this._unregisterFromParent();
+    }
+  });
+});
+;define('ember-bootstrap/mixins/component-parent', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Mixin.create({
+
+    /**
+     * Array of registered child components
+     *
+     * @property children
+     * @type array
+     * @protected
+     */
+    children: null,
+
+    init() {
+      this._super(...arguments);
+      this.set('children', Ember.A());
+    },
+
+    /**
+     * Register a component as a child of this parent
+     *
+     * @method registerChild
+     * @param child
+     * @public
+     */
+    registerChild(child) {
+      Ember.run.schedule('actions', this, function () {
+        this.get('children').addObject(child);
+      });
+    },
+
+    /**
+     * Remove the child component from this parent component
+     *
+     * @method removeChild
+     * @param child
+     * @public
+     */
+    removeChild(child) {
+      Ember.run.schedule('actions', this, function () {
+        this.get('children').removeObject(child);
+      });
+    }
+  });
+});
+;define('ember-bootstrap/mixins/control-attributes', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Mixin.create({
+    attributeBindings: ['name', 'autofocus', 'disabled', 'readonly', 'required', 'tabindex', 'form', 'title', 'ariaDescribedBy:aria-describedby'],
+    tagName: 'input'
+  });
+});
+;define('ember-bootstrap/mixins/control-validation', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Mixin.create({
+    classNameBindings: ['formFeedbackClass'],
+
+    validationType: null,
+
+    formFeedbackClass: Ember.computed('validationType', function () {
+      let validationType = this.get('validationType');
+      switch (validationType) {
+        case 'error':
+          return 'is-invalid';
+        case 'success':
+          return 'is-valid';
+        case 'warning':
+          return 'is-warning'; // not officially supported in BS4 :(
+      }
+    })
+  });
+});
+;define('ember-bootstrap/mixins/dropdown-toggle', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Mixin.create({
+    classNames: ['dropdown-toggle'],
+
+    /**
+     * @property ariaRole
+     * @default button
+     * @type string
+     * @protected
+     */
+    ariaRole: 'button',
+
+    /**
+     * Reference to the parent dropdown component
+     *
+     * @property dropdown
+     * @type {Components.Dropdown}
+     * @private
+     */
+    dropdown: null,
+
+    didReceiveAttrs() {
+      this._super(...arguments);
+      let dropdown = this.get('dropdown');
+      if (dropdown) {
+        Ember.run.schedule('actions', this, function () {
+          if (!this.get('isDestroyed')) {
+            dropdown.set('toggle', this);
+          }
+        });
+      }
+    }
+  });
+});
+;define('ember-bootstrap/mixins/size-class', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Mixin.create({
+    /**
+     * Prefix for the size class, e.g. "btn" for button size classes ("btn-lg", "btn-sm" etc.)
+     *
+     * @property classTypePrefix
+     * @type string
+     * @required
+     * @protected
+     */
+    classTypePrefix: null,
+
+    classNameBindings: ['sizeClass'],
+
+    sizeClass: Ember.computed('size', function () {
+      let prefix = this.get('classTypePrefix');
+      let size = this.get('size');
+      return Ember.isBlank(size) ? null : `${prefix}-${size}`;
+    }),
+
+    /**
+     * Property for size styling, set to 'lg', 'sm' or 'xs'
+     *
+     * Also see the [Bootstrap docs](http://getbootstrap.com/css/#buttons-sizes)
+     *
+     * @property size
+     * @type String
+     * @public
+     */
+    size: null
+  });
+});
+;define('ember-bootstrap/mixins/sub-component', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Mixin.create({
+    targetObject: Ember.computed.alias('parentView')
+  });
+});
+;define('ember-bootstrap/mixins/transition-support', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Mixin.create({
+
+    /**
+     * @property transitionsEnabled
+     * @type boolean
+     * @private
+     */
+    transitionsEnabled: Ember.computed.reads('fade'),
+
+    /**
+     * Access to the fastboot service if available
+     *
+     * @property fastboot
+     * @type {Ember.Service}
+     * @private
+     */
+    fastboot: Ember.computed(function () {
+      let owner = Ember.getOwner(this);
+      return owner.lookup('service:fastboot');
+    }),
+
+    /**
+     * Use CSS transitions?
+     *
+     * @property usesTransition
+     * @type boolean
+     * @readonly
+     * @private
+     */
+    usesTransition: Ember.computed('fade', 'fastboot.isFastBoot', function () {
+      return !this.get('fastboot.isFastBoot') && this.get('transitionsEnabled');
+    })
+  });
+});
+;define('ember-bootstrap/mixins/type-class', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Mixin.create({
+    /**
+     * Prefix for the type class, e.g. "btn" for button type classes ("btn-primary2 etc.)
+     *
+     * @property classTypePrefix
+     * @type string
+     * @required
+     * @protected
+     */
+    classTypePrefix: null,
+
+    classNameBindings: ['typeClass'],
+
+    typeClass: Ember.computed('type', function () {
+      let prefix = this.get('classTypePrefix');
+      let type = this.get('type') || 'default';
+
+      if (this.get('outline')) {
+        return `${prefix}-outline-${type}`;
+      }
+      return `${prefix}-${type}`;
+    }),
+
+    /**
+     * Property for type styling
+     *
+     * For the available types see the [Bootstrap docs](http://getbootstrap.com/css/#buttons-options) (use without "btn-" prefix)
+     *
+     * @property type
+     * @type String
+     * @default 'default'
+     * @public
+     */
+    type: 'default'
+  });
+});
+;define("ember-bootstrap/templates/components/bs-accordion", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "NlJ5TfmO",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[14,1,[[27,\"hash\",null,[[\"item\",\"change\"],[[27,\"component\",[[23,[\"itemComponent\"]]],[[\"selected\",\"onClick\"],[[23,[\"isSelected\"]],[27,\"action\",[[22,0,[]],\"change\"],null]]]],[27,\"action\",[[22,0,[]],\"change\"],null]]]]]]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-accordion.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-accordion/body", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "d1fHOQU2",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[4,\"component\",[[23,[\"collapseComponent\"]]],[[\"ariaRole\",\"collapsed\"],[\"tabpanel\",[23,[\"collapsed\"]]]],{\"statements\":[[0,\"  \"],[7,\"div\"],[12,\"class\",[28,[\"card-body \",[21,\"class\"]]]],[9],[0,\"\\n    \"],[14,1],[0,\"\\n  \"],[10],[0,\"\\n\"]],\"parameters\":[]},null]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-accordion/body.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-accordion/item", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "mPvMzGl7",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[4,\"if\",[[25,1]],null,{\"statements\":[[0,\"  \"],[14,1,[[27,\"hash\",null,[[\"title\",\"body\"],[[27,\"component\",[[23,[\"titleComponent\"]]],[[\"collapsed\",\"disabled\",\"onClick\"],[[23,[\"collapsed\"]],[23,[\"disabled\"]],[27,\"action\",[[22,0,[]],[23,[\"onClick\"]],[23,[\"value\"]]],null]]]],[27,\"component\",[[23,[\"bodyComponent\"]]],[[\"collapsed\"],[[23,[\"collapsed\"]]]]]]]]]],[0,\"\\n\\n\"]],\"parameters\":[]},{\"statements\":[[4,\"component\",[[23,[\"titleComponent\"]]],[[\"collapsed\",\"disabled\",\"onClick\"],[[23,[\"collapsed\"]],[23,[\"disabled\"]],[27,\"action\",[[22,0,[]],[23,[\"onClick\"]],[23,[\"value\"]]],null]]],{\"statements\":[[0,\"    \"],[1,[21,\"title\"],false],[0,\"\\n\"]],\"parameters\":[]},null],[4,\"component\",[[23,[\"bodyComponent\"]]],[[\"collapsed\"],[[23,[\"collapsed\"]]]],{\"statements\":[[0,\"    \"],[14,1],[0,\"\\n\"]],\"parameters\":[]},null]],\"parameters\":[]}]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-accordion/item.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-accordion/title", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "VmAiFoTz",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[7,\"h5\"],[11,\"class\",\"mb-0\"],[9],[0,\"\\n  \"],[7,\"button\"],[12,\"class\",[28,[\"btn btn-link \",[27,\"if\",[[23,[\"disabled\"]],\"disabled\"],null]]]],[12,\"disabled\",[21,\"disabled\"]],[11,\"type\",\"button\"],[9],[0,\"\\n    \"],[14,1],[0,\"\\n  \"],[10],[0,\"\\n\"],[10],[0,\"\\n\"]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-accordion/title.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-alert", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "M1vq6Hpx",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[4,\"unless\",[[23,[\"hidden\"]]],null,{\"statements\":[[4,\"if\",[[23,[\"dismissible\"]]],null,{\"statements\":[[0,\"    \"],[7,\"button\"],[11,\"class\",\"close\"],[11,\"aria-label\",\"Close\"],[11,\"type\",\"button\"],[9],[0,\"\\n      \"],[7,\"span\"],[11,\"aria-hidden\",\"true\"],[9],[0,\"×\"],[10],[0,\"\\n    \"],[3,\"action\",[[22,0,[]],\"dismiss\"]],[10],[0,\"\\n\"]],\"parameters\":[]},null],[0,\"  \"],[14,1],[0,\"\\n\"]],\"parameters\":[]},null]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-alert.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-button-group", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "EoEc0htX",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[14,1,[[27,\"hash\",null,[[\"button\"],[[27,\"component\",[[23,[\"buttonComponent\"]]],[[\"buttonGroupType\",\"groupValue\",\"onClick\"],[[23,[\"type\"]],[23,[\"value\"]],[27,\"action\",[[22,0,[]],\"buttonPressed\"],null]]]]]]]]]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-button-group.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-button", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "x0SVmZBj",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[4,\"if\",[[23,[\"icon\"]]],null,{\"statements\":[[7,\"i\"],[12,\"class\",[21,\"icon\"]],[9],[10],[0,\" \"]],\"parameters\":[]},null],[1,[21,\"text\"],false],[14,1,[[27,\"hash\",null,[[\"isFulfilled\",\"isPending\",\"isRejected\",\"isSettled\"],[[23,[\"isFulfilled\"]],[23,[\"isPending\"]],[23,[\"isRejected\"]],[23,[\"isSettled\"]]]]]]],[0,\"\\n\"]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-button.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-carousel", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "yO9FFEY6",
+    "block": "{\"symbols\":[\"indicator\",\"_index\",\"&default\"],\"statements\":[[4,\"if\",[[23,[\"showIndicators\"]]],null,{\"statements\":[[0,\"  \"],[7,\"ol\"],[11,\"class\",\"carousel-indicators\"],[9],[0,\"\\n\"],[4,\"each\",[[23,[\"indicators\"]]],null,{\"statements\":[[0,\"      \"],[7,\"li\"],[12,\"class\",[27,\"if\",[[27,\"bs-eq\",[[23,[\"currentIndex\"]],[22,2,[]]],null],\"active\"],null]],[12,\"onclick\",[27,\"action\",[[22,0,[]],\"toSlide\",[22,2,[]]],null]],[11,\"role\",\"button\"],[9],[10],[0,\"\\n\"]],\"parameters\":[1,2]},null],[0,\"  \"],[10],[0,\"\\n\"]],\"parameters\":[]},null],[0,\"\\n\"],[7,\"div\"],[11,\"class\",\"carousel-inner\"],[11,\"role\",\"listbox\"],[9],[0,\"\\n  \"],[14,3,[[27,\"hash\",null,[[\"slide\"],[[27,\"component\",[[23,[\"slideComponent\"]]],[[\"currentSlide\",\"directionalClassName\",\"followingSlide\",\"orderClassName\",\"presentationState\"],[[23,[\"currentSlide\"]],[23,[\"directionalClassName\"]],[23,[\"followingSlide\"]],[23,[\"orderClassName\"]],[23,[\"presentationState\"]]]]]]]]]],[0,\"\\n\"],[10],[0,\"\\n\\n\"],[4,\"if\",[[23,[\"showControls\"]]],null,{\"statements\":[[0,\"  \"],[7,\"a\"],[12,\"class\",[21,\"prevControlClassName\"]],[12,\"href\",[28,[\"#\",[21,\"elementId\"]]]],[11,\"role\",\"button\"],[9],[0,\"\\n    \"],[7,\"span\"],[11,\"aria-hidden\",\"true\"],[12,\"class\",[21,\"prevControlIcon\"]],[9],[10],[0,\"\\n    \"],[7,\"span\"],[11,\"class\",\"sr-only\"],[9],[1,[21,\"prevControlLabel\"],false],[10],[0,\"\\n  \"],[3,\"action\",[[22,0,[]],\"toPrevSlide\"]],[10],[0,\"\\n  \"],[7,\"a\"],[12,\"class\",[21,\"nextControlClassName\"]],[12,\"href\",[28,[\"#\",[21,\"elementId\"]]]],[11,\"role\",\"button\"],[9],[0,\"\\n    \"],[7,\"span\"],[11,\"aria-hidden\",\"true\"],[12,\"class\",[21,\"nextControlIcon\"]],[9],[10],[0,\"\\n    \"],[7,\"span\"],[11,\"class\",\"sr-only\"],[9],[1,[21,\"nextControlLabel\"],false],[10],[0,\"\\n  \"],[3,\"action\",[[22,0,[]],\"toNextSlide\"]],[10],[0,\"\\n\"]],\"parameters\":[]},null]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-carousel.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-carousel/slide", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "VBapCW4f",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[14,1]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-carousel/slide.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-dropdown", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "feWTInwx",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[14,1,[[27,\"hash\",null,[[\"button\",\"toggle\",\"menu\",\"toggleDropdown\",\"openDropdown\",\"closeDropdown\",\"isOpen\"],[[27,\"component\",[[23,[\"buttonComponent\"]]],[[\"dropdown\",\"onClick\"],[[22,0,[]],[27,\"action\",[[22,0,[]],\"toggleDropdown\"],null]]]],[27,\"component\",[[23,[\"toggleComponent\"]]],[[\"dropdown\",\"inNav\",\"onClick\"],[[22,0,[]],[23,[\"inNav\"]],[27,\"action\",[[22,0,[]],\"toggleDropdown\"],null]]]],[27,\"component\",[[23,[\"menuComponent\"]]],[[\"isOpen\",\"direction\",\"inNav\",\"toggleElement\",\"dropdownElementId\"],[[23,[\"isOpen\"]],[23,[\"direction\"]],[23,[\"inNav\"]],[23,[\"toggleElement\"]],[23,[\"elementId\"]]]]],[27,\"action\",[[22,0,[]],\"toggleDropdown\"],null],[27,\"action\",[[22,0,[]],\"openDropdown\"],null],[27,\"action\",[[22,0,[]],\"closeDropdown\"],null],[23,[\"isOpen\"]]]]]]],[0,\"\\n\"]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-dropdown.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-dropdown/menu", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "YVa4Lvra",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[4,\"if\",[[23,[\"_isOpen\"]]],null,{\"statements\":[[4,\"ember-popper\",null,[[\"id\",\"class\",\"ariaRole\",\"placement\",\"popperTarget\",\"renderInPlace\",\"popperContainer\",\"modifiers\"],[[27,\"concat\",[[23,[\"dropdownElementId\"]],\"__menu\"],null],[27,\"concat\",[\"dropdown-menu \",[23,[\"alignClass\"]],[27,\"if\",[[23,[\"isOpen\"]],\" show\"],null],\" \",[23,[\"class\"]]],null],[23,[\"ariaRole\"]],[23,[\"popperPlacement\"]],[23,[\"toggleElement\"]],[23,[\"_renderInPlace\"]],\"#ember-bootstrap-wormhole\",[23,[\"popperModifiers\"]]]],{\"statements\":[[0,\"    \"],[14,1,[[27,\"hash\",null,[[\"item\",\"link-to\",\"divider\"],[[27,\"component\",[[23,[\"itemComponent\"]]],null],[27,\"component\",[[23,[\"linkToComponent\"]]],null],[27,\"component\",[[23,[\"dividerComponent\"]]],null]]]]]],[0,\"\\n\"]],\"parameters\":[]},null]],\"parameters\":[]},null]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-dropdown/menu.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-form", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "fvsCHjRC",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[14,1,[[27,\"hash\",null,[[\"element\",\"group\",\"isSubmitting\"],[[27,\"component\",[[23,[\"elementComponent\"]]],[[\"model\",\"formLayout\",\"horizontalLabelGridClass\",\"showAllValidations\",\"onChange\"],[[23,[\"model\"]],[23,[\"formLayout\"]],[23,[\"horizontalLabelGridClass\"]],[23,[\"showAllValidations\"]],[27,\"action\",[[22,0,[]],\"change\"],null]]]],[27,\"component\",[[23,[\"groupComponent\"]]],[[\"formLayout\"],[[23,[\"formLayout\"]]]]],[23,[\"isSubmitting\"]]]]]]],[0,\"\\n\"]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-form.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-form/element", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "y+VAwtbv",
+    "block": "{\"symbols\":[\"control\",\"&default\"],\"statements\":[[4,\"component\",[[23,[\"layoutComponent\"]]],[[\"hasLabel\",\"formElementId\",\"horizontalLabelGridClass\",\"errorsComponent\",\"feedbackIconComponent\",\"labelComponent\",\"helpTextComponent\"],[[23,[\"hasLabel\"]],[23,[\"formElementId\"]],[23,[\"horizontalLabelGridClass\"]],[27,\"component\",[[23,[\"errorsComponent\"]]],[[\"messages\",\"show\",\"showMultipleErrors\"],[[23,[\"validationMessages\"]],[23,[\"showValidationMessages\"]],[23,[\"showMultipleErrors\"]]]]],[27,\"component\",[[23,[\"feedbackIconComponent\"]]],[[\"iconName\",\"show\"],[[23,[\"iconName\"]],[23,[\"hasFeedback\"]]]]],[27,\"component\",[[23,[\"labelComponent\"]]],[[\"label\",\"invisibleLabel\",\"formElementId\",\"controlType\",\"formLayout\",\"size\"],[[23,[\"label\"]],[23,[\"invisibleLabel\"]],[23,[\"formElementId\"]],[23,[\"controlType\"]],[23,[\"formLayout\"]],[23,[\"size\"]]]]],[27,\"if\",[[23,[\"hasHelpText\"]],[27,\"component\",[[23,[\"helpTextComponent\"]]],[[\"text\",\"id\"],[[23,[\"helpText\"]],[23,[\"ariaDescribedBy\"]]]]]],null]]],{\"statements\":[[4,\"with\",[[27,\"component\",[[23,[\"controlComponent\"]]],[[\"value\",\"id\",\"name\",\"type\",\"label\",\"placeholder\",\"autofocus\",\"disabled\",\"readonly\",\"required\",\"controlSize\",\"tabindex\",\"minlength\",\"maxlength\",\"min\",\"max\",\"pattern\",\"accept\",\"autocomplete\",\"autocapitalize\",\"autocorrect\",\"autosave\",\"inputmode\",\"multiple\",\"step\",\"form\",\"spellcheck\",\"cols\",\"rows\",\"wrap\",\"title\",\"options\",\"optionLabelPath\",\"ariaDescribedBy\",\"onChange\",\"validationType\",\"size\"],[[23,[\"value\"]],[23,[\"formElementId\"]],[23,[\"name\"]],[23,[\"controlType\"]],[23,[\"label\"]],[23,[\"placeholder\"]],[23,[\"autofocus\"]],[23,[\"disabled\"]],[23,[\"readonly\"]],[23,[\"required\"]],[23,[\"controlSize\"]],[23,[\"tabindex\"]],[23,[\"minlength\"]],[23,[\"maxlength\"]],[23,[\"min\"]],[23,[\"max\"]],[23,[\"pattern\"]],[23,[\"accept\"]],[23,[\"autocomplete\"]],[23,[\"autocapitalize\"]],[23,[\"autocorrect\"]],[23,[\"autosave\"]],[23,[\"inputmode\"]],[23,[\"multiple\"]],[23,[\"step\"]],[23,[\"form\"]],[23,[\"spellcheck\"]],[23,[\"cols\"]],[23,[\"rows\"]],[23,[\"wrap\"]],[23,[\"title\"]],[23,[\"options\"]],[23,[\"optionLabelPath\"]],[27,\"if\",[[23,[\"hasHelpText\"]],[23,[\"ariaDescribedBy\"]]],null],[27,\"action\",[[22,0,[]],\"change\"],null],[23,[\"validation\"]],[23,[\"size\"]]]]]],null,{\"statements\":[[4,\"if\",[[24,2]],null,{\"statements\":[[0,\"      \"],[14,2,[[27,\"hash\",null,[[\"value\",\"id\",\"validation\",\"control\"],[[23,[\"value\"]],[23,[\"formElementId\"]],[23,[\"validation\"]],[22,1,[]]]]]]],[0,\"\\n\"]],\"parameters\":[]},{\"statements\":[[0,\"      \"],[1,[27,\"component\",[[22,1,[]]],null],false],[0,\"\\n\"]],\"parameters\":[]}]],\"parameters\":[1]},null]],\"parameters\":[]},null]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-form/element.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-form/element/control/radio", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "NwG+U0lR",
+    "block": "{\"symbols\":[\"option\",\"index\",\"id\",\"&default\"],\"statements\":[[4,\"each\",[[23,[\"options\"]]],null,{\"statements\":[[0,\"  \"],[7,\"div\"],[12,\"class\",[28,[\"form-check\",[27,\"if\",[[23,[\"inline\"]],\" form-check-inline\"],null]]]],[9],[0,\"\\n\"],[4,\"with\",[[27,\"concat\",[[22,0,[\"elementId\"]],\"-\",[22,2,[]]],null]],null,{\"statements\":[[0,\"      \"],[7,\"input\"],[11,\"class\",\"form-check-input\"],[12,\"id\",[22,3,[]]],[12,\"checked\",[27,\"bs-eq\",[[22,1,[]],[23,[\"value\"]]],null]],[12,\"onclick\",[27,\"action\",[[22,0,[]],[23,[\"onChange\"]],[22,1,[]]],null]],[12,\"name\",[21,\"name\"]],[12,\"required\",[21,\"required\"]],[12,\"disabled\",[21,\"disabled\"]],[12,\"autofocus\",[21,\"autofocus\"]],[12,\"tabindex\",[21,\"tabindex\"]],[12,\"form\",[21,\"form\"]],[12,\"title\",[21,\"title\"]],[11,\"type\",\"radio\"],[9],[10],[0,\"\\n      \"],[7,\"label\"],[12,\"for\",[22,3,[]]],[11,\"class\",\"form-check-label\"],[9],[0,\"\\n\"],[4,\"if\",[[23,[\"hasblock\"]]],null,{\"statements\":[[0,\"          \"],[14,4],[0,\"\\n\"]],\"parameters\":[]},{\"statements\":[[4,\"if\",[[23,[\"optionLabelPath\"]]],null,{\"statements\":[[0,\"            \"],[1,[27,\"get\",[[22,1,[]],[23,[\"optionLabelPath\"]]],null],false],[0,\"\\n\"]],\"parameters\":[]},{\"statements\":[[0,\"            \"],[1,[22,1,[]],false],[0,\"\\n\"]],\"parameters\":[]}]],\"parameters\":[]}],[0,\"      \"],[10],[0,\"\\n\"]],\"parameters\":[3]},null],[0,\"  \"],[10],[0,\"\\n\"]],\"parameters\":[1,2]},null]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-form/element/control/radio.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-form/element/errors", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "r1RXxCOH",
+    "block": "{\"symbols\":[\"message\"],\"statements\":[[4,\"if\",[[23,[\"show\"]]],null,{\"statements\":[[4,\"if\",[[23,[\"showMultipleErrors\"]]],null,{\"statements\":[[0,\"    \"],[7,\"div\"],[11,\"class\",\"pre-scrollable\"],[9],[0,\"\\n\"],[4,\"each\",[[23,[\"messages\"]]],null,{\"statements\":[[0,\"        \"],[7,\"div\"],[12,\"class\",[21,\"feedbackClass\"]],[9],[1,[22,1,[]],false],[10],[0,\"\\n\"]],\"parameters\":[1]},null],[0,\"    \"],[10],[0,\"\\n\"]],\"parameters\":[]},{\"statements\":[[0,\"    \"],[7,\"div\"],[12,\"class\",[21,\"feedbackClass\"]],[9],[1,[23,[\"messages\",\"firstObject\"]],false],[10],[0,\"\\n\"]],\"parameters\":[]}]],\"parameters\":[]},null]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-form/element/errors.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-form/element/feedback-icon", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "0s5tcig6",
+    "block": "{\"symbols\":[],\"statements\":[[4,\"if\",[[23,[\"show\"]]],null,{\"statements\":[[0,\"  \"],[7,\"span\"],[12,\"class\",[28,[\"form-control-feedback \",[21,\"iconName\"]]]],[11,\"aria-hidden\",\"true\"],[9],[10],[0,\"\\n\"]],\"parameters\":[]},null]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-form/element/feedback-icon.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-form/element/help-text", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "zZVUZt6L",
+    "block": "{\"symbols\":[],\"statements\":[[1,[21,\"text\"],false]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-form/element/help-text.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-form/element/label", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "FQB0BfVQ",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[4,\"if\",[[24,1]],null,{\"statements\":[[0,\"  \"],[14,1],[0,\"\\n\"]],\"parameters\":[]},null],[1,[21,\"label\"],false],[0,\"\\n\"]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-form/element/label.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-form/element/layout/horizontal", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "LoR3o8mt",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[4,\"if\",[[23,[\"hasLabel\"]]],null,{\"statements\":[[0,\"  \"],[1,[27,\"component\",[[23,[\"labelComponent\"]]],[[\"labelClass\"],[[23,[\"horizontalLabelGridClass\"]]]]],false],[0,\"\\n  \"],[7,\"div\"],[12,\"class\",[21,\"horizontalInputGridClass\"]],[9],[0,\"\\n    \"],[14,1],[0,\"\\n    \"],[1,[27,\"component\",[[23,[\"errorsComponent\"]]],null],false],[0,\"\\n    \"],[1,[27,\"component\",[[23,[\"helpTextComponent\"]]],null],false],[0,\"\\n  \"],[10],[0,\"\\n\"]],\"parameters\":[]},{\"statements\":[[0,\"  \"],[7,\"div\"],[12,\"class\",[28,[[21,\"horizontalInputGridClass\"],\" \",[21,\"horizontalInputOffsetGridClass\"]]]],[9],[0,\"\\n    \"],[14,1],[0,\"\\n    \"],[1,[27,\"component\",[[23,[\"errorsComponent\"]]],null],false],[0,\"\\n    \"],[1,[27,\"component\",[[23,[\"helpTextComponent\"]]],null],false],[0,\"\\n  \"],[10],[0,\"\\n\"]],\"parameters\":[]}]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-form/element/layout/horizontal.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-form/element/layout/horizontal/checkbox", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "RAvdI/m2",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[7,\"div\"],[12,\"class\",[28,[[21,\"horizontalInputGridClass\"],\" \",[21,\"horizontalInputOffsetGridClass\"]]]],[9],[0,\"\\n  \"],[7,\"div\"],[11,\"class\",\"form-check\"],[9],[0,\"\\n    \"],[14,1],[0,\"\\n    \"],[1,[27,\"component\",[[23,[\"labelComponent\"]]],null],false],[0,\"\\n    \"],[1,[27,\"component\",[[23,[\"errorsComponent\"]]],null],false],[0,\"\\n    \"],[1,[27,\"component\",[[23,[\"helpTextComponent\"]]],null],false],[0,\"\\n  \"],[10],[0,\"\\n\"],[10],[0,\"\\n\"]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-form/element/layout/horizontal/checkbox.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-form/element/layout/vertical", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "ydl8SRHr",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[4,\"if\",[[23,[\"hasLabel\"]]],null,{\"statements\":[[0,\"  \"],[1,[27,\"component\",[[23,[\"labelComponent\"]]],null],false],[0,\"\\n\"]],\"parameters\":[]},null],[14,1],[0,\"\\n\"],[1,[27,\"component\",[[23,[\"errorsComponent\"]]],null],false],[0,\"\\n\"],[1,[27,\"component\",[[23,[\"helpTextComponent\"]]],null],false]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-form/element/layout/vertical.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-form/element/layout/vertical/checkbox", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "6h500LYY",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[7,\"div\"],[11,\"class\",\"form-check\"],[9],[0,\"\\n  \"],[14,1],[0,\"\\n  \"],[1,[27,\"component\",[[23,[\"labelComponent\"]]],null],false],[0,\"\\n  \"],[1,[27,\"component\",[[23,[\"errorsComponent\"]]],null],false],[0,\"\\n  \"],[1,[27,\"component\",[[23,[\"helpTextComponent\"]]],null],false],[0,\"\\n\"],[10],[0,\"\\n\"]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-form/element/layout/vertical/checkbox.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-form/group", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "HBwk1S/K",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[14,1],[0,\"\\n\"],[4,\"if\",[[23,[\"hasFeedback\"]]],null,{\"statements\":[[0,\"  \"],[7,\"span\"],[12,\"class\",[28,[\"form-control-feedback \",[21,\"iconName\"]]]],[11,\"aria-hidden\",\"true\"],[9],[10],[0,\"\\n\"]],\"parameters\":[]},null]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-form/group.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-modal-simple", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "6JULKEhk",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[4,\"if\",[[23,[\"inDom\"]]],null,{\"statements\":[[4,\"if\",[[23,[\"_renderInPlace\"]]],null,{\"statements\":[[4,\"bs-modal/dialog\",null,[[\"onClose\",\"fade\",\"showModal\",\"id\",\"keyboard\",\"size\",\"backdropClose\",\"class\",\"inDom\",\"paddingLeft\",\"paddingRight\",\"centered\"],[[27,\"action\",[[22,0,[]],\"close\"],null],[23,[\"fade\"]],[23,[\"showModal\"]],[23,[\"modalId\"]],[23,[\"keyboard\"]],[23,[\"size\"]],[23,[\"backdropClose\"]],[23,[\"class\"]],[23,[\"inDom\"]],[23,[\"paddingLeft\"]],[23,[\"paddingRight\"]],[27,\"bs-eq\",[[23,[\"position\"]],\"center\"],null]]],{\"statements\":[[0,\"      \"],[1,[27,\"bs-modal/header\",null,[[\"title\",\"closeButton\",\"onClose\"],[[23,[\"title\"]],[23,[\"closeButton\"]],[27,\"action\",[[22,0,[]],\"close\"],null]]]],false],[0,\"\\n\"],[4,\"bs-modal/body\",null,null,{\"statements\":[[0,\"        \"],[14,1,[[27,\"hash\",null,[[\"close\",\"submit\"],[[27,\"action\",[[22,0,[]],\"close\"],null],[27,\"action\",[[22,0,[]],\"submit\"],null]]]]]],[0,\"\\n\"]],\"parameters\":[]},null],[0,\"      \"],[1,[27,\"bs-modal/footer\",null,[[\"closeTitle\",\"submitTitle\",\"submitButtonType\",\"onClose\",\"onSubmit\"],[[23,[\"closeTitle\"]],[23,[\"submitTitle\"]],[23,[\"submitButtonType\"]],[27,\"action\",[[22,0,[]],\"close\"],null],[27,\"action\",[[22,0,[]],\"submit\"],null]]]],false],[0,\"\\n\"]],\"parameters\":[]},null],[0,\"\\n    \"],[7,\"div\"],[9],[0,\"\\n\"],[4,\"if\",[[23,[\"showBackdrop\"]]],null,{\"statements\":[[0,\"        \"],[7,\"div\"],[12,\"class\",[28,[\"modal-backdrop \",[27,\"if\",[[23,[\"fade\"]],\"fade\"],null],\" \",[27,\"if\",[[23,[\"showModal\"]],[23,[\"showClass\"]]],null]]]],[12,\"id\",[21,\"backdropId\"]],[9],[10],[0,\"\\n\"]],\"parameters\":[]},null],[0,\"    \"],[10],[0,\"\\n\"]],\"parameters\":[]},{\"statements\":[[4,\"in-element\",[[23,[\"destinationElement\"]]],[[\"guid\",\"nextSibling\"],[\"%cursor:0%\",null]],{\"statements\":[[4,\"bs-modal/dialog\",null,[[\"onClose\",\"fade\",\"showModal\",\"id\",\"keyboard\",\"size\",\"backdropClose\",\"class\",\"inDom\",\"paddingLeft\",\"paddingRight\",\"centered\"],[[27,\"action\",[[22,0,[]],\"close\"],null],[23,[\"fade\"]],[23,[\"showModal\"]],[23,[\"modalId\"]],[23,[\"keyboard\"]],[23,[\"size\"]],[23,[\"backdropClose\"]],[23,[\"class\"]],[23,[\"inDom\"]],[23,[\"paddingLeft\"]],[23,[\"paddingRight\"]],[27,\"bs-eq\",[[23,[\"position\"]],\"center\"],null]]],{\"statements\":[[0,\"      \"],[1,[27,\"bs-modal/header\",null,[[\"title\",\"closeButton\",\"onClose\"],[[23,[\"title\"]],[23,[\"closeButton\"]],[27,\"action\",[[22,0,[]],\"close\"],null]]]],false],[0,\"\\n\"],[4,\"bs-modal/body\",null,null,{\"statements\":[[0,\"        \"],[14,1,[[27,\"hash\",null,[[\"close\",\"submit\"],[[27,\"action\",[[22,0,[]],\"close\"],null],[27,\"action\",[[22,0,[]],\"submit\"],null]]]]]],[0,\"\\n\"]],\"parameters\":[]},null],[0,\"      \"],[1,[27,\"bs-modal/footer\",null,[[\"closeTitle\",\"submitTitle\",\"submitButtonType\",\"onClose\",\"onSubmit\"],[[23,[\"closeTitle\"]],[23,[\"submitTitle\"]],[23,[\"submitButtonType\"]],[27,\"action\",[[22,0,[]],\"close\"],null],[27,\"action\",[[22,0,[]],\"submit\"],null]]]],false],[0,\"\\n\"]],\"parameters\":[]},null],[0,\"\\n    \"],[7,\"div\"],[9],[0,\"\\n\"],[4,\"if\",[[23,[\"showBackdrop\"]]],null,{\"statements\":[[0,\"        \"],[7,\"div\"],[12,\"class\",[28,[\"modal-backdrop \",[27,\"if\",[[23,[\"fade\"]],\"fade\"],null],\" \",[27,\"if\",[[23,[\"showModal\"]],[23,[\"showClass\"]]],null]]]],[12,\"id\",[21,\"backdropId\"]],[9],[10],[0,\"\\n\"]],\"parameters\":[]},null],[0,\"    \"],[10],[0,\"\\n\"]],\"parameters\":[]},null]],\"parameters\":[]}]],\"parameters\":[]},null]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-modal-simple.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-modal", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "BQ91iypQ",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[4,\"if\",[[23,[\"inDom\"]]],null,{\"statements\":[[4,\"if\",[[23,[\"_renderInPlace\"]]],null,{\"statements\":[[4,\"component\",[[23,[\"dialogComponent\"]]],[[\"onClose\",\"fade\",\"showModal\",\"id\",\"keyboard\",\"size\",\"backdropClose\",\"class\",\"inDom\",\"paddingLeft\",\"paddingRight\",\"centered\"],[[27,\"action\",[[22,0,[]],\"close\"],null],[23,[\"fade\"]],[23,[\"showModal\"]],[23,[\"modalId\"]],[23,[\"keyboard\"]],[23,[\"size\"]],[23,[\"backdropClose\"]],[23,[\"class\"]],[23,[\"inDom\"]],[23,[\"paddingLeft\"]],[23,[\"paddingRight\"]],[27,\"bs-eq\",[[23,[\"position\"]],\"center\"],null]]],{\"statements\":[[0,\"      \"],[14,1,[[27,\"hash\",null,[[\"header\",\"body\",\"footer\",\"close\",\"submit\"],[[27,\"component\",[[23,[\"headerComponent\"]]],[[\"title\",\"onClose\"],[[23,[\"title\"]],[27,\"action\",[[22,0,[]],\"close\"],null]]]],[27,\"component\",[[23,[\"bodyComponent\"]]],null],[27,\"component\",[[23,[\"footerComponent\"]]],[[\"onClose\",\"onSubmit\"],[[27,\"action\",[[22,0,[]],\"close\"],null],[27,\"action\",[[22,0,[]],\"submit\"],null]]]],[27,\"action\",[[22,0,[]],\"close\"],null],[27,\"action\",[[22,0,[]],\"submit\"],null]]]]]],[0,\"\\n\"]],\"parameters\":[]},null],[0,\"\\n    \"],[7,\"div\"],[9],[0,\"\\n\"],[4,\"if\",[[23,[\"showBackdrop\"]]],null,{\"statements\":[[0,\"        \"],[7,\"div\"],[12,\"class\",[28,[\"modal-backdrop \",[27,\"if\",[[23,[\"fade\"]],\"fade\"],null],\" \",[27,\"if\",[[23,[\"showModal\"]],[23,[\"showClass\"]]],null]]]],[12,\"id\",[21,\"backdropId\"]],[9],[10],[0,\"\\n\"]],\"parameters\":[]},null],[0,\"    \"],[10],[0,\"\\n\"]],\"parameters\":[]},{\"statements\":[[4,\"in-element\",[[23,[\"destinationElement\"]]],[[\"guid\",\"nextSibling\"],[\"%cursor:0%\",null]],{\"statements\":[[4,\"component\",[[23,[\"dialogComponent\"]]],[[\"onClose\",\"fade\",\"showModal\",\"id\",\"keyboard\",\"size\",\"backdropClose\",\"class\",\"inDom\",\"paddingLeft\",\"paddingRight\",\"centered\"],[[27,\"action\",[[22,0,[]],\"close\"],null],[23,[\"fade\"]],[23,[\"showModal\"]],[23,[\"modalId\"]],[23,[\"keyboard\"]],[23,[\"size\"]],[23,[\"backdropClose\"]],[23,[\"class\"]],[23,[\"inDom\"]],[23,[\"paddingLeft\"]],[23,[\"paddingRight\"]],[27,\"bs-eq\",[[23,[\"position\"]],\"center\"],null]]],{\"statements\":[[0,\"      \"],[14,1,[[27,\"hash\",null,[[\"header\",\"body\",\"footer\",\"close\",\"submit\"],[[27,\"component\",[[23,[\"headerComponent\"]]],[[\"title\",\"onClose\"],[[23,[\"title\"]],[27,\"action\",[[22,0,[]],\"close\"],null]]]],[27,\"component\",[[23,[\"bodyComponent\"]]],null],[27,\"component\",[[23,[\"footerComponent\"]]],[[\"onClose\",\"onSubmit\"],[[27,\"action\",[[22,0,[]],\"close\"],null],[27,\"action\",[[22,0,[]],\"submit\"],null]]]],[27,\"action\",[[22,0,[]],\"close\"],null],[27,\"action\",[[22,0,[]],\"submit\"],null]]]]]],[0,\"\\n\"]],\"parameters\":[]},null],[0,\"\\n    \"],[7,\"div\"],[9],[0,\"\\n\"],[4,\"if\",[[23,[\"showBackdrop\"]]],null,{\"statements\":[[0,\"        \"],[7,\"div\"],[12,\"class\",[28,[\"modal-backdrop \",[27,\"if\",[[23,[\"fade\"]],\"fade\"],null],\" \",[27,\"if\",[[23,[\"showModal\"]],[23,[\"showClass\"]]],null]]]],[12,\"id\",[21,\"backdropId\"]],[9],[10],[0,\"\\n\"]],\"parameters\":[]},null],[0,\"    \"],[10],[0,\"\\n\"]],\"parameters\":[]},null]],\"parameters\":[]}]],\"parameters\":[]},null]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-modal.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-modal/body", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "lzUvbuQc",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[14,1]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-modal/body.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-modal/dialog", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "hdOp+TbQ",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[7,\"div\"],[12,\"class\",[28,[\"modal-dialog \",[21,\"sizeClass\"],\" \",[27,\"if\",[[23,[\"centered\"]],\"modal-dialog-centered\"],null]]]],[11,\"role\",\"document\"],[9],[0,\"\\n  \"],[7,\"div\"],[11,\"class\",\"modal-content\"],[9],[0,\"\\n    \"],[14,1],[0,\"\\n  \"],[10],[0,\"\\n\"],[10]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-modal/dialog.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-modal/footer", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "Jf4742rN",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[4,\"if\",[[24,1]],null,{\"statements\":[[0,\"  \"],[14,1],[0,\"\\n\"]],\"parameters\":[]},{\"statements\":[[4,\"if\",[[23,[\"hasSubmitButton\"]]],null,{\"statements\":[[0,\"    \"],[4,\"component\",[[23,[\"buttonComponent\"]]],[[\"onClick\"],[[27,\"action\",[[22,0,[]],[23,[\"onClose\"]]],null]]],{\"statements\":[[1,[21,\"closeTitle\"],false]],\"parameters\":[]},null],[0,\"\\n    \"],[4,\"component\",[[23,[\"buttonComponent\"]]],[[\"type\",\"onClick\",\"disabled\"],[[23,[\"submitButtonType\"]],[27,\"action\",[[22,0,[]],[23,[\"onSubmit\"]]],null],[23,[\"submitDisabled\"]]]],{\"statements\":[[1,[21,\"submitTitle\"],false]],\"parameters\":[]},null],[0,\"\\n\"]],\"parameters\":[]},{\"statements\":[[0,\"    \"],[4,\"component\",[[23,[\"buttonComponent\"]]],[[\"type\",\"onClick\"],[\"primary\",[27,\"action\",[[22,0,[]],[23,[\"onClose\"]]],null]]],{\"statements\":[[1,[21,\"closeTitle\"],false]],\"parameters\":[]},null],[0,\"\\n\"]],\"parameters\":[]}]],\"parameters\":[]}]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-modal/footer.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-modal/header", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "LctrZaaf",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[4,\"if\",[[24,1]],null,{\"statements\":[[0,\"  \"],[14,1],[0,\"\\n\"]],\"parameters\":[]},{\"statements\":[[0,\"  \"],[4,\"component\",[[23,[\"titleComponent\"]]],null,{\"statements\":[[1,[21,\"title\"],false]],\"parameters\":[]},null],[0,\"\\n\"]],\"parameters\":[]}],[4,\"if\",[[23,[\"closeButton\"]]],null,{\"statements\":[[0,\"  \"],[1,[27,\"component\",[[23,[\"closeComponent\"]]],[[\"onClick\"],[[27,\"action\",[[22,0,[]],[23,[\"onClose\"]]],null]]]],false],[0,\"\\n\"]],\"parameters\":[]},null]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-modal/header.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-modal/header/close", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "j9kGUdCW",
+    "block": "{\"symbols\":[],\"statements\":[[7,\"span\"],[11,\"aria-hidden\",\"true\"],[9],[0,\"×\"],[10]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-modal/header/close.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-modal/header/title", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "ZPsvhQze",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[14,1],[0,\"\\n\"]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-modal/header/title.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-nav", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "UGza0S7e",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[14,1,[[27,\"hash\",null,[[\"item\",\"link-to\",\"dropdown\"],[[27,\"component\",[[23,[\"itemComponent\"]]],null],[27,\"component\",[[23,[\"linkToComponent\"]]],null],[27,\"component\",[[23,[\"dropdownComponent\"]]],[[\"inNav\",\"tagName\"],[true,\"li\"]]]]]]]],[0,\"\\n\"]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-nav.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-nav/item", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "JjHghMPj",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[14,1],[0,\"\\n\"]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-nav/item.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-navbar", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "WqWBDxJa",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[4,\"if\",[[23,[\"fluid\"]]],null,{\"statements\":[[0,\"  \"],[14,1,[[27,\"hash\",null,[[\"toggle\",\"content\",\"nav\",\"collapse\",\"expand\",\"toggleNavbar\"],[[27,\"component\",[[23,[\"toggleComponent\"]]],[[\"onClick\",\"collapsed\"],[[27,\"action\",[[22,0,[]],\"toggleNavbar\"],null],[23,[\"_collapsed\"]]]]],[27,\"component\",[[23,[\"contentComponent\"]]],[[\"collapsed\",\"onHidden\",\"onShown\"],[[23,[\"_collapsed\"]],[23,[\"onCollapsed\"]],[23,[\"onExpanded\"]]]]],[27,\"component\",[[23,[\"navComponent\"]]],[[\"linkToComponent\"],[[27,\"component\",[[23,[\"linkToComponent\"]]],[[\"onCollapse\"],[[27,\"action\",[[22,0,[]],\"collapse\"],null]]]]]]],[27,\"action\",[[22,0,[]],\"collapse\"],null],[27,\"action\",[[22,0,[]],\"expand\"],null],[27,\"action\",[[22,0,[]],\"toggleNavbar\"],null]]]]]],[0,\"\\n\"]],\"parameters\":[]},{\"statements\":[[0,\"  \"],[7,\"div\"],[11,\"class\",\"container\"],[9],[0,\"\\n    \"],[14,1,[[27,\"hash\",null,[[\"toggle\",\"content\",\"nav\",\"collapse\",\"expand\",\"toggleNavbar\"],[[27,\"component\",[[23,[\"toggleComponent\"]]],[[\"onClick\",\"collapsed\"],[[27,\"action\",[[22,0,[]],\"toggleNavbar\"],null],[23,[\"_collapsed\"]]]]],[27,\"component\",[[23,[\"contentComponent\"]]],[[\"collapsed\",\"onHidden\",\"onShown\"],[[23,[\"_collapsed\"]],[23,[\"onCollapsed\"]],[23,[\"onExpanded\"]]]]],[27,\"component\",[[23,[\"navComponent\"]]],[[\"linkToComponent\"],[[27,\"component\",[[23,[\"linkToComponent\"]]],[[\"onCollapse\"],[[27,\"action\",[[22,0,[]],\"collapse\"],null]]]]]]],[27,\"action\",[[22,0,[]],\"collapse\"],null],[27,\"action\",[[22,0,[]],\"expand\"],null],[27,\"action\",[[22,0,[]],\"toggleNavbar\"],null]]]]]],[0,\"\\n  \"],[10],[0,\"\\n\"]],\"parameters\":[]}]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-navbar.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-navbar/content", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "dCUp3YIX",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[14,1],[0,\"\\n\"]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-navbar/content.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-navbar/toggle", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "Pbe7Bnx3",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[4,\"if\",[[24,1]],null,{\"statements\":[[0,\"  \"],[14,1],[0,\"\\n\"]],\"parameters\":[]},{\"statements\":[[0,\"  \"],[7,\"span\"],[11,\"class\",\"navbar-toggler-icon\"],[9],[10],[0,\"\\n\"]],\"parameters\":[]}]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-navbar/toggle.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-popover", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "s1iHyWDb",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[4,\"if\",[[23,[\"inDom\"]]],null,{\"statements\":[[4,\"component\",[[23,[\"elementComponent\"]]],[[\"id\",\"parent\",\"placement\",\"fade\",\"showHelp\",\"title\",\"class\",\"renderInPlace\",\"popperTarget\",\"autoPlacement\",\"viewportElement\",\"viewportPadding\"],[[23,[\"overlayId\"]],[22,0,[]],[23,[\"placement\"]],[23,[\"fade\"]],[23,[\"showHelp\"]],[23,[\"title\"]],[23,[\"class\"]],[23,[\"_renderInPlace\"]],[23,[\"triggerTargetElement\"]],[23,[\"autoPlacement\"]],[23,[\"viewportElement\"]],[23,[\"viewportPadding\"]]]],{\"statements\":[[0,\"    \"],[14,1,[[27,\"hash\",null,[[\"close\"],[[27,\"action\",[[22,0,[]],\"close\"],null]]]]]],[0,\"\\n\"]],\"parameters\":[]},null]],\"parameters\":[]},null]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-popover.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-popover/element", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "mfr1RxBU",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[4,\"ember-popper\",null,[[\"id\",\"class\",\"ariaRole\",\"placement\",\"renderInPlace\",\"popperTarget\",\"modifiers\",\"popperContainer\",\"onCreate\",\"onUpdate\"],[[23,[\"id\"]],[23,[\"popperClass\"]],[23,[\"ariaRole\"]],[23,[\"placement\"]],[23,[\"renderInPlace\"]],[23,[\"popperTarget\"]],[23,[\"popperModifiers\"]],\"#ember-bootstrap-wormhole\",[27,\"action\",[[22,0,[]],\"updatePlacement\"],null],[27,\"action\",[[22,0,[]],\"updatePlacement\"],null]]],{\"statements\":[[0,\"  \"],[7,\"div\"],[12,\"class\",[21,\"arrowClass\"]],[9],[10],[0,\"\\n\"],[4,\"if\",[[23,[\"hasTitle\"]]],null,{\"statements\":[[0,\"    \"],[7,\"h3\"],[12,\"class\",[21,\"titleClass\"]],[9],[1,[21,\"title\"],false],[10],[0,\"\\n\"]],\"parameters\":[]},null],[0,\"  \"],[7,\"div\"],[12,\"class\",[21,\"contentClass\"]],[9],[14,1],[10],[0,\"\\n\"]],\"parameters\":[]},null]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-popover/element.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-progress", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "3FxYZGg3",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[14,1,[[27,\"hash\",null,[[\"bar\"],[[27,\"component\",[[23,[\"progressBarComponent\"]]],null]]]]]],[0,\"\\n\"]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-progress.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-progress/bar", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "OnuU4eqw",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[4,\"if\",[[23,[\"showLabel\"]]],null,{\"statements\":[[4,\"if\",[[24,1]],null,{\"statements\":[[0,\"    \"],[14,1,[[23,[\"percentRounded\"]]]],[0,\"\\n\"]],\"parameters\":[]},{\"statements\":[[0,\"    \"],[1,[21,\"percentRounded\"],false],[0,\"%\\n\"]],\"parameters\":[]}]],\"parameters\":[]},{\"statements\":[[4,\"if\",[[24,1]],null,{\"statements\":[[0,\"    \"],[7,\"span\"],[11,\"class\",\"sr-only\"],[9],[14,1,[[23,[\"percentRounded\"]]]],[10],[0,\"\\n\"]],\"parameters\":[]},{\"statements\":[[0,\"    \"],[7,\"span\"],[11,\"class\",\"sr-only\"],[9],[1,[21,\"percentRounded\"],false],[0,\"%\"],[10],[0,\"\\n\"]],\"parameters\":[]}],[0,\"\\n\"]],\"parameters\":[]}]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-progress/bar.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-tab", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "vZgCmLxU",
+    "block": "{\"symbols\":[\"nav\",\"item\",\"dd\",\"menu\",\"subItem\",\"&default\"],\"statements\":[[4,\"if\",[[23,[\"customTabs\"]]],null,{\"statements\":[[0,\"  \"],[14,6,[[27,\"hash\",null,[[\"pane\",\"activeId\",\"select\"],[[27,\"component\",[[23,[\"paneComponent\"]]],[[\"parent\",\"activeId\",\"fade\",\"fadeTransition\"],[[22,0,[]],[23,[\"isActiveId\"]],[23,[\"fade\"]],[23,[\"fadeTransition\"]]]]],[23,[\"isActiveId\"]],[27,\"action\",[[22,0,[]],\"select\"],null]]]]]],[0,\"\\n\"]],\"parameters\":[]},{\"statements\":[[4,\"component\",[[23,[\"navComponent\"]]],[[\"type\"],[[23,[\"type\"]]]],{\"statements\":[[4,\"each\",[[23,[\"navItems\"]]],null,{\"statements\":[[4,\"if\",[[22,2,[\"isGroup\"]]],null,{\"statements\":[[4,\"component\",[[27,\"-assert-implicit-component-helper-argument\",[[22,1,[\"dropdown\"]],\"expected `nav.dropdown` to be a contextual component but found a string. Did you mean `(component nav.dropdown)`? ('ember-bootstrap/templates/components/bs-tab.hbs' @ L13:C11) \"],null]],[[\"class\"],[[27,\"if\",[[27,\"bs-contains\",[[22,2,[\"childIds\"]],[23,[\"isActiveId\"]]],null],\"active\"],null]]],{\"statements\":[[0,\"          \"],[4,\"component\",[[27,\"-assert-implicit-component-helper-argument\",[[22,3,[\"toggle\"]],\"expected `dd.toggle` to be a contextual component but found a string. Did you mean `(component dd.toggle)`? ('ember-bootstrap/templates/components/bs-tab.hbs' @ L14:C13) \"],null]],null,{\"statements\":[[1,[22,2,[\"groupTitle\"]],false],[0,\" \"],[7,\"span\"],[11,\"class\",\"caret\"],[9],[10]],\"parameters\":[]},null],[0,\"\\n\"],[4,\"component\",[[27,\"-assert-implicit-component-helper-argument\",[[22,3,[\"menu\"]],\"expected `dd.menu` to be a contextual component but found a string. Did you mean `(component dd.menu)`? ('ember-bootstrap/templates/components/bs-tab.hbs' @ L15:C13) \"],null]],null,{\"statements\":[[4,\"each\",[[22,2,[\"children\"]]],null,{\"statements\":[[4,\"component\",[[27,\"-assert-implicit-component-helper-argument\",[[22,4,[\"item\"]],\"expected `menu.item` to be a contextual component but found a string. Did you mean `(component menu.item)`? ('ember-bootstrap/templates/components/bs-tab.hbs' @ L17:C17) \"],null]],[[\"class\"],[[27,\"if\",[[27,\"bs-eq\",[[23,[\"isActiveId\"]],[22,5,[\"elementId\"]]],null],\"active\"],null]]],{\"statements\":[[0,\"                \"],[7,\"a\"],[12,\"href\",[28,[\"#\",[22,5,[\"elementId\"]]]]],[11,\"role\",\"tab\"],[12,\"class\",[27,\"if\",[[27,\"bs-eq\",[[23,[\"isActiveId\"]],[22,5,[\"elementId\"]]],null],\"nav-link active\",\"nav-link\"],null]],[9],[0,\"\\n                  \"],[1,[22,5,[\"title\"]],false],[0,\"\\n                \"],[3,\"action\",[[22,0,[]],\"select\",[22,5,[\"elementId\"]]]],[10],[0,\"\\n\"]],\"parameters\":[]},null]],\"parameters\":[5]},null]],\"parameters\":[4]},null]],\"parameters\":[3]},null]],\"parameters\":[]},{\"statements\":[[4,\"component\",[[27,\"-assert-implicit-component-helper-argument\",[[22,1,[\"item\"]],\"expected `nav.item` to be a contextual component but found a string. Did you mean `(component nav.item)`? ('ember-bootstrap/templates/components/bs-tab.hbs' @ L26:C11) \"],null]],[[\"active\"],[[27,\"bs-eq\",[[22,2,[\"elementId\"]],[23,[\"isActiveId\"]]],null]]],{\"statements\":[[0,\"          \"],[7,\"a\"],[12,\"href\",[28,[\"#\",[22,2,[\"elementId\"]]]]],[11,\"role\",\"tab\"],[12,\"class\",[27,\"if\",[[27,\"bs-eq\",[[23,[\"isActiveId\"]],[22,2,[\"elementId\"]]],null],\"nav-link active\",\"nav-link\"],null]],[9],[0,\"\\n            \"],[1,[22,2,[\"title\"]],false],[0,\"\\n          \"],[3,\"action\",[[22,0,[]],\"select\",[22,2,[\"elementId\"]]]],[10],[0,\"\\n\"]],\"parameters\":[]},null]],\"parameters\":[]}]],\"parameters\":[2]},null]],\"parameters\":[1]},null],[0,\"\\n  \"],[7,\"div\"],[11,\"class\",\"tab-content\"],[9],[0,\"\\n    \"],[14,6,[[27,\"hash\",null,[[\"pane\",\"activeId\",\"select\"],[[27,\"component\",[[23,[\"paneComponent\"]]],[[\"parent\",\"activeId\",\"fade\",\"fadeTransition\"],[[22,0,[]],[23,[\"isActiveId\"]],[23,[\"fade\"]],[23,[\"fadeTransition\"]]]]],[23,[\"isActiveId\"]],[27,\"action\",[[22,0,[]],\"select\"],null]]]]]],[0,\"\\n  \"],[10],[0,\"\\n\"]],\"parameters\":[]}]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-tab.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-tab/pane", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "c8Xih854",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[14,1],[0,\"\\n\"]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-tab/pane.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-tooltip", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "IPJJzmSH",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[4,\"if\",[[23,[\"inDom\"]]],null,{\"statements\":[[4,\"component\",[[23,[\"elementComponent\"]]],[[\"id\",\"placement\",\"fade\",\"showHelp\",\"class\",\"renderInPlace\",\"popperTarget\",\"autoPlacement\",\"viewportElement\",\"viewportPadding\"],[[23,[\"overlayId\"]],[23,[\"placement\"]],[23,[\"fade\"]],[23,[\"showHelp\"]],[23,[\"class\"]],[23,[\"_renderInPlace\"]],[23,[\"triggerTargetElement\"]],[23,[\"autoPlacement\"]],[23,[\"viewportElement\"]],[23,[\"viewportPadding\"]]]],{\"statements\":[[4,\"if\",[[24,1]],null,{\"statements\":[[0,\"      \"],[14,1,[[27,\"hash\",null,[[\"close\"],[[27,\"action\",[[22,0,[]],\"close\"],null]]]]]],[0,\"\\n\"]],\"parameters\":[]},{\"statements\":[[0,\"      \"],[1,[21,\"title\"],false],[0,\"\\n\"]],\"parameters\":[]}]],\"parameters\":[]},null]],\"parameters\":[]},null]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-tooltip.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-bootstrap/templates/components/bs-tooltip/element", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "Ybkhunt0",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[4,\"ember-popper\",null,[[\"id\",\"class\",\"ariaRole\",\"placement\",\"renderInPlace\",\"popperTarget\",\"modifiers\",\"popperContainer\",\"onCreate\",\"onUpdate\"],[[23,[\"id\"]],[23,[\"popperClass\"]],[23,[\"ariaRole\"]],[23,[\"placement\"]],[23,[\"renderInPlace\"]],[23,[\"popperTarget\"]],[23,[\"popperModifiers\"]],\"#ember-bootstrap-wormhole\",[27,\"action\",[[22,0,[]],\"updatePlacement\"],null],[27,\"action\",[[22,0,[]],\"updatePlacement\"],null]]],{\"statements\":[[0,\"  \"],[7,\"div\"],[12,\"class\",[21,\"arrowClass\"]],[9],[10],[0,\"\\n  \"],[7,\"div\"],[11,\"class\",\"tooltip-inner\"],[9],[0,\"\\n    \"],[14,1],[0,\"\\n  \"],[10],[0,\"\\n\"]],\"parameters\":[]},null]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-bootstrap/templates/components/bs-tooltip/element.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define('ember-bootstrap/utils/dom', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.findElementById = findElementById;
+  exports.getDOM = getDOM;
+
+
+  function childNodesOfElement(element) {
+    let children = [];
+    let child = element.firstChild;
+    while (child) {
+      children.push(child);
+      child = child.nextSibling;
+    }
+    return children;
+  } /*
+     * Implement some helpers methods for interacting with the DOM,
+     * be it Fastboot's SimpleDOM or the browser's version.
+     *
+     * Credit to https://github.com/yapplabs/ember-wormhole, from where this has been shamelessly stolen.
+     */
+
+  function findElementById(doc, id) {
+    if (doc.getElementById) {
+      return doc.getElementById(id);
+    }
+
+    let nodes = childNodesOfElement(doc);
+    let node;
+
+    while (nodes.length) {
+      node = nodes.shift();
+
+      if (node.getAttribute && node.getAttribute('id') === id) {
+        return node;
+      }
+      nodes = childNodesOfElement(node).concat(nodes);
+    }
+  }
+
+  // Private Ember API usage. Get the dom implementation used by the current
+  // renderer, be it native browser DOM or Fastboot SimpleDOM
+  function getDOM(context) {
+    let { renderer } = context;
+    if (!renderer._dom) {
+      // pre glimmer2
+      let container = Ember.getOwner ? Ember.getOwner(context) : context.container;
+      let documentService = container.lookup('service:-document');
+
+      if (documentService) {
+        return documentService;
+      }
+
+      renderer = container.lookup('renderer:-dom');
+    }
+
+    if (renderer._dom && renderer._dom.document) {
+      return renderer._dom.document;
+    } else {
+      throw new Error('Could not get DOM');
+    }
+  }
+});
+;define('ember-bootstrap/utils/get-parent', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = getParent;
+  function getParent(view) {
+    if (Ember.get(view, 'tagName') === '') {
+      // Beware: use of private API! :(
+      if (Ember.ViewUtils && Ember.ViewUtils.getViewBounds) {
+        return Ember.ViewUtils.getViewBounds(view).parentElement;
+      } else {
+        return view._renderNode.contextualElement;
+      }
+    } else {
+      return Ember.get(view, 'element').parentNode;
+    }
+  }
+});
+;define('ember-bootstrap/utils/listen-to-cp', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+
+  exports.default = function (dependentKey, defaultValue = null) {
+    return Ember.computed(dependentKey, {
+      get() {
+        return Ember.getWithDefault(this, dependentKey, defaultValue);
+      },
+      set(key, value) {
+        // eslint-disable-line no-unused-vars
+        return value;
+      }
+    });
+  };
+});
+;define('ember-bootstrap/utils/transition-end', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = waitForTransitionEnd;
+  function waitForTransitionEnd(node, duration = 0) {
+    if (!node) {
+      return Ember.RSVP.reject();
+    }
+    let backup;
+
+    if (Ember.testing) {
+      duration = 0;
+    }
+
+    return new Ember.RSVP.Promise(function (resolve) {
+      let done = function () {
+        if (backup) {
+          Ember.run.cancel(backup);
+          backup = null;
+        }
+        node.removeEventListener('transitionend', done);
+        resolve();
+      };
+
+      node.addEventListener('transitionend', done, false);
+      backup = Ember.run.later(this, done, duration);
+    });
+  }
+});
 ;define('ember-cli-app-version/initializer-factory', ['exports'], function (exports) {
   'use strict';
 
@@ -63100,6 +74820,3386 @@ createDeprecatedModule('resolver');
   const versionRegExp = exports.versionRegExp = /\d+[.]\d+[.]\d+/; // Match any number of 3 sections of digits separated by .
   const versionExtendedRegExp = exports.versionExtendedRegExp = /\d+[.]\d+[.]\d+-[a-z]*([.]\d+)?/; // Match the above but also hyphen followed by any number of lowercase letters, then optionally period and digits
   const shaRegExp = exports.shaRegExp = /[a-z\d]{8}$/; // Match 8 lowercase letters and digits, at the end of the string only (to avoid matching with version extended part)
+});
+;define('ember-cli-flash/components/flash-message', ['exports', 'ember-cli-flash/templates/components/flash-message'], function (exports, _flashMessage) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+
+
+  const {
+    and,
+    bool,
+    readOnly,
+    not
+  } = Ember.computed;
+  const {
+    next,
+    cancel
+  } = Ember.run;
+
+  exports.default = Ember.Component.extend({
+    layout: _flashMessage.default,
+    active: false,
+    messageStyle: 'bootstrap',
+    classNames: ['flash-message'],
+    classNameBindings: ['alertType', 'active', 'exiting'],
+    attributeBindings: ['aria-label', 'aria-describedby', 'role'],
+
+    showProgress: readOnly('flash.showProgress'),
+    notExiting: not('exiting'),
+    showProgressBar: and('showProgress', 'notExiting'),
+    exiting: readOnly('flash.exiting'),
+    hasBlock: bool('template').readOnly(),
+
+    alertType: Ember.computed('flash.type', {
+      get() {
+        const flashType = Ember.getWithDefault(this, 'flash.type', '');
+        const messageStyle = Ember.getWithDefault(this, 'messageStyle', '');
+        let prefix = 'alert alert-';
+
+        if (messageStyle === 'foundation') {
+          prefix = 'alert-box ';
+        }
+
+        return `${prefix}${flashType}`;
+      }
+    }),
+
+    flashType: Ember.computed('flash.type', {
+      get() {
+        const flashType = Ember.getWithDefault(this, 'flash.type', '');
+
+        return Ember.String.classify(flashType);
+      }
+    }),
+
+    didInsertElement() {
+      this._super(...arguments);
+      const pendingSet = next(this, () => {
+        Ember.set(this, 'active', true);
+      });
+      Ember.set(this, 'pendingSet', pendingSet);
+    },
+
+    progressDuration: Ember.computed('flash.showProgress', {
+      get() {
+        if (!Ember.get(this, 'flash.showProgress')) {
+          return false;
+        }
+
+        const duration = Ember.getWithDefault(this, 'flash.timeout', 0);
+
+        return Ember.String.htmlSafe(`transition-duration: ${duration}ms`);
+      }
+    }),
+
+    click() {
+      const destroyOnClick = Ember.getWithDefault(this, 'flash.destroyOnClick', true);
+
+      if (destroyOnClick) {
+        this._destroyFlashMessage();
+      }
+    },
+
+    mouseEnter() {
+      const flash = Ember.get(this, 'flash');
+      if (Ember.isPresent(flash)) {
+        flash.preventExit();
+      }
+    },
+
+    mouseLeave() {
+      const flash = Ember.get(this, 'flash');
+      if (Ember.isPresent(flash) && !Ember.get(flash, 'exiting')) {
+        flash.allowExit();
+      }
+    },
+
+    willDestroy() {
+      this._super(...arguments);
+      this._destroyFlashMessage();
+      cancel(Ember.get(this, 'pendingSet'));
+    },
+
+    // private
+    _destroyFlashMessage() {
+      const flash = Ember.getWithDefault(this, 'flash', false);
+
+      if (flash) {
+        flash.destroyMessage();
+      }
+    },
+
+    actions: {
+      close() {
+        this._destroyFlashMessage();
+      }
+    }
+  });
+});
+;define('ember-cli-flash/flash/object', ['exports', 'ember-cli-flash/utils/computed'], function (exports, _computed) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Object.extend(Ember.Evented, {
+    exitTimer: null,
+    exiting: false,
+    isExitable: true,
+    initializedTime: null,
+
+    _guid: _computed.default.guidFor('message').readOnly(),
+
+    init() {
+      this._super(...arguments);
+
+      if (Ember.get(this, 'sticky')) {
+        return;
+      }
+      this.timerTask();
+      this._setInitializedTime();
+    },
+
+    destroyMessage() {
+      this._cancelTimer();
+      let exitTaskInstance = Ember.get(this, 'exitTaskInstance');
+      if (exitTaskInstance) {
+        Ember.run.cancel(exitTaskInstance);
+        this._teardown();
+      } else {
+        this.exitTimerTask();
+      }
+    },
+
+    exitMessage() {
+      if (!Ember.get(this, 'isExitable')) {
+        return;
+      }
+      this.exitTimerTask();
+      this.trigger('didExitMessage');
+    },
+
+    willDestroy() {
+      const onDestroy = Ember.get(this, 'onDestroy');
+      if (onDestroy) {
+        onDestroy();
+      }
+
+      this._cancelTimer();
+      this._cancelTimer('exitTaskInstance');
+      this._super(...arguments);
+    },
+
+    preventExit() {
+      Ember.set(this, 'isExitable', false);
+    },
+
+    allowExit() {
+      Ember.set(this, 'isExitable', true);
+      this._checkIfShouldExit();
+    },
+
+    timerTask() {
+      let timeout = Ember.get(this, 'timeout');
+      if (!timeout) {
+        return;
+      }
+      let timerTaskInstance = Ember.run.later(() => {
+        this.exitMessage();
+      }, timeout);
+      Ember.set(this, 'timerTaskInstance', timerTaskInstance);
+    },
+
+    exitTimerTask() {
+      if (Ember.get(this, 'isDestroyed')) {
+        return;
+      }
+      Ember.set(this, 'exiting', true);
+      let extendedTimeout = Ember.get(this, 'extendedTimeout');
+      if (extendedTimeout) {
+        let exitTaskInstance = Ember.run.later(() => {
+          this._teardown();
+        }, extendedTimeout);
+        Ember.set(this, 'exitTaskInstance', exitTaskInstance);
+      } else {
+        this._teardown();
+      }
+    },
+
+    // private
+    _setInitializedTime() {
+      let currentTime = new Date().getTime();
+
+      Ember.set(this, 'initializedTime', currentTime);
+    },
+
+    _getElapsedTime() {
+      let currentTime = new Date().getTime();
+      let initializedTime = Ember.get(this, 'initializedTime');
+
+      return currentTime - initializedTime;
+    },
+
+    _cancelTimer(taskName = 'timerTaskInstance') {
+      let taskInstance = Ember.get(this, taskName);
+      if (taskInstance) {
+        Ember.run.cancel(taskInstance);
+      }
+    },
+
+    _checkIfShouldExit() {
+      if (this._getElapsedTime() >= Ember.get(this, 'timeout') && !Ember.get(this, 'sticky')) {
+        this._cancelTimer();
+        this.exitMessage();
+      }
+    },
+
+    _teardown() {
+      const queue = Ember.get(this, 'flashService.queue');
+      if (queue) {
+        queue.removeObject(this);
+      }
+      this.destroy();
+      this.trigger('didDestroyMessage');
+    }
+  });
+});
+;define('ember-cli-flash/services/flash-messages', ['exports', 'ember-cli-flash/flash/object', 'ember-cli-flash/utils/object-without', 'ember-cli-flash/utils/flash-message-options'], function (exports, _object, _objectWithout, _flashMessageOptions) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Service.extend({
+    isEmpty: Ember.computed.equal('queue.length', 0).readOnly(),
+    _guids: Ember.computed.mapBy('queue', '_guid').readOnly(),
+
+    arrangedQueue: Ember.computed.sort('queue', function (a, b) {
+      if (a.priority < b.priority) {
+        return 1;
+      } else if (a.priority > b.priority) {
+        return -1;
+      }
+      return 0;
+    }).readOnly(),
+
+    init() {
+      this._super(...arguments);
+      this._setDefaults();
+      this.queue = Ember.A();
+    },
+
+    add(options = {}) {
+      this._enqueue(this._newFlashMessage(options));
+
+      return this;
+    },
+
+    clearMessages() {
+      const flashes = Ember.get(this, 'queue');
+
+      if (Ember.isNone(flashes)) {
+        return;
+      }
+
+      flashes.clear();
+
+      return this;
+    },
+
+    registerTypes(types = Ember.A()) {
+      types.forEach(type => this._registerType(type));
+
+      return this;
+    },
+
+    peekFirst() {
+      return Ember.get(this, 'queue.firstObject');
+    },
+
+    peekLast() {
+      return Ember.get(this, 'queue.lastObject');
+    },
+
+    getFlashObject() {
+      const errorText = 'A flash message must be added before it can be returned';
+      (true && !(Ember.get(this, 'queue').length) && Ember.assert(errorText, Ember.get(this, 'queue').length));
+
+
+      return this.peekLast();
+    },
+
+    _newFlashMessage(options = {}) {
+      (true && !(Ember.get(this, 'defaultPreventDuplicates') ? options.message : true) && Ember.assert('The flash message cannot be empty when preventDuplicates is enabled.', Ember.get(this, 'defaultPreventDuplicates') ? options.message : true));
+
+
+      const flashService = this;
+      const allDefaults = Ember.getWithDefault(this, 'flashMessageDefaults', {});
+      const defaults = (0, _objectWithout.default)(allDefaults, ['types', 'injectionFactories', 'preventDuplicates']);
+
+      const flashMessageOptions = Ember.assign({}, defaults, { flashService });
+
+      for (let key in options) {
+        const value = Ember.get(options, key);
+        const option = this._getOptionOrDefault(key, value);
+
+        Ember.set(flashMessageOptions, key, option);
+      }
+
+      return _object.default.create(flashMessageOptions);
+    },
+
+    _getOptionOrDefault(key, value) {
+      const defaults = Ember.getWithDefault(this, 'flashMessageDefaults', {});
+      const defaultOption = Ember.get(defaults, key);
+
+      if (Ember.typeOf(value) === 'undefined') {
+        return defaultOption;
+      }
+
+      return value;
+    },
+
+    flashMessageDefaults: Ember.computed(function () {
+      const config = Ember.getOwner(this).resolveRegistration('config:environment');
+      const overrides = Ember.getWithDefault(config, 'flashMessageDefaults', {});
+      return (0, _flashMessageOptions.default)(overrides);
+    }),
+
+    _setDefaults() {
+      const defaults = Ember.getWithDefault(this, 'flashMessageDefaults', {});
+
+      for (let key in defaults) {
+        const classifiedKey = Ember.String.classify(key);
+        const defaultKey = `default${classifiedKey}`;
+
+        Ember.set(this, defaultKey, defaults[key]);
+      }
+
+      this.registerTypes(Ember.getWithDefault(this, 'defaultTypes', Ember.A()));
+    },
+
+    _registerType(type) {
+      (true && !(type) && Ember.assert('The flash type cannot be undefined', type));
+
+
+      this[type] = (message, options = {}) => {
+        const flashMessageOptions = Ember.assign({}, options);
+        Ember.setProperties(flashMessageOptions, { message, type });
+
+        return this.add(flashMessageOptions);
+      };
+    },
+
+    _hasDuplicate(guid) {
+      return Ember.get(this, '_guids').includes(guid);
+    },
+
+    _enqueue(flashInstance) {
+      const preventDuplicates = Ember.get(this, 'defaultPreventDuplicates');
+
+      if (preventDuplicates) {
+        const guid = Ember.get(flashInstance, '_guid');
+
+        if (this._hasDuplicate(guid)) {
+          (true && Ember.warn('Attempting to add a duplicate message to the Flash Messages Service', false, {
+            id: 'ember-cli-flash.duplicate-message'
+          }));
+
+          return;
+        }
+      }
+
+      return Ember.get(this, 'queue').pushObject(flashInstance);
+    }
+  });
+});
+;define("ember-cli-flash/templates/components/flash-message", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "whSlt+vZ",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[4,\"if\",[[24,1]],null,{\"statements\":[[0,\"  \"],[14,1,[[22,0,[]],[23,[\"flash\"]],[27,\"action\",[[22,0,[]],\"close\"],null]]],[0,\"\\n\"]],\"parameters\":[]},{\"statements\":[[0,\"  \"],[1,[23,[\"flash\",\"message\"]],false],[0,\"\\n\"],[4,\"if\",[[23,[\"showProgressBar\"]]],null,{\"statements\":[[0,\"    \"],[7,\"div\"],[11,\"class\",\"alert-progress\"],[9],[0,\"\\n      \"],[7,\"div\"],[11,\"class\",\"alert-progressBar\"],[12,\"style\",[21,\"progressDuration\"]],[9],[10],[0,\"\\n    \"],[10],[0,\"\\n\"]],\"parameters\":[]},null]],\"parameters\":[]}]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-cli-flash/templates/components/flash-message.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define('ember-cli-flash/utils/computed', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.add = add;
+  exports.guidFor = guidFor;
+  function add(...dependentKeys) {
+    const computedFunc = Ember.computed({
+      get() {
+        const values = dependentKeys.map(dependentKey => {
+          const value = Ember.get(this, dependentKey);
+
+          if (Ember.typeOf(value) !== 'number') {
+            return;
+          }
+
+          return value;
+        });
+
+        return Ember.A(values).compact().reduce((prev, curr) => {
+          return prev + curr;
+        });
+      }
+    });
+
+    return computedFunc.property.apply(computedFunc, dependentKeys);
+  }
+
+  function guidFor(dependentKey) {
+    return Ember.computed(dependentKey, {
+      get() {
+        const value = Ember.get(this, dependentKey);
+
+        return Ember.guidFor(value.toString());
+      }
+    });
+  }
+});
+;define('ember-cli-flash/utils/flash-message-options', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+
+  exports.default = function (configOverrides) {
+    const addonDefaults = {
+      timeout: 3000,
+      extendedTimeout: 0,
+      priority: 100,
+      sticky: false,
+      showProgress: false,
+      type: 'info',
+      types: ['success', 'info', 'warning', 'danger', 'alert', 'secondary'],
+      injectionFactories: ['route', 'controller', 'view', 'component'],
+      preventDuplicates: false
+    };
+    return assign(addonDefaults, configOverrides);
+  };
+
+  const assign = Ember.assign || Ember.merge; /* eslint-disable ember/new-module-imports */
+});
+;define('ember-cli-flash/utils/object-compact', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = objectCompact;
+  function objectCompact(objectInstance) {
+    const compactedObject = {};
+
+    for (let key in objectInstance) {
+      const value = objectInstance[key];
+
+      if (Ember.isPresent(value)) {
+        compactedObject[key] = value;
+      }
+    }
+
+    return compactedObject;
+  }
+});
+;define("ember-cli-flash/utils/object-only", ["exports"], function (exports) {
+  "use strict";
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = objectWithout;
+  function objectWithout(originalObj = {}, keysToRemain = []) {
+    let newObj = {};
+
+    for (let key in originalObj) {
+      if (keysToRemain.indexOf(key) !== -1) {
+        newObj[key] = originalObj[key];
+      }
+    }
+
+    return newObj;
+  }
+});
+;define("ember-cli-flash/utils/object-without", ["exports"], function (exports) {
+  "use strict";
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = objectWithout;
+  function objectWithout(originalObj = {}, keysToRemove = []) {
+    let newObj = {};
+
+    for (let key in originalObj) {
+      if (keysToRemove.indexOf(key) === -1) {
+        newObj[key] = originalObj[key];
+      }
+    }
+
+    return newObj;
+  }
+});
+;define('ember-cli-string-helpers/-private/create-string-helper', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+
+  exports.default = function (stringFunction) {
+    return function ([string]) {
+      if (Ember.String.isHTMLSafe(string)) {
+        string = string.string;
+      }
+
+      string = string || '';
+      return stringFunction(string);
+    };
+  };
+});
+;define('ember-cli-string-helpers/helpers/camelize', ['exports', 'ember-cli-string-helpers/-private/create-string-helper'], function (exports, _createStringHelper) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.camelize = undefined;
+  const camelize = exports.camelize = (0, _createStringHelper.default)(Ember.String.camelize);
+  exports.default = Ember.Helper.helper(camelize);
+});
+;define('ember-cli-string-helpers/helpers/capitalize', ['exports', 'ember-cli-string-helpers/-private/create-string-helper'], function (exports, _createStringHelper) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.capitalize = undefined;
+  const capitalize = exports.capitalize = (0, _createStringHelper.default)(Ember.String.capitalize);
+  exports.default = Ember.Helper.helper(capitalize);
+});
+;define('ember-cli-string-helpers/helpers/classify', ['exports', 'ember-cli-string-helpers/-private/create-string-helper'], function (exports, _createStringHelper) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.classify = undefined;
+  const classify = exports.classify = (0, _createStringHelper.default)(Ember.String.classify);
+  exports.default = Ember.Helper.helper(classify);
+});
+;define('ember-cli-string-helpers/helpers/dasherize', ['exports', 'ember-cli-string-helpers/-private/create-string-helper'], function (exports, _createStringHelper) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.dasherize = undefined;
+  const dasherize = exports.dasherize = (0, _createStringHelper.default)(Ember.String.dasherize);
+  exports.default = Ember.Helper.helper(dasherize);
+});
+;define('ember-cli-string-helpers/helpers/html-safe', ['exports', 'ember-cli-string-helpers/-private/create-string-helper'], function (exports, _createStringHelper) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.htmlSafe = undefined;
+  const htmlSafe = exports.htmlSafe = (0, _createStringHelper.default)(Ember.String.htmlSafe);
+  exports.default = Ember.Helper.helper(htmlSafe);
+});
+;define('ember-cli-string-helpers/helpers/humanize', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.humanize = humanize;
+
+
+  const regex = /_+|-+/g;
+  const replacement = ' ';
+
+  // The substituted value will be contained in the result variable
+  function humanize([string]) {
+    if (Ember.String.isHTMLSafe(string)) {
+      string = string.string;
+    }
+
+    if (string === undefined || string === null) {
+      return '';
+    }
+
+    let result = string.toLowerCase().replace(regex, replacement);
+    return result.charAt(0).toUpperCase() + result.slice(1);
+  }
+
+  exports.default = Ember.Helper.helper(humanize);
+});
+;define('ember-cli-string-helpers/helpers/lowercase', ['exports', 'ember-cli-string-helpers/utils/lowercase', 'ember-cli-string-helpers/-private/create-string-helper'], function (exports, _lowercase, _createStringHelper) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.lowercase = undefined;
+  const lowercase = exports.lowercase = (0, _createStringHelper.default)(_lowercase.default);
+  exports.default = Ember.Helper.helper(lowercase);
+});
+;define('ember-cli-string-helpers/helpers/titleize', ['exports', 'ember-cli-string-helpers/utils/titleize', 'ember-cli-string-helpers/-private/create-string-helper'], function (exports, _titleize, _createStringHelper) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.titleize = undefined;
+  const titleize = exports.titleize = (0, _createStringHelper.default)(_titleize.default);
+  exports.default = Ember.Helper.helper(titleize);
+});
+;define('ember-cli-string-helpers/helpers/trim', ['exports', 'ember-cli-string-helpers/utils/trim', 'ember-cli-string-helpers/-private/create-string-helper'], function (exports, _trim, _createStringHelper) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.trim = undefined;
+  const trim = exports.trim = (0, _createStringHelper.default)(_trim.default);
+  exports.default = Ember.Helper.helper(trim);
+});
+;define('ember-cli-string-helpers/helpers/truncate', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.truncate = truncate;
+  function truncate([string, characterLimit = 140, useEllipsis = true]) {
+    let limit = useEllipsis ? characterLimit - 3 : characterLimit;
+
+    if (Ember.String.isHTMLSafe(string)) {
+      string = string.string;
+    }
+
+    if (string && string.length > limit) {
+      return useEllipsis ? `${string.substring(0, limit)}...` : string.substring(0, limit);
+    } else {
+      return string;
+    }
+  }
+
+  exports.default = Ember.Helper.helper(truncate);
+});
+;define('ember-cli-string-helpers/helpers/underscore', ['exports', 'ember-cli-string-helpers/-private/create-string-helper'], function (exports, _createStringHelper) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.underscore = undefined;
+  const underscore = exports.underscore = (0, _createStringHelper.default)(Ember.String.underscore);
+  exports.default = Ember.Helper.helper(underscore);
+});
+;define('ember-cli-string-helpers/helpers/uppercase', ['exports', 'ember-cli-string-helpers/utils/uppercase', 'ember-cli-string-helpers/-private/create-string-helper'], function (exports, _uppercase, _createStringHelper) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.uppercase = undefined;
+  const uppercase = exports.uppercase = (0, _createStringHelper.default)(_uppercase.default);
+  exports.default = Ember.Helper.helper(uppercase);
+});
+;define('ember-cli-string-helpers/helpers/w', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.w = w;
+  function w([...wordStrings]) {
+    return wordStrings.map(Ember.String.w).reduce((words, moreWords) => {
+      return words.concat(moreWords);
+    }, []);
+  }
+
+  exports.default = Ember.Helper.helper(w);
+});
+;define('ember-cli-string-helpers/utils/lowercase', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = lowercase;
+  function lowercase(string = '') {
+    if (typeof string !== 'string') {
+      throw new TypeError(`Expected a string, got a ${typeof string}`);
+    }
+
+    return string.toLowerCase();
+  }
+});
+;define('ember-cli-string-helpers/utils/titleize', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = titleize;
+  function titleize(string = '') {
+    if (typeof string !== 'string') {
+      throw new TypeError(`Expected a string, got a ${typeof string}`);
+    }
+
+    return string.toLowerCase().replace(/(?:^|\s|-|\/)\S/g, function (m) {
+      return m.toUpperCase();
+    });
+  }
+});
+;define('ember-cli-string-helpers/utils/trim', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = trim;
+  function trim(string = '') {
+    if (typeof string !== 'string') {
+      throw new TypeError(`Expected a string, got a ${typeof string}`);
+    }
+
+    return string.trim();
+  }
+});
+;define('ember-cli-string-helpers/utils/uppercase', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = uppercase;
+  function uppercase(string = '') {
+    if (typeof string !== 'string') {
+      throw new TypeError(`Expected a string, got a ${typeof string}`);
+    }
+
+    return string.toUpperCase();
+  }
+});
+;define('ember-concurrency/-buffer-policy', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  const saturateActiveQueue = scheduler => {
+    while (scheduler.activeTaskInstances.length < scheduler.maxConcurrency) {
+      let taskInstance = scheduler.queuedTaskInstances.shift();
+      if (!taskInstance) {
+        break;
+      }
+      scheduler.activeTaskInstances.push(taskInstance);
+    }
+  };
+
+  function numPerformSlots(scheduler) {
+    return scheduler.maxConcurrency - scheduler.queuedTaskInstances.length - scheduler.activeTaskInstances.length;
+  }
+
+  const enqueueTasksPolicy = exports.enqueueTasksPolicy = {
+    requiresUnboundedConcurrency: true,
+    schedule(scheduler) {
+      // [a,b,_] [c,d,e,f] becomes
+      // [a,b,c] [d,e,f]
+      saturateActiveQueue(scheduler);
+    },
+    getNextPerformStatus(scheduler) {
+      return numPerformSlots(scheduler) > 0 ? 'succeed' : 'enqueue';
+    }
+  };
+
+  const dropQueuedTasksPolicy = exports.dropQueuedTasksPolicy = {
+    cancelReason: `it belongs to a 'drop' Task that was already running`,
+    schedule(scheduler) {
+      // [a,b,_] [c,d,e,f] becomes
+      // [a,b,c] []
+      saturateActiveQueue(scheduler);
+      scheduler.spliceTaskInstances(this.cancelReason, scheduler.queuedTaskInstances, 0, scheduler.queuedTaskInstances.length);
+    },
+    getNextPerformStatus(scheduler) {
+      return numPerformSlots(scheduler) > 0 ? 'succeed' : 'drop';
+    }
+  };
+
+  const cancelOngoingTasksPolicy = exports.cancelOngoingTasksPolicy = {
+    cancelReason: `it belongs to a 'restartable' Task that was .perform()ed again`,
+    schedule(scheduler) {
+      // [a,b,_] [c,d,e,f] becomes
+      // [d,e,f] []
+      let activeTaskInstances = scheduler.activeTaskInstances;
+      let queuedTaskInstances = scheduler.queuedTaskInstances;
+      activeTaskInstances.push(...queuedTaskInstances);
+      queuedTaskInstances.length = 0;
+
+      let numToShift = Math.max(0, activeTaskInstances.length - scheduler.maxConcurrency);
+      scheduler.spliceTaskInstances(this.cancelReason, activeTaskInstances, 0, numToShift);
+    },
+    getNextPerformStatus(scheduler) {
+      return numPerformSlots(scheduler) > 0 ? 'succeed' : 'cancel_previous';
+    }
+  };
+
+  const dropButKeepLatestPolicy = exports.dropButKeepLatestPolicy = {
+    cancelReason: `it belongs to a 'keepLatest' Task that was already running`,
+    schedule(scheduler) {
+      // [a,b,_] [c,d,e,f] becomes
+      // [d,e,f] []
+      saturateActiveQueue(scheduler);
+      scheduler.spliceTaskInstances(this.cancelReason, scheduler.queuedTaskInstances, 0, scheduler.queuedTaskInstances.length - 1);
+    }
+  };
+});
+;define('ember-concurrency/-cancelable-promise-helpers', ['exports', 'ember-concurrency/-task-instance', 'ember-concurrency/utils'], function (exports, _taskInstance, _utils) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.hash = exports.race = exports.allSettled = exports.all = undefined;
+
+
+  const asyncAll = taskAwareVariantOf(Ember.RSVP.Promise, 'all', identity);
+
+  function* resolver(value) {
+    return value;
+  }
+
+  /**
+   * A cancelation-aware variant of [Promise.all](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/all).
+   * The normal version of a `Promise.all` just returns a regular, uncancelable
+   * Promise. The `ember-concurrency` variant of `all()` has the following
+   * additional behavior:
+   *
+   * - if the task that `yield`ed `all()` is canceled, any of the
+   *   {@linkcode TaskInstance}s passed in to `all` will be canceled
+   * - if any of the {@linkcode TaskInstance}s (or regular promises) passed in reject (or
+   *   are canceled), all of the other unfinished `TaskInstance`s will
+   *   be automatically canceled.
+   *
+   * [Check out the "Awaiting Multiple Child Tasks example"](/docs/examples/joining-tasks)
+   */
+  const all = exports.all = things => {
+    if (things.length === 0) {
+      return things;
+    }
+
+    for (let i = 0; i < things.length; ++i) {
+      let t = things[i];
+      if (!(t && t[_utils.yieldableSymbol])) {
+        return asyncAll(things);
+      }
+    }
+
+    let isAsync = false;
+    let taskInstances = things.map(thing => {
+      let ti = _taskInstance.default.create({
+        // TODO: consider simpler iterator than full on generator fn?
+        fn: resolver,
+        args: [thing]
+      })._start();
+
+      if (ti._completionState !== 1) {
+        isAsync = true;
+      }
+      return ti;
+    });
+
+    if (isAsync) {
+      return asyncAll(taskInstances);
+    } else {
+      return taskInstances.map(ti => ti.value);
+    }
+  };
+
+  /**
+   * A cancelation-aware variant of [RSVP.allSettled](http://emberjs.com/api/classes/RSVP.html#method_allSettled).
+   * The normal version of a `RSVP.allSettled` just returns a regular, uncancelable
+   * Promise. The `ember-concurrency` variant of `allSettled()` has the following
+   * additional behavior:
+   *
+   * - if the task that `yield`ed `allSettled()` is canceled, any of the
+   *   {@linkcode TaskInstance}s passed in to `allSettled` will be canceled
+   */
+  const allSettled = exports.allSettled = taskAwareVariantOf(Ember.RSVP, 'allSettled', identity);
+
+  /**
+   * A cancelation-aware variant of [Promise.race](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/race).
+   * The normal version of a `Promise.race` just returns a regular, uncancelable
+   * Promise. The `ember-concurrency` variant of `race()` has the following
+   * additional behavior:
+   *
+   * - if the task that `yield`ed `race()` is canceled, any of the
+   *   {@linkcode TaskInstance}s passed in to `race` will be canceled
+   * - once any of the tasks/promises passed in complete (either success, failure,
+   *   or cancelation), any of the {@linkcode TaskInstance}s passed in will be canceled
+   *
+   * [Check out the "Awaiting Multiple Child Tasks example"](/docs/examples/joining-tasks)
+   */
+  const race = exports.race = taskAwareVariantOf(Ember.RSVP.Promise, 'race', identity);
+
+  /**
+   * A cancelation-aware variant of [RSVP.hash](http://emberjs.com/api/classes/RSVP.html#hash).
+   * The normal version of a `RSVP.hash` just returns a regular, uncancelable
+   * Promise. The `ember-concurrency` variant of `hash()` has the following
+   * additional behavior:
+   *
+   * - if the task that `yield`ed `hash()` is canceled, any of the
+   *   {@linkcode TaskInstance}s passed in to `allSettled` will be canceled
+   * - if any of the items rejects/cancels, all other cancelable items
+   *   (e.g. {@linkcode TaskInstance}s) will be canceled
+   */
+  const hash = exports.hash = taskAwareVariantOf(Ember.RSVP, 'hash', getValues);
+
+  function identity(obj) {
+    return obj;
+  }
+
+  function getValues(obj) {
+    return Object.keys(obj).map(k => obj[k]);
+  }
+
+  function taskAwareVariantOf(obj, method, getItems) {
+    return function (thing) {
+      let items = getItems(thing);
+      let defer = Ember.RSVP.defer();
+
+      obj[method](thing).then(defer.resolve, defer.reject);
+
+      let hasCancelled = false;
+      let cancelAll = () => {
+        if (hasCancelled) {
+          return;
+        }
+        hasCancelled = true;
+        items.forEach(it => {
+          if (it) {
+            if (it instanceof _taskInstance.default) {
+              it.cancel();
+            } else if (typeof it.__ec_cancel__ === 'function') {
+              it.__ec_cancel__();
+            }
+          }
+        });
+      };
+
+      let promise = defer.promise.finally(cancelAll);
+      promise.__ec_cancel__ = cancelAll;
+      return promise;
+    };
+  }
+});
+;define('ember-concurrency/-encapsulated-task', ['exports', 'ember-concurrency/-task-instance'], function (exports, _taskInstance) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _taskInstance.default.extend({
+    _makeIterator() {
+      let perform = this.get('perform');
+      (true && !(typeof perform === 'function') && Ember.assert("The object passed to `task()` must define a `perform` generator function, e.g. `perform: function * (a,b,c) {...}`, or better yet `*perform(a,b,c) {...}`", typeof perform === 'function'));
+
+      return perform.apply(this, this.args);
+    },
+
+    perform: null
+  });
+});
+;define('ember-concurrency/-helpers', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.taskHelperClosure = taskHelperClosure;
+  function taskHelperClosure(helperName, taskMethod, _args, hash) {
+    let task = _args[0];
+    let outerArgs = _args.slice(1);
+
+    return Ember.run.bind(null, function (...innerArgs) {
+      if (!task || typeof task[taskMethod] !== 'function') {
+        (true && !(false) && Ember.assert(`The first argument passed to the \`${helperName}\` helper should be a Task object (without quotes); you passed ${task}`, false));
+
+        return;
+      }
+
+      if (hash && hash.value) {
+        let event = innerArgs.pop();
+        innerArgs.push(Ember.get(event, hash.value));
+      }
+
+      return task[taskMethod](...outerArgs, ...innerArgs);
+    });
+  }
+});
+;define('ember-concurrency/-property-modifiers-mixin', ['exports', 'ember-concurrency/-scheduler', 'ember-concurrency/-buffer-policy'], function (exports, _scheduler, _bufferPolicy) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.propertyModifiers = undefined;
+  exports.resolveScheduler = resolveScheduler;
+  const propertyModifiers = exports.propertyModifiers = {
+    // by default, task(...) expands to task(...).enqueue().maxConcurrency(Infinity)
+    _bufferPolicy: _bufferPolicy.enqueueTasksPolicy,
+    _maxConcurrency: Infinity,
+    _taskGroupPath: null,
+    _hasUsedModifier: false,
+    _hasSetBufferPolicy: false,
+    _hasEnabledEvents: false,
+
+    restartable() {
+      return setBufferPolicy(this, _bufferPolicy.cancelOngoingTasksPolicy);
+    },
+
+    enqueue() {
+      return setBufferPolicy(this, _bufferPolicy.enqueueTasksPolicy);
+    },
+
+    drop() {
+      return setBufferPolicy(this, _bufferPolicy.dropQueuedTasksPolicy);
+    },
+
+    keepLatest() {
+      return setBufferPolicy(this, _bufferPolicy.dropButKeepLatestPolicy);
+    },
+
+    maxConcurrency(n) {
+      this._hasUsedModifier = true;
+      this._maxConcurrency = n;
+      assertModifiersNotMixedWithGroup(this);
+      return this;
+    },
+
+    group(taskGroupPath) {
+      this._taskGroupPath = taskGroupPath;
+      assertModifiersNotMixedWithGroup(this);
+      return this;
+    },
+
+    evented() {
+      this._hasEnabledEvents = true;
+      return this;
+    },
+
+    debug() {
+      this._debug = true;
+      return this;
+    }
+  };
+
+  function setBufferPolicy(obj, policy) {
+    obj._hasSetBufferPolicy = true;
+    obj._hasUsedModifier = true;
+    obj._bufferPolicy = policy;
+    assertModifiersNotMixedWithGroup(obj);
+
+    if (obj._maxConcurrency === Infinity) {
+      obj._maxConcurrency = 1;
+    }
+
+    return obj;
+  }
+
+  function assertModifiersNotMixedWithGroup(obj) {
+    (true && !(!obj._hasUsedModifier || !obj._taskGroupPath) && Ember.assert(`ember-concurrency does not currently support using both .group() with other task modifiers (e.g. drop(), enqueue(), restartable())`, !obj._hasUsedModifier || !obj._taskGroupPath));
+  }
+
+  function resolveScheduler(propertyObj, obj, TaskGroup) {
+    if (propertyObj._taskGroupPath) {
+      let taskGroup = obj.get(propertyObj._taskGroupPath);
+      (true && !(taskGroup instanceof TaskGroup) && Ember.assert(`Expected path '${propertyObj._taskGroupPath}' to resolve to a TaskGroup object, but instead was ${taskGroup}`, taskGroup instanceof TaskGroup));
+
+      return taskGroup._scheduler;
+    } else {
+      return _scheduler.default.create({
+        bufferPolicy: propertyObj._bufferPolicy,
+        maxConcurrency: propertyObj._maxConcurrency
+      });
+    }
+  }
+});
+;define('ember-concurrency/-scheduler', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+
+
+  let SEEN_INDEX = 0;
+
+  const Scheduler = Ember.Object.extend({
+    lastPerformed: null,
+    lastStarted: null,
+    lastRunning: null,
+    lastSuccessful: null,
+    lastComplete: null,
+    lastErrored: null,
+    lastCanceled: null,
+    lastIncomplete: null,
+    performCount: 0,
+
+    boundHandleFulfill: null,
+    boundHandleReject: null,
+
+    init() {
+      this._super(...arguments);
+      this.activeTaskInstances = [];
+      this.queuedTaskInstances = [];
+    },
+
+    cancelAll(reason) {
+      let seen = [];
+      this.spliceTaskInstances(reason, this.activeTaskInstances, 0, this.activeTaskInstances.length, seen);
+      this.spliceTaskInstances(reason, this.queuedTaskInstances, 0, this.queuedTaskInstances.length, seen);
+      flushTaskCounts(seen);
+    },
+
+    spliceTaskInstances(cancelReason, taskInstances, index, count, seen) {
+      for (let i = index; i < index + count; ++i) {
+        let taskInstance = taskInstances[i];
+
+        if (!taskInstance.hasStarted) {
+          // This tracking logic is kinda spread all over the place...
+          // maybe TaskInstances themselves could notify
+          // some delegate of queued state changes upon cancelation?
+          taskInstance.task.decrementProperty('numQueued');
+        }
+
+        taskInstance.cancel(cancelReason);
+        if (seen) {
+          seen.push(taskInstance.task);
+        }
+      }
+      taskInstances.splice(index, count);
+    },
+
+    schedule(taskInstance) {
+      Ember.set(this, 'lastPerformed', taskInstance);
+      this.incrementProperty('performCount');
+      taskInstance.task.incrementProperty('numQueued');
+      this.queuedTaskInstances.push(taskInstance);
+      this._flushQueues();
+    },
+
+    _flushQueues() {
+      let seen = [];
+
+      for (let i = 0; i < this.activeTaskInstances.length; ++i) {
+        seen.push(this.activeTaskInstances[i].task);
+      }
+
+      this.activeTaskInstances = filterFinished(this.activeTaskInstances);
+
+      this.bufferPolicy.schedule(this);
+
+      var lastStarted = null;
+      for (let i = 0; i < this.activeTaskInstances.length; ++i) {
+        let taskInstance = this.activeTaskInstances[i];
+        if (!taskInstance.hasStarted) {
+          this._startTaskInstance(taskInstance);
+          lastStarted = taskInstance;
+        }
+        seen.push(taskInstance.task);
+      }
+
+      if (lastStarted) {
+        Ember.set(this, 'lastStarted', lastStarted);
+      }
+      Ember.set(this, 'lastRunning', lastStarted);
+
+      for (let i = 0; i < this.queuedTaskInstances.length; ++i) {
+        seen.push(this.queuedTaskInstances[i].task);
+      }
+
+      flushTaskCounts(seen);
+      Ember.set(this, 'concurrency', this.activeTaskInstances.length);
+    },
+
+    _startTaskInstance(taskInstance) {
+      let task = taskInstance.task;
+      task.decrementProperty('numQueued');
+      task.incrementProperty('numRunning');
+
+      taskInstance._start()._onFinalize(() => {
+        task.decrementProperty('numRunning');
+        var state = taskInstance._completionState;
+        Ember.set(this, 'lastComplete', taskInstance);
+        if (state === 1) {
+          Ember.set(this, 'lastSuccessful', taskInstance);
+        } else {
+          if (state === 2) {
+            Ember.set(this, 'lastErrored', taskInstance);
+          } else if (state === 3) {
+            Ember.set(this, 'lastCanceled', taskInstance);
+          }
+          Ember.set(this, 'lastIncomplete', taskInstance);
+        }
+        Ember.run.once(this, this._flushQueues);
+      });
+    }
+  });
+
+  function flushTaskCounts(tasks) {
+    SEEN_INDEX++;
+    for (let i = 0, l = tasks.length; i < l; ++i) {
+      let task = tasks[i];
+      if (task._seenIndex < SEEN_INDEX) {
+        task._seenIndex = SEEN_INDEX;
+        updateTaskChainCounts(task);
+      }
+    }
+  }
+
+  function updateTaskChainCounts(task) {
+    let numRunning = task.numRunning;
+    let numQueued = task.numQueued;
+    let taskGroup = task.get('group');
+
+    while (taskGroup) {
+      Ember.set(taskGroup, 'numRunning', numRunning);
+      Ember.set(taskGroup, 'numQueued', numQueued);
+      taskGroup = taskGroup.get('group');
+    }
+  }
+
+  function filterFinished(taskInstances) {
+    let ret = [];
+    for (let i = 0, l = taskInstances.length; i < l; ++i) {
+      let taskInstance = taskInstances[i];
+      if (Ember.get(taskInstance, 'isFinished') === false) {
+        ret.push(taskInstance);
+      }
+    }
+    return ret;
+  }
+
+  exports.default = Scheduler;
+});
+;define('ember-concurrency/-task-group', ['exports', 'ember-concurrency/utils', 'ember-concurrency/-task-state-mixin', 'ember-concurrency/-property-modifiers-mixin'], function (exports, _utils, _taskStateMixin, _propertyModifiersMixin) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.TaskGroupProperty = exports.TaskGroup = undefined;
+  const TaskGroup = exports.TaskGroup = Ember.Object.extend(_taskStateMixin.default, {
+    isTaskGroup: true,
+
+    toString() {
+      return `<TaskGroup:${this._propertyName}>`;
+    },
+
+    _numRunningOrNumQueued: Ember.computed.or('numRunning', 'numQueued'),
+    isRunning: Ember.computed.bool('_numRunningOrNumQueued'),
+    isQueued: false
+  });
+
+  class TaskGroupProperty extends _utils._ComputedProperty {
+    constructor(taskFn) {
+      let tp;
+      super(function (_propertyName) {
+        return TaskGroup.create({
+          fn: taskFn,
+          context: this,
+          _origin: this,
+          _taskGroupPath: tp._taskGroupPath,
+          _scheduler: (0, _propertyModifiersMixin.resolveScheduler)(tp, this, TaskGroup),
+          _propertyName
+        });
+      });
+      tp = this;
+    }
+  }
+
+  exports.TaskGroupProperty = TaskGroupProperty;
+  (0, _utils.objectAssign)(TaskGroupProperty.prototype, _propertyModifiersMixin.propertyModifiers);
+});
+;define('ember-concurrency/-task-instance', ['exports', 'ember-concurrency/utils'], function (exports, _utils) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.PERFORM_TYPE_LINKED = exports.PERFORM_TYPE_UNLINKED = exports.PERFORM_TYPE_DEFAULT = undefined;
+  exports.getRunningInstance = getRunningInstance;
+  exports.didCancel = didCancel;
+  exports.go = go;
+  exports.wrap = wrap;
+
+
+  const TASK_CANCELATION_NAME = 'TaskCancelation';
+
+  const COMPLETION_PENDING = 0;
+  const COMPLETION_SUCCESS = 1;
+  const COMPLETION_ERROR = 2;
+  const COMPLETION_CANCEL = 3;
+
+  const GENERATOR_STATE_BEFORE_CREATE = "BEFORE_CREATE";
+  const GENERATOR_STATE_HAS_MORE_VALUES = "HAS_MORE_VALUES";
+  const GENERATOR_STATE_DONE = "DONE";
+  const GENERATOR_STATE_ERRORED = "ERRORED";
+
+  const PERFORM_TYPE_DEFAULT = exports.PERFORM_TYPE_DEFAULT = "PERFORM_TYPE_DEFAULT";
+  const PERFORM_TYPE_UNLINKED = exports.PERFORM_TYPE_UNLINKED = "PERFORM_TYPE_UNLINKED";
+  const PERFORM_TYPE_LINKED = exports.PERFORM_TYPE_LINKED = "PERFORM_TYPE_LINKED";
+
+  let TASK_INSTANCE_STACK = [];
+
+  function getRunningInstance() {
+    return TASK_INSTANCE_STACK[TASK_INSTANCE_STACK.length - 1];
+  }
+
+  function handleYieldedUnknownThenable(thenable, taskInstance, resumeIndex) {
+    thenable.then(value => {
+      taskInstance.proceed(resumeIndex, _utils.YIELDABLE_CONTINUE, value);
+    }, error => {
+      taskInstance.proceed(resumeIndex, _utils.YIELDABLE_THROW, error);
+    });
+  }
+
+  /**
+   * Returns true if the object passed to it is a TaskCancelation error.
+   * If you call `someTask.perform().catch(...)` or otherwise treat
+   * a {@linkcode TaskInstance} like a promise, you may need to
+   * handle the cancelation of a TaskInstance differently from
+   * other kinds of errors it might throw, and you can use this
+   * convenience function to distinguish cancelation from errors.
+   *
+   * ```js
+   * click() {
+   *   this.get('myTask').perform().catch(e => {
+   *     if (!didCancel(e)) { throw e; }
+   *   });
+   * }
+   * ```
+   *
+   * @param {Object} error the caught error, which might be a TaskCancelation
+   * @returns {Boolean}
+   */
+  function didCancel(e) {
+    return e && e.name === TASK_CANCELATION_NAME;
+  }
+
+  function forwardToInternalPromise(method) {
+    return function (...args) {
+      this._hasSubscribed = true;
+      return this.get('_promise')[method](...args);
+    };
+  }
+
+  function spliceSlice(str, index, count, add) {
+    return str.slice(0, index) + (add || "") + str.slice(index + count);
+  }
+
+  /**
+    A `TaskInstance` represent a single execution of a
+    {@linkcode Task}. Every call to {@linkcode Task#perform} returns
+    a `TaskInstance`.
+  
+    `TaskInstance`s are cancelable, either explicitly
+    via {@linkcode TaskInstance#cancel} or {@linkcode Task#cancelAll},
+    or automatically due to the host object being destroyed, or
+    because concurrency policy enforced by a
+    {@linkcode TaskProperty Task Modifier} canceled the task instance.
+  
+    <style>
+      .ignore-this--this-is-here-to-hide-constructor,
+      #TaskInstance { display: none }
+    </style>
+  
+    @class TaskInstance
+  */
+  let taskInstanceAttrs = {
+    iterator: null,
+    _disposer: null,
+    _completionState: COMPLETION_PENDING,
+    task: null,
+    args: [],
+    _hasSubscribed: false,
+    _runLoop: true,
+    _debug: false,
+    _hasEnabledEvents: false,
+    cancelReason: null,
+    _performType: PERFORM_TYPE_DEFAULT,
+    _expectsLinkedYield: false,
+
+    /**
+     * If this TaskInstance runs to completion by returning a property
+     * other than a rejecting promise, this property will be set
+     * with that value.
+     *
+     * @memberof TaskInstance
+     * @instance
+     * @readOnly
+     */
+    value: null,
+
+    /**
+     * If this TaskInstance is canceled or throws an error (or yields
+     * a promise that rejects), this property will be set with that error.
+     * Otherwise, it is null.
+     *
+     * @memberof TaskInstance
+     * @instance
+     * @readOnly
+     */
+    error: null,
+
+    /**
+     * True if the task instance is fulfilled.
+     *
+     * @memberof TaskInstance
+     * @instance
+     * @readOnly
+     */
+    isSuccessful: false,
+
+    /**
+     * True if the task instance resolves to a rejection.
+     *
+     * @memberof TaskInstance
+     * @instance
+     * @readOnly
+     */
+    isError: false,
+
+    /**
+     * True if the task instance was canceled before it could run to completion.
+     *
+     * @memberof TaskInstance
+     * @instance
+     * @readOnly
+     */
+    isCanceled: Ember.computed.and('isCanceling', 'isFinished'),
+    isCanceling: false,
+
+    /**
+     * True if the task instance has started, else false.
+     *
+     * @memberof TaskInstance
+     * @instance
+     * @readOnly
+     */
+    hasStarted: false,
+
+    /**
+     * True if the task has run to completion.
+     *
+     * @memberof TaskInstance
+     * @instance
+     * @readOnly
+     */
+    isFinished: false,
+
+    /**
+     * True if the task is still running.
+     *
+     * @memberof TaskInstance
+     * @instance
+     * @readOnly
+     */
+    isRunning: Ember.computed.not('isFinished'),
+
+    /**
+     * Describes the state that the task instance is in. Can be used for debugging,
+     * or potentially driving some UI state. Possible values are:
+     *
+     * - `"dropped"`: task instance was canceled before it started
+     * - `"canceled"`: task instance was canceled before it could finish
+     * - `"finished"`: task instance ran to completion (even if an exception was thrown)
+     * - `"running"`: task instance is currently running (returns true even if
+     *     is paused on a yielded promise)
+     * - `"waiting"`: task instance hasn't begun running yet (usually
+     *     because the task is using the {@linkcode TaskProperty#enqueue .enqueue()}
+     *     task modifier)
+     *
+     * The animated timeline examples on the [Task Concurrency](/#/docs/task-concurrency)
+     * docs page make use of this property.
+     *
+     * @memberof TaskInstance
+     * @instance
+     * @readOnly
+     */
+    state: Ember.computed('isDropped', 'isCanceling', 'hasStarted', 'isFinished', function () {
+      if (Ember.get(this, 'isDropped')) {
+        return 'dropped';
+      } else if (Ember.get(this, 'isCanceling')) {
+        return 'canceled';
+      } else if (Ember.get(this, 'isFinished')) {
+        return 'finished';
+      } else if (Ember.get(this, 'hasStarted')) {
+        return 'running';
+      } else {
+        return 'waiting';
+      }
+    }),
+
+    /**
+     * True if the TaskInstance was canceled before it could
+     * ever start running. For example, calling
+     * {@linkcode Task#perform .perform()} twice on a
+     * task with the {@linkcode TaskProperty#drop .drop()} modifier applied
+     * will result in the second task instance being dropped.
+     *
+     * @memberof TaskInstance
+     * @instance
+     * @readOnly
+     */
+    isDropped: Ember.computed('isCanceling', 'hasStarted', function () {
+      return Ember.get(this, 'isCanceling') && !Ember.get(this, 'hasStarted');
+    }),
+
+    /**
+     * Event emitted when a new {@linkcode TaskInstance} starts executing.
+     *
+     * `on` from `@ember/object/evented` may be used to create a binding on the host object to the event.
+     *
+     * ```js
+     * export default Ember.Component.extend({
+     *   doSomething: task(function * () {
+     *     // ... does something
+     *   }),
+     *
+     *   onDoSomethingStarted: on('doSomething:started', function (taskInstance) {
+     *     // ...
+     *   })
+     * });
+     * ```
+     *
+     * @event TaskInstance#TASK_NAME:started
+     * @param {TaskInstance} taskInstance - Task instance that was started
+     */
+
+    /**
+     * Event emitted when a {@linkcode TaskInstance} succeeds.
+     *
+     * `on` from `@ember/object/evented` may be used to create a binding on the host object to the event.
+     *
+     * ```js
+     * export default Ember.Component.extend({
+     *   doSomething: task(function * () {
+     *     // ... does something
+     *   }),
+     *
+     *   onDoSomethingSucceeded: on('doSomething:succeeded', function (taskInstance) {
+     *     // ...
+     *   })
+     * });
+     * ```
+     *
+     * @event TaskInstance#TASK_NAME:succeeded
+     * @param {TaskInstance} taskInstance - Task instance that was succeeded
+     */
+
+    /**
+     * Event emitted when a {@linkcode TaskInstance} throws an an error that is
+     * not handled within the task itself.
+     *
+     * `on` from `@ember/object/evented` may be used to create a binding on the host object to the event.
+     *
+     * ```js
+     * export default Ember.Component.extend({
+     *   doSomething: task(function * () {
+     *     // ... does something
+     *   }),
+     *
+     *   onDoSomethingErrored: on('doSomething:errored', function (taskInstance, error) {
+     *     // ...
+     *   })
+     * });
+     * ```
+     *
+     * @event TaskInstance#TASK_NAME:errored
+     * @param {TaskInstance} taskInstance - Task instance that was started
+     * @param {Error} error - Error that was thrown by the task instance
+     */
+
+    /**
+     * Event emitted when a {@linkcode TaskInstance} is canceled.
+     *
+     * `on` from `@ember/object/evented` may be used to create a binding on the host object to the event.
+     *
+     * ```js
+     * export default Ember.Component.extend({
+     *   doSomething: task(function * () {
+     *     // ... does something
+     *   }),
+     *
+     *   onDoSomethingCanceled: on('doSomething:canceled', function (taskInstance, cancelationReason) {
+     *     // ...
+     *   })
+     * });
+     * ```
+     *
+     * @event TaskInstance#TASK_NAME:canceled
+     * @param {TaskInstance} taskInstance - Task instance that was started
+     * @param {string} cancelationReason - Cancelation reason that was was provided to {@linkcode TaskInstance#cancel}
+     */
+
+    _index: 1,
+
+    _start() {
+      if (this.hasStarted || this.isCanceling) {
+        return this;
+      }
+      Ember.set(this, 'hasStarted', true);
+      this._scheduleProceed(_utils.YIELDABLE_CONTINUE, undefined);
+      this._triggerEvent('started', this);
+      return this;
+    },
+
+    toString() {
+      let taskString = "" + this.task;
+      return spliceSlice(taskString, -1, 0, `.perform()`);
+    },
+
+    /**
+     * Cancels the task instance. Has no effect if the task instance has
+     * already been canceled or has already finished running.
+     *
+     * @method cancel
+     * @memberof TaskInstance
+     * @instance
+     */
+    cancel(cancelReason = ".cancel() was explicitly called") {
+      if (this.isCanceling || Ember.get(this, 'isFinished')) {
+        return;
+      }
+      Ember.set(this, 'isCanceling', true);
+
+      let name = Ember.get(this, 'task._propertyName') || "<unknown>";
+      Ember.set(this, 'cancelReason', `TaskInstance '${name}' was canceled because ${cancelReason}. For more information, see: http://ember-concurrency.com/docs/task-cancelation-help`);
+
+      if (this.hasStarted) {
+        this._proceedSoon(_utils.YIELDABLE_CANCEL, null);
+      } else {
+        this._finalize(null, COMPLETION_CANCEL);
+      }
+    },
+
+    _defer: null,
+    _promise: Ember.computed(function () {
+      this._defer = Ember.RSVP.defer();
+      this._maybeResolveDefer();
+      return this._defer.promise;
+    }),
+
+    _maybeResolveDefer() {
+      if (!this._defer || !this._completionState) {
+        return;
+      }
+
+      if (this._completionState === COMPLETION_SUCCESS) {
+        this._defer.resolve(this.value);
+      } else {
+        this._defer.reject(this.error);
+      }
+    },
+
+    /**
+     * Returns a promise that resolves with the value returned
+     * from the task's (generator) function, or rejects with
+     * either the exception thrown from the task function, or
+     * an error with a `.name` property with value `"TaskCancelation"`.
+     *
+     * @method then
+     * @memberof TaskInstance
+     * @instance
+     * @return {Promise}
+     */
+    then: forwardToInternalPromise('then'),
+
+    /**
+     * @method catch
+     * @memberof TaskInstance
+     * @instance
+     * @return {Promise}
+     */
+    catch: forwardToInternalPromise('catch'),
+
+    /**
+     * @method finally
+     * @memberof TaskInstance
+     * @instance
+     * @return {Promise}
+     */
+    finally: forwardToInternalPromise('finally'),
+
+    _finalize(_value, _completionState) {
+      let completionState = _completionState;
+      let value = _value;
+      this._index++;
+
+      if (this.isCanceling) {
+        completionState = COMPLETION_CANCEL;
+        value = new Error(this.cancelReason);
+
+        if (this._debug || Ember.ENV.DEBUG_TASKS) {
+          Ember.Logger.log(this.cancelReason);
+        }
+
+        value.name = TASK_CANCELATION_NAME;
+        value.taskInstance = this;
+      }
+
+      Ember.set(this, '_completionState', completionState);
+      Ember.set(this, '_result', value);
+
+      if (completionState === COMPLETION_SUCCESS) {
+        Ember.set(this, 'isSuccessful', true);
+        Ember.set(this, 'value', value);
+      } else if (completionState === COMPLETION_ERROR) {
+        Ember.set(this, 'isError', true);
+        Ember.set(this, 'error', value);
+      } else if (completionState === COMPLETION_CANCEL) {
+        Ember.set(this, 'error', value);
+      }
+
+      Ember.set(this, 'isFinished', true);
+
+      this._dispose();
+      this._runFinalizeCallbacks();
+      this._dispatchFinalizeEvents();
+    },
+
+    _finalizeCallbacks: null,
+    _onFinalize(callback) {
+      if (!this._finalizeCallbacks) {
+        this._finalizeCallbacks = [];
+      }
+      this._finalizeCallbacks.push(callback);
+
+      if (this._completionState) {
+        this._runFinalizeCallbacks();
+      }
+    },
+
+    _runFinalizeCallbacks() {
+      this._maybeResolveDefer();
+      if (this._finalizeCallbacks) {
+        for (let i = 0, l = this._finalizeCallbacks.length; i < l; ++i) {
+          this._finalizeCallbacks[i]();
+        }
+        this._finalizeCallbacks = null;
+      }
+
+      this._maybeThrowUnhandledTaskErrorLater();
+    },
+
+    _maybeThrowUnhandledTaskErrorLater() {
+      // this backports the Ember 2.0+ RSVP _onError 'after' microtask behavior to Ember < 2.0
+      if (!this._hasSubscribed && this._completionState === COMPLETION_ERROR) {
+        Ember.run.schedule(Ember.run.backburner.queueNames[Ember.run.backburner.queueNames.length - 1], () => {
+          if (!this._hasSubscribed && !didCancel(this.error)) {
+            Ember.RSVP.reject(this.error);
+          }
+        });
+      }
+    },
+
+    _dispatchFinalizeEvents() {
+      switch (this._completionState) {
+        case COMPLETION_SUCCESS:
+          this._triggerEvent('succeeded', this);
+          break;
+        case COMPLETION_ERROR:
+          this._triggerEvent('errored', this, Ember.get(this, 'error'));
+          break;
+        case COMPLETION_CANCEL:
+          this._triggerEvent('canceled', this, Ember.get(this, 'cancelReason'));
+          break;
+      }
+    },
+
+    /**
+     * Runs any disposers attached to the task's most recent `yield`.
+     * For instance, when a task yields a TaskInstance, it registers that
+     * child TaskInstance's disposer, so that if the parent task is canceled,
+     * _dispose() will run that disposer and cancel the child TaskInstance.
+     *
+     * @private
+     */
+    _dispose() {
+      if (this._disposer) {
+        let disposer = this._disposer;
+        this._disposer = null;
+
+        // TODO: test erroring disposer
+        disposer();
+      }
+    },
+
+    _isGeneratorDone() {
+      let state = this._generatorState;
+      return state === GENERATOR_STATE_DONE || state === GENERATOR_STATE_ERRORED;
+    },
+
+    /**
+     * Calls .next()/.throw()/.return() on the task's generator function iterator,
+     * essentially taking a single step of execution on the task function.
+     *
+     * @private
+     */
+    _resumeGenerator(nextValue, iteratorMethod) {
+      (true && !(!this._isGeneratorDone()) && Ember.assert("The task generator function has already run to completion. This is probably an ember-concurrency bug.", !this._isGeneratorDone()));
+
+
+      try {
+        TASK_INSTANCE_STACK.push(this);
+
+        let iterator = this._getIterator();
+        let result = iterator[iteratorMethod](nextValue);
+
+        this._generatorValue = result.value;
+        if (result.done) {
+          this._generatorState = GENERATOR_STATE_DONE;
+        } else {
+          this._generatorState = GENERATOR_STATE_HAS_MORE_VALUES;
+        }
+      } catch (e) {
+        this._generatorValue = e;
+        this._generatorState = GENERATOR_STATE_ERRORED;
+      } finally {
+        if (this._expectsLinkedYield) {
+          if (!this._generatorValue || this._generatorValue._performType !== PERFORM_TYPE_LINKED) {
+            Ember.Logger.warn("You performed a .linked() task without immediately yielding/returning it. This is currently unsupported (but might be supported in future version of ember-concurrency).");
+          }
+          this._expectsLinkedYield = false;
+        }
+
+        TASK_INSTANCE_STACK.pop();
+      }
+    },
+
+    _getIterator() {
+      if (!this.iterator) {
+        this.iterator = this._makeIterator();
+      }
+      return this.iterator;
+    },
+
+    /**
+     * Returns a generator function iterator (the object with
+     * .next()/.throw()/.return() methods) using the task function
+     * supplied to `task(...)`. It uses `apply` so that the `this`
+     * context is the host object the task lives on, and passes
+     * the args passed to `perform(...args)` through to the generator
+     * function.
+     *
+     * `_makeIterator` is overridden in EncapsulatedTask to produce
+     * an iterator based on the `*perform()` function on the
+     * EncapsulatedTask definition.
+     *
+     * @private
+     */
+    _makeIterator() {
+      return this.fn.apply(this.context, this.args);
+    },
+
+    /**
+     * The TaskInstance internally tracks an index/sequence number
+     * (the `_index` property) which gets incremented every time the
+     * task generator function iterator takes a step. When a task
+     * function is paused at a `yield`, there are two events that
+     * cause the TaskInstance to take a step: 1) the yielded value
+     * "resolves", thus resuming the TaskInstance's execution, or
+     * 2) the TaskInstance is canceled. We need some mechanism to prevent
+     * stale yielded value resolutions from resuming the TaskFunction
+     * after the TaskInstance has already moved on (either because
+     * the TaskInstance has since been canceled or because an
+     * implementation of the Yieldable API tried to resume the
+     * TaskInstance more than once). The `_index` serves as
+     * that simple mechanism: anyone resuming a TaskInstance
+     * needs to pass in the `index` they were provided that acts
+     * as a ticket to resume the TaskInstance that expires once
+     * the TaskInstance has moved on.
+     *
+     * @private
+     */
+    _advanceIndex(index) {
+      if (this._index === index) {
+        return ++this._index;
+      }
+    },
+
+    _proceedSoon(yieldResumeType, value) {
+      this._advanceIndex(this._index);
+      if (this._runLoop) {
+        Ember.run.join(() => {
+          Ember.run.schedule('actions', this, this._proceed, yieldResumeType, value);
+        });
+      } else {
+        setTimeout(() => this._proceed(yieldResumeType, value), 1);
+      }
+    },
+
+    proceed(index, yieldResumeType, value) {
+      if (this._completionState) {
+        return;
+      }
+      if (!this._advanceIndex(index)) {
+        return;
+      }
+      this._proceedSoon(yieldResumeType, value);
+    },
+
+    _scheduleProceed(yieldResumeType, value) {
+      if (this._completionState) {
+        return;
+      }
+
+      if (this._runLoop && !Ember.run.currentRunLoop) {
+        Ember.run(this, this._proceed, yieldResumeType, value);
+        return;
+      } else if (!this._runLoop && Ember.run.currentRunLoop) {
+        setTimeout(() => this._proceed(yieldResumeType, value), 1);
+        return;
+      } else {
+        this._proceed(yieldResumeType, value);
+      }
+    },
+
+    _proceed(yieldResumeType, value) {
+      if (this._completionState) {
+        return;
+      }
+
+      if (this._generatorState === GENERATOR_STATE_DONE) {
+        this._handleResolvedReturnedValue(yieldResumeType, value);
+      } else {
+        this._handleResolvedContinueValue(yieldResumeType, value);
+      }
+    },
+
+    _handleResolvedReturnedValue(yieldResumeType, value) {
+      (true && !(this._completionState === COMPLETION_PENDING) && Ember.assert("expected completion state to be pending", this._completionState === COMPLETION_PENDING));
+      (true && !(this._generatorState === GENERATOR_STATE_DONE) && Ember.assert("expected generator to be done", this._generatorState === GENERATOR_STATE_DONE));
+
+
+      switch (yieldResumeType) {
+        case _utils.YIELDABLE_CONTINUE:
+        case _utils.YIELDABLE_RETURN:
+          this._finalize(value, COMPLETION_SUCCESS);
+          break;
+        case _utils.YIELDABLE_THROW:
+          this._finalize(value, COMPLETION_ERROR);
+          break;
+        case _utils.YIELDABLE_CANCEL:
+          Ember.set(this, 'isCanceling', true);
+          this._finalize(null, COMPLETION_CANCEL);
+          break;
+      }
+    },
+
+    _generatorState: GENERATOR_STATE_BEFORE_CREATE,
+    _generatorValue: null,
+    _handleResolvedContinueValue(_yieldResumeType, resumeValue) {
+      let iteratorMethod = _yieldResumeType;
+      if (iteratorMethod === _utils.YIELDABLE_CANCEL) {
+        Ember.set(this, 'isCanceling', true);
+        iteratorMethod = _utils.YIELDABLE_RETURN;
+      }
+
+      this._dispose();
+
+      let beforeIndex = this._index;
+      this._resumeGenerator(resumeValue, iteratorMethod);
+
+      if (!this._advanceIndex(beforeIndex)) {
+        return;
+      }
+
+      if (this._generatorState === GENERATOR_STATE_ERRORED) {
+        this._finalize(this._generatorValue, COMPLETION_ERROR);
+        return;
+      }
+
+      this._handleYieldedValue();
+    },
+
+    _handleYieldedValue() {
+      let yieldedValue = this._generatorValue;
+      if (!yieldedValue) {
+        this._proceedWithSimpleValue(yieldedValue);
+        return;
+      }
+
+      if (yieldedValue instanceof _utils.RawValue) {
+        this._proceedWithSimpleValue(yieldedValue.value);
+        return;
+      }
+
+      this._addDisposer(yieldedValue.__ec_cancel__);
+
+      if (yieldedValue[_utils.yieldableSymbol]) {
+        this._invokeYieldable(yieldedValue);
+      } else if (typeof yieldedValue.then === 'function') {
+        handleYieldedUnknownThenable(yieldedValue, this, this._index);
+      } else {
+        this._proceedWithSimpleValue(yieldedValue);
+      }
+    },
+
+    _proceedWithSimpleValue(yieldedValue) {
+      this.proceed(this._index, _utils.YIELDABLE_CONTINUE, yieldedValue);
+    },
+
+    _addDisposer(maybeDisposer) {
+      if (typeof maybeDisposer === 'function') {
+        let priorDisposer = this._disposer;
+        if (priorDisposer) {
+          this._disposer = () => {
+            priorDisposer();
+            maybeDisposer();
+          };
+        } else {
+          this._disposer = maybeDisposer;
+        }
+      }
+    },
+
+    _invokeYieldable(yieldedValue) {
+      try {
+        let maybeDisposer = yieldedValue[_utils.yieldableSymbol](this, this._index);
+        this._addDisposer(maybeDisposer);
+      } catch (e) {
+        // TODO: handle erroneous yieldable implementation
+      }
+    },
+
+    _triggerEvent(eventType, ...args) {
+      if (!this._hasEnabledEvents) {
+        return;
+      }
+
+      let host = Ember.get(this, 'task.context');
+      let eventNamespace = Ember.get(this, 'task._propertyName');
+
+      if (host && host.trigger && eventNamespace) {
+        host.trigger(`${eventNamespace}:${eventType}`, ...args);
+      }
+    }
+  };
+
+  taskInstanceAttrs[_utils.yieldableSymbol] = function handleYieldedTaskInstance(parentTaskInstance, resumeIndex) {
+    let yieldedTaskInstance = this;
+    yieldedTaskInstance._hasSubscribed = true;
+
+    yieldedTaskInstance._onFinalize(() => {
+      let state = yieldedTaskInstance._completionState;
+      if (state === COMPLETION_SUCCESS) {
+        parentTaskInstance.proceed(resumeIndex, _utils.YIELDABLE_CONTINUE, yieldedTaskInstance.value);
+      } else if (state === COMPLETION_ERROR) {
+        parentTaskInstance.proceed(resumeIndex, _utils.YIELDABLE_THROW, yieldedTaskInstance.error);
+      } else if (state === COMPLETION_CANCEL) {
+        parentTaskInstance.proceed(resumeIndex, _utils.YIELDABLE_CANCEL, null);
+      }
+    });
+
+    return function disposeYieldedTaskInstance() {
+      if (yieldedTaskInstance._performType !== PERFORM_TYPE_UNLINKED) {
+        if (yieldedTaskInstance._performType === PERFORM_TYPE_DEFAULT) {
+          let parentObj = Ember.get(parentTaskInstance, 'task.context');
+          let childObj = Ember.get(yieldedTaskInstance, 'task.context');
+          if (parentObj && childObj && parentObj !== childObj && parentObj.isDestroying && Ember.get(yieldedTaskInstance, 'isRunning')) {
+            let parentName = `\`${parentTaskInstance.task._propertyName}\``;
+            let childName = `\`${yieldedTaskInstance.task._propertyName}\``;
+            Ember.Logger.warn(`ember-concurrency detected a potentially hazardous "self-cancel loop" between parent task ${parentName} and child task ${childName}. If you want child task ${childName} to be canceled when parent task ${parentName} is canceled, please change \`.perform()\` to \`.linked().perform()\`. If you want child task ${childName} to keep running after parent task ${parentName} is canceled, change it to \`.unlinked().perform()\``);
+          }
+        }
+        yieldedTaskInstance.cancel();
+      }
+    };
+  };
+
+  let TaskInstance = Ember.Object.extend(taskInstanceAttrs);
+
+  function go(args, fn, attrs = {}) {
+    return TaskInstance.create(Object.assign({ args, fn, context: this }, attrs))._start();
+  }
+
+  function wrap(fn, attrs = {}) {
+    return function wrappedRunnerFunction(...args) {
+      return go.call(this, args, fn, attrs);
+    };
+  }
+
+  exports.default = TaskInstance;
+});
+;define('ember-concurrency/-task-property', ['exports', 'ember-concurrency/-task-instance', 'ember-concurrency/-task-state-mixin', 'ember-concurrency/-task-group', 'ember-concurrency/-property-modifiers-mixin', 'ember-concurrency/utils', 'ember-concurrency/-encapsulated-task'], function (exports, _taskInstance, _taskStateMixin, _taskGroup, _propertyModifiersMixin, _utils, _encapsulatedTask) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.TaskProperty = exports.Task = undefined;
+
+
+  const PerformProxy = Ember.Object.extend({
+    _task: null,
+    _performType: null,
+    _linkedObject: null,
+
+    perform(...args) {
+      return this._task._performShared(args, this._performType, this._linkedObject);
+    }
+  });
+
+  /**
+    The `Task` object lives on a host Ember object (e.g.
+    a Component, Route, or Controller). You call the
+    {@linkcode Task#perform .perform()} method on this object
+    to create run individual {@linkcode TaskInstance}s,
+    and at any point, you can call the {@linkcode Task#cancelAll .cancelAll()}
+    method on this object to cancel all running or enqueued
+    {@linkcode TaskInstance}s.
+  
+  
+    <style>
+      .ignore-this--this-is-here-to-hide-constructor,
+      #Task{ display: none }
+    </style>
+  
+    @class Task
+  */
+  const Task = exports.Task = Ember.Object.extend(_taskStateMixin.default, {
+    /**
+     * `true` if any current task instances are running.
+     *
+     * @memberof Task
+     * @member {boolean} isRunning
+     * @instance
+     * @readOnly
+     */
+
+    /**
+     * `true` if any future task instances are queued.
+     *
+     * @memberof Task
+     * @member {boolean} isQueued
+     * @instance
+     * @readOnly
+     */
+
+    /**
+     * `true` if the task is not in the running or queued state.
+     *
+     * @memberof Task
+     * @member {boolean} isIdle
+     * @instance
+     * @readOnly
+     */
+
+    /**
+     * The current state of the task: `"running"`, `"queued"` or `"idle"`.
+     *
+     * @memberof Task
+     * @member {string} state
+     * @instance
+     * @readOnly
+     */
+
+    /**
+     * The most recently started task instance.
+     *
+     * @memberof Task
+     * @member {TaskInstance} last
+     * @instance
+     * @readOnly
+     */
+
+    /**
+     * The most recent task instance that is currently running.
+     *
+     * @memberof Task
+     * @member {TaskInstance} lastRunning
+     * @instance
+     * @readOnly
+     */
+
+    /**
+     * The most recently performed task instance.
+     *
+     * @memberof Task
+     * @member {TaskInstance} lastPerformed
+     * @instance
+     * @readOnly
+     */
+
+    /**
+     * The most recent task instance that succeeded.
+     *
+     * @memberof Task
+     * @member {TaskInstance} lastSuccessful
+     * @instance
+     * @readOnly
+     */
+
+    /**
+     * The most recently completed task instance.
+     *
+     * @memberof Task
+     * @member {TaskInstance} lastComplete
+     * @instance
+     * @readOnly
+     */
+
+    /**
+     * The most recent task instance that errored.
+     *
+     * @memberof Task
+     * @member {TaskInstance} lastErrored
+     * @instance
+     * @readOnly
+     */
+
+    /**
+     * The most recently canceled task instance.
+     *
+     * @memberof Task
+     * @member {TaskInstance} lastCanceled
+     * @instance
+     * @readOnly
+     */
+
+    /**
+     * The most recent task instance that is incomplete.
+     *
+     * @memberof Task
+     * @member {TaskInstance} lastIncomplete
+     * @instance
+     * @readOnly
+     */
+
+    /**
+     * The number of times this task has been performed.
+     *
+     * @memberof Task
+     * @member {number} performCount
+     * @instance
+     * @readOnly
+     */
+
+    fn: null,
+    context: null,
+    _observes: null,
+    _curryArgs: null,
+    _linkedObjects: null,
+
+    init() {
+      this._super(...arguments);
+
+      if (typeof this.fn === 'object') {
+        let owner = Ember.getOwner(this.context);
+        let ownerInjection = owner ? owner.ownerInjection() : {};
+        this._taskInstanceFactory = _encapsulatedTask.default.extend(ownerInjection, this.fn);
+      }
+
+      (0, _utils._cleanupOnDestroy)(this.context, this, 'cancelAll', { reason: 'the object it lives on was destroyed or unrendered' });
+    },
+
+    _curry(...args) {
+      let task = this._clone();
+      task._curryArgs = [...(this._curryArgs || []), ...args];
+      return task;
+    },
+
+    linked() {
+      let taskInstance = (0, _taskInstance.getRunningInstance)();
+      if (!taskInstance) {
+        throw new Error(`You can only call .linked() from within a task.`);
+      }
+
+      return PerformProxy.create({
+        _task: this,
+        _performType: _taskInstance.PERFORM_TYPE_LINKED,
+        _linkedObject: taskInstance
+      });
+    },
+
+    unlinked() {
+      return PerformProxy.create({
+        _task: this,
+        _performType: _taskInstance.PERFORM_TYPE_UNLINKED
+      });
+    },
+
+    _clone() {
+      return Task.create({
+        fn: this.fn,
+        context: this.context,
+        _origin: this._origin,
+        _taskGroupPath: this._taskGroupPath,
+        _scheduler: this._scheduler,
+        _propertyName: this._propertyName
+      });
+    },
+
+    /**
+     * This property is true if this task is NOT running, i.e. the number
+     * of currently running TaskInstances is zero.
+     *
+     * This property is useful for driving the state/style of buttons
+     * and loading UI, among other things.
+     *
+     * @memberof Task
+     * @instance
+     * @readOnly
+     */
+
+    /**
+     * This property is true if this task is running, i.e. the number
+     * of currently running TaskInstances is greater than zero.
+     *
+     * This property is useful for driving the state/style of buttons
+     * and loading UI, among other things.
+     *
+     * @memberof Task
+     * @instance
+     * @readOnly
+     */
+
+    /**
+     * EXPERIMENTAL
+     *
+     * This value describes what would happen to the TaskInstance returned
+     * from .perform() if .perform() were called right now.  Returns one of
+     * the following values:
+     *
+     * - `succeed`: new TaskInstance will start running immediately
+     * - `drop`: new TaskInstance will be dropped
+     * - `enqueue`: new TaskInstance will be enqueued for later execution
+     *
+     * @memberof Task
+     * @instance
+     * @private
+     * @readOnly
+     */
+
+    /**
+     * EXPERIMENTAL
+     *
+     * Returns true if calling .perform() right now would immediately start running
+     * the returned TaskInstance.
+     *
+     * @memberof Task
+     * @instance
+     * @private
+     * @readOnly
+     */
+
+    /**
+     * EXPERIMENTAL
+     *
+     * Returns true if calling .perform() right now would immediately cancel (drop)
+     * the returned TaskInstance.
+     *
+     * @memberof Task
+     * @instance
+     * @private
+     * @readOnly
+     */
+
+    /**
+     * EXPERIMENTAL
+     *
+     * Returns true if calling .perform() right now would enqueue the TaskInstance
+     * rather than execute immediately.
+     *
+     * @memberof Task
+     * @instance
+     * @private
+     * @readOnly
+     */
+
+    /**
+     * EXPERIMENTAL
+     *
+     * Returns true if calling .perform() right now would cause a previous task to be canceled
+     *
+     * @memberof Task
+     * @instance
+     * @private
+     * @readOnly
+     */
+
+    /**
+     * The current number of active running task instances. This
+     * number will never exceed maxConcurrency.
+     *
+     * @memberof Task
+     * @instance
+     * @readOnly
+     */
+
+    /**
+     * Cancels all running or queued `TaskInstance`s for this Task.
+     * If you're trying to cancel a specific TaskInstance (rather
+     * than all of the instances running under this task) call
+     * `.cancel()` on the specific TaskInstance.
+     *
+     * @method cancelAll
+     * @memberof Task
+     * @instance
+     */
+
+    toString() {
+      return `<Task:${this._propertyName}>`;
+    },
+
+    _taskInstanceFactory: _taskInstance.default,
+
+    /**
+     * Creates a new {@linkcode TaskInstance} and attempts to run it right away.
+     * If running this task instance would increase the task's concurrency
+     * to a number greater than the task's maxConcurrency, this task
+     * instance might be immediately canceled (dropped), or enqueued
+     * to run at later time, after the currently running task(s) have finished.
+     *
+     * @method perform
+     * @memberof Task
+     * @param {*} arg* - args to pass to the task function
+     * @instance
+     *
+     * @fires TaskInstance#TASK_NAME:started
+     * @fires TaskInstance#TASK_NAME:succeeded
+     * @fires TaskInstance#TASK_NAME:errored
+     * @fires TaskInstance#TASK_NAME:canceled
+     *
+     */
+    perform(...args) {
+      return this._performShared(args, _taskInstance.PERFORM_TYPE_DEFAULT, null);
+    },
+
+    _performShared(args, performType, linkedObject) {
+      let fullArgs = this._curryArgs ? [...this._curryArgs, ...args] : args;
+      let taskInstance = this._taskInstanceFactory.create({
+        fn: this.fn,
+        args: fullArgs,
+        context: this.context,
+        owner: this.context,
+        task: this,
+        _debug: this._debug,
+        _hasEnabledEvents: this._hasEnabledEvents,
+        _origin: this,
+        _performType: performType
+      });
+
+      if (performType === _taskInstance.PERFORM_TYPE_LINKED) {
+        linkedObject._expectsLinkedYield = true;
+      }
+
+      if (this.context.isDestroying) {
+        // TODO: express this in terms of lifetimes; a task linked to
+        // a dead lifetime should immediately cancel.
+        taskInstance.cancel();
+      }
+
+      this._scheduler.schedule(taskInstance);
+      return taskInstance;
+    },
+
+    [_utils.INVOKE](...args) {
+      return this.perform(...args);
+    }
+  });
+
+  /**
+    A {@link TaskProperty} is the Computed Property-like object returned
+    from the {@linkcode task} function. You can call Task Modifier methods
+    on this object to configure the behavior of the {@link Task}.
+  
+    See [Managing Task Concurrency](/#/docs/task-concurrency) for an
+    overview of all the different task modifiers you can use and how
+    they impact automatic cancelation / enqueueing of task instances.
+  
+    <style>
+      .ignore-this--this-is-here-to-hide-constructor,
+      #TaskProperty { display: none }
+    </style>
+  
+    @class TaskProperty
+  */
+  class TaskProperty extends _utils._ComputedProperty {
+    constructor(taskFn) {
+      let tp;
+      super(function (_propertyName) {
+        taskFn.displayName = `${_propertyName} (task)`;
+        return Task.create({
+          fn: tp.taskFn,
+          context: this,
+          _origin: this,
+          _taskGroupPath: tp._taskGroupPath,
+          _scheduler: (0, _propertyModifiersMixin.resolveScheduler)(tp, this, _taskGroup.TaskGroup),
+          _propertyName,
+          _debug: tp._debug,
+          _hasEnabledEvents: tp._hasEnabledEvents
+        });
+      });
+      tp = this;
+      this.taskFn = taskFn;
+      this.eventNames = null;
+      this.cancelEventNames = null;
+      this._observes = null;
+    }
+
+    setup(proto, taskName) {
+      if (super.setup) {
+        super.setup(...arguments);
+      }
+      if (this._maxConcurrency !== Infinity && !this._hasSetBufferPolicy) {
+        Ember.Logger.warn(`The use of maxConcurrency() without a specified task modifier is deprecated and won't be supported in future versions of ember-concurrency. Please specify a task modifier instead, e.g. \`${taskName}: task(...).enqueue().maxConcurrency(${this._maxConcurrency})\``);
+      }
+
+      registerOnPrototype(Ember.addListener, proto, this.eventNames, taskName, 'perform', false);
+      registerOnPrototype(Ember.addListener, proto, this.cancelEventNames, taskName, 'cancelAll', false);
+      registerOnPrototype(Ember.addObserver, proto, this._observes, taskName, 'perform', true);
+    }
+
+    /**
+     * Calling `task(...).on(eventName)` configures the task to be
+     * automatically performed when the specified events fire. In
+     * this way, it behaves like
+     * [Ember.on](http://emberjs.com/api/classes/Ember.html#method_on).
+     *
+     * You can use `task(...).on('init')` to perform the task
+     * when the host object is initialized.
+     *
+     * ```js
+     * export default Ember.Component.extend({
+     *   pollForUpdates: task(function * () {
+     *     // ... this runs when the Component is first created
+     *     // because we specified .on('init')
+     *   }).on('init'),
+     *
+     *   handleFoo: task(function * (a, b, c) {
+     *     // this gets performed automatically if the 'foo'
+     *     // event fires on this Component,
+     *     // e.g., if someone called component.trigger('foo')
+     *   }).on('foo'),
+     * });
+     * ```
+     *
+     * [See the Writing Tasks Docs for more info](/#/docs/writing-tasks)
+     *
+     * @method on
+     * @memberof TaskProperty
+     * @param {String} eventNames*
+     * @instance
+     */
+    on() {
+      this.eventNames = this.eventNames || [];
+      this.eventNames.push.apply(this.eventNames, arguments);
+      return this;
+    }
+
+    /**
+     * This behaves like the {@linkcode TaskProperty#on task(...).on() modifier},
+     * but instead will cause the task to be canceled if any of the
+     * specified events fire on the parent object.
+     *
+     * [See the Live Example](/#/docs/examples/route-tasks/1)
+     *
+     * @method cancelOn
+     * @memberof TaskProperty
+     * @param {String} eventNames*
+     * @instance
+     */
+    cancelOn() {
+      this.cancelEventNames = this.cancelEventNames || [];
+      this.cancelEventNames.push.apply(this.cancelEventNames, arguments);
+      return this;
+    }
+
+    observes(...properties) {
+      this._observes = properties;
+      return this;
+    }
+
+    /**
+     * Configures the task to cancel old currently task instances
+     * to make room for a new one to perform. Sets default
+     * maxConcurrency to 1.
+     *
+     * [See the Live Example](/#/docs/examples/route-tasks/1)
+     *
+     * @method restartable
+     * @memberof TaskProperty
+     * @instance
+     */
+
+    /**
+     * Configures the task to run task instances one-at-a-time in
+     * the order they were `.perform()`ed. Sets default
+     * maxConcurrency to 1.
+     *
+     * @method enqueue
+     * @memberof TaskProperty
+     * @instance
+     */
+
+    /**
+     * Configures the task to immediately cancel (i.e. drop) any
+     * task instances performed when the task is already running
+     * at maxConcurrency. Sets default maxConcurrency to 1.
+     *
+     * @method drop
+     * @memberof TaskProperty
+     * @instance
+     */
+
+    /**
+     * Configures the task to drop all but the most recently
+     * performed {@linkcode TaskInstance }.
+     *
+     * @method keepLatest
+     * @memberof TaskProperty
+     * @instance
+     */
+
+    /**
+     * Sets the maximum number of task instances that are allowed
+     * to run at the same time. By default, with no task modifiers
+     * applied, this number is Infinity (there is no limit
+     * to the number of tasks that can run at the same time).
+     * {@linkcode TaskProperty#restartable .restartable()},
+     * {@linkcode TaskProperty#enqueue .enqueue()}, and
+     * {@linkcode TaskProperty#drop .drop()} set the default
+     * maxConcurrency to 1, but you can override this value
+     * to set the maximum number of concurrently running tasks
+     * to a number greater than 1.
+     *
+     * [See the AJAX Throttling example](/#/docs/examples/ajax-throttling)
+     *
+     * The example below uses a task with `maxConcurrency(3)` to limit
+     * the number of concurrent AJAX requests (for anyone using this task)
+     * to 3.
+     *
+     * ```js
+     * doSomeAjax: task(function * (url) {
+     *   return Ember.$.getJSON(url).promise();
+     * }).maxConcurrency(3),
+     *
+     * elsewhere() {
+     *   this.get('doSomeAjax').perform("http://www.example.com/json");
+     * },
+     * ```
+     *
+     * @method maxConcurrency
+     * @memberof TaskProperty
+     * @param {Number} n The maximum number of concurrently running tasks
+     * @instance
+     */
+
+    /**
+     * Adds this task to a TaskGroup so that concurrency constraints
+     * can be shared between multiple tasks.
+     *
+     * [See the Task Group docs for more information](/#/docs/task-groups)
+     *
+     * @method group
+     * @memberof TaskProperty
+     * @param {String} groupPath A path to the TaskGroup property
+     * @instance
+     */
+
+    /**
+     * Activates lifecycle events, allowing Evented host objects to react to task state
+     * changes.
+     *
+     * ```js
+     *
+     * export default Component.extend({
+     *   uploadTask: task(function* (file) {
+     *     // ... file upload stuff
+     *   }).evented(),
+     *
+     *   uploadedStarted: on('uploadTask:started', function(taskInstance) {
+     *     this.get('analytics').track("User Photo: upload started");
+     *   }),
+     * });
+     * ```
+     *
+     * @method evented
+     * @memberof TaskProperty
+     * @instance
+     */
+
+    /**
+     * Logs lifecycle events to aid in debugging unexpected Task behavior.
+     * Presently only logs cancelation events and the reason for the cancelation,
+     * e.g. "TaskInstance 'doStuff' was canceled because the object it lives on was destroyed or unrendered"
+     *
+     * @method debug
+     * @memberof TaskProperty
+     * @instance
+     */
+
+    perform() {
+      throw new Error("It looks like you tried to perform a task via `this.nameOfTask.perform()`, which isn't supported. Use `this.get('nameOfTask').perform()` instead.");
+    }
+  }
+
+  exports.TaskProperty = TaskProperty;
+  (0, _utils.objectAssign)(TaskProperty.prototype, _propertyModifiersMixin.propertyModifiers);
+
+  let handlerCounter = 0;
+
+  function registerOnPrototype(addListenerOrObserver, proto, names, taskName, taskMethod, once) {
+    if (names) {
+      for (let i = 0; i < names.length; ++i) {
+        let name = names[i];
+
+        let handlerName = `__ember_concurrency_handler_${handlerCounter++}`;
+        proto[handlerName] = makeTaskCallback(taskName, taskMethod, once);
+        addListenerOrObserver(proto, name, null, handlerName);
+      }
+    }
+  }
+
+  function makeTaskCallback(taskName, method, once) {
+    return function () {
+      let task = this.get(taskName);
+
+      if (once) {
+        Ember.run.scheduleOnce('actions', task, method, ...arguments);
+      } else {
+        task[method].apply(task, arguments);
+      }
+    };
+  }
+});
+;define('ember-concurrency/-task-state-mixin', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+
+  const { alias } = Ember.computed;
+
+  // this is a mixin of properties/methods shared between Tasks and TaskGroups
+  exports.default = Ember.Mixin.create({
+    isRunning: Ember.computed.gt('numRunning', 0),
+    isQueued: Ember.computed.gt('numQueued', 0),
+    isIdle: Ember.computed('isRunning', 'isQueued', function () {
+      return !this.get('isRunning') && !this.get('isQueued');
+    }),
+
+    state: Ember.computed('isRunning', 'isQueued', function () {
+      if (this.get('isRunning')) {
+        return 'running';
+      } else if (this.get('isQueued')) {
+        return 'queued';
+      } else {
+        return 'idle';
+      }
+    }),
+
+    _propertyName: null,
+    _origin: null,
+    name: alias('_propertyName'),
+
+    concurrency: alias('numRunning'),
+    last: alias('_scheduler.lastStarted'),
+    lastRunning: alias('_scheduler.lastRunning'),
+    lastPerformed: alias('_scheduler.lastPerformed'),
+    lastSuccessful: alias('_scheduler.lastSuccessful'),
+    lastComplete: alias('_scheduler.lastComplete'),
+    lastErrored: alias('_scheduler.lastErrored'),
+    lastCanceled: alias('_scheduler.lastCanceled'),
+    lastIncomplete: alias('_scheduler.lastIncomplete'),
+    performCount: alias('_scheduler.performCount'),
+
+    numRunning: 0,
+    numQueued: 0,
+    _seenIndex: 0,
+
+    cancelAll(options) {
+      let { reason, resetState } = options || {};
+      reason = reason || ".cancelAll() was explicitly called on the Task";
+
+      this._scheduler.cancelAll(reason);
+
+      if (resetState) {
+        this._resetState();
+      }
+    },
+
+    group: Ember.computed(function () {
+      return this._taskGroupPath && this.context.get(this._taskGroupPath);
+    }),
+
+    _scheduler: null,
+
+    _resetState() {
+      this.setProperties({
+        'last': null,
+        'lastRunning': null,
+        'lastStarted': null,
+        'lastPerformed': null,
+        'lastSuccessful': null,
+        'lastComplete': null,
+        'lastErrored': null,
+        'lastCanceled': null,
+        'lastIncomplete': null,
+        'performCount': 0
+      });
+    }
+  });
+});
+;define('ember-concurrency/-wait-for', ['exports', 'ember-concurrency/utils'], function (exports, _utils) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.waitForQueue = waitForQueue;
+  exports.waitForEvent = waitForEvent;
+  exports.waitForProperty = waitForProperty;
+
+
+  class WaitFor {
+    then(...args) {
+      return (0, _utils.yieldableToPromise)(this).then(...args);
+    }
+  }
+
+  class WaitForQueueYieldable extends WaitFor {
+    constructor(queueName) {
+      super();
+      this.queueName = queueName;
+    }
+
+    [_utils.yieldableSymbol](taskInstance, resumeIndex) {
+      Ember.run.schedule(this.queueName, () => {
+        taskInstance.proceed(resumeIndex, _utils.YIELDABLE_CONTINUE, null);
+      });
+    }
+  }
+
+  class WaitForEventYieldable extends WaitFor {
+    constructor(object, eventName) {
+      super();
+      this.object = object;
+      this.eventName = eventName;
+    }
+
+    [_utils.yieldableSymbol](taskInstance, resumeIndex) {
+      let unbind = () => {};
+      let didFinish = false;
+      let fn = event => {
+        didFinish = true;
+        unbind();
+        taskInstance.proceed(resumeIndex, _utils.YIELDABLE_CONTINUE, event);
+      };
+
+      if (typeof this.object.addEventListener === 'function') {
+        // assume that we're dealing with a DOM `EventTarget`.
+        this.object.addEventListener(this.eventName, fn);
+
+        // unfortunately this is required, because IE 11 does not support the
+        // `once` option: https://caniuse.com/#feat=once-event-listener
+        unbind = () => {
+          this.object.removeEventListener(this.eventName, fn);
+        };
+
+        return unbind;
+      } else {
+        // assume that we're dealing with either `Ember.Evented` or a compatible
+        // interface, like jQuery.
+        this.object.one(this.eventName, fn);
+
+        return () => {
+          if (!didFinish) {
+            this.object.off(this.eventName, fn);
+          }
+        };
+      }
+    }
+  }
+
+  class WaitForPropertyYieldable extends WaitFor {
+    constructor(object, key, predicateCallback = Boolean) {
+      super();
+      this.object = object;
+      this.key = key;
+
+      if (typeof predicateCallback === 'function') {
+        this.predicateCallback = predicateCallback;
+      } else {
+        this.predicateCallback = v => v === predicateCallback;
+      }
+    }
+
+    [_utils.yieldableSymbol](taskInstance, resumeIndex) {
+      let observerFn = () => {
+        let value = Ember.get(this.object, this.key);
+        let predicateValue = this.predicateCallback(value);
+        if (predicateValue) {
+          taskInstance.proceed(resumeIndex, _utils.YIELDABLE_CONTINUE, value);
+          return true;
+        }
+      };
+
+      if (!observerFn()) {
+        this.object.addObserver(this.key, null, observerFn);
+        return () => {
+          this.object.removeObserver(this.key, null, observerFn);
+        };
+      }
+    }
+  }
+
+  /**
+   * Use `waitForQueue` to pause the task until a certain run loop queue is reached.
+   *
+   * ```js
+   * import { task, waitForQueue } from 'ember-concurrency';
+   * export default Component.extend({
+   *   myTask: task(function * () {
+   *     yield waitForQueue('afterRender');
+   *     console.log("now we're in the afterRender queue");
+   *   })
+   * });
+   * ```
+   *
+   * @param {string} queueName the name of the Ember run loop queue
+   */
+  function waitForQueue(queueName) {
+    return new WaitForQueueYieldable(queueName);
+  }
+
+  /**
+   * Use `waitForEvent` to pause the task until an event is fired. The event
+   * can either be a jQuery event or an Ember.Evented event (or any event system
+   * where the object supports `.on()` `.one()` and `.off()`).
+   *
+   * ```js
+   * import { task, waitForEvent } from 'ember-concurrency';
+   * export default Component.extend({
+   *   myTask: task(function * () {
+   *     console.log("Please click anywhere..");
+   *     let clickEvent = yield waitForEvent($('body'), 'click');
+   *     console.log("Got event", clickEvent);
+   *
+   *     let emberEvent = yield waitForEvent(this, 'foo');
+   *     console.log("Got foo event", emberEvent);
+   *
+   *     // somewhere else: component.trigger('foo', { value: 123 });
+   *   })
+   * });
+   * ```
+   *
+   * @param {object} object the Ember Object or jQuery selector (with ,on(), .one(), and .off())
+   *                 that the event fires from
+   * @param {function} eventName the name of the event to wait for
+   */
+  function waitForEvent(object, eventName) {
+    (true && !((0, _utils.isEventedObject)(object)) && Ember.assert(`${object} must include Ember.Evented (or support \`.one()\` and \`.off()\`) or DOM EventTarget (or support \`addEventListener\` and  \`removeEventListener\`) to be able to use \`waitForEvent\``, (0, _utils.isEventedObject)(object)));
+
+    return new WaitForEventYieldable(object, eventName);
+  }
+
+  /**
+   * Use `waitForProperty` to pause the task until a property on an object
+   * changes to some expected value. This can be used for a variety of use
+   * cases, including synchronizing with another task by waiting for it
+   * to become idle, or change state in some other way. If you omit the
+   * callback, `waitForProperty` will resume execution when the observed
+   * property becomes truthy. If you provide a callback, it'll be called
+   * immediately with the observed property's current value, and multiple
+   * times thereafter whenever the property changes, until you return
+   * a truthy value from the callback, or the current task is canceled.
+   * You can also pass in a non-Function value in place of the callback,
+   * in which case the task will continue executing when the property's
+   * value becomes the value that you passed in.
+   *
+   * ```js
+   * import { task, waitForProperty } from 'ember-concurrency';
+   * export default Component.extend({
+   *   foo: 0,
+   *
+   *   myTask: task(function * () {
+   *     console.log("Waiting for `foo` to become 5");
+   *
+   *     yield waitForProperty(this, 'foo', v => v === 5);
+   *     // alternatively: yield waitForProperty(this, 'foo', 5);
+   *
+   *     // somewhere else: this.set('foo', 5)
+   *
+   *     console.log("`foo` is 5!");
+   *
+   *     // wait for another task to be idle before running:
+   *     yield waitForProperty(this, 'otherTask.isIdle');
+   *     console.log("otherTask is idle!");
+   *   })
+   * });
+   * ```
+   *
+   * @param {object} object an object (most likely an Ember Object)
+   * @param {string} key the property name that is observed for changes
+   * @param {function} callbackOrValue a Function that should return a truthy value
+   *                                   when the task should continue executing, or
+   *                                   a non-Function value that the watched property
+   *                                   needs to equal before the task will continue running
+   */
+  function waitForProperty(object, key, predicateCallback) {
+    return new WaitForPropertyYieldable(object, key, predicateCallback);
+  }
+});
+;define('ember-concurrency/helpers/cancel-all', ['exports', 'ember-concurrency/-helpers'], function (exports, _helpers) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.cancelHelper = cancelHelper;
+
+
+  const CANCEL_REASON = "the 'cancel-all' template helper was invoked";
+
+  function cancelHelper(args) {
+    let cancelable = args[0];
+    if (!cancelable || typeof cancelable.cancelAll !== 'function') {
+      (true && !(false) && Ember.assert(`The first argument passed to the \`cancel-all\` helper should be a Task or TaskGroup (without quotes); you passed ${cancelable}`, false));
+    }
+
+    return (0, _helpers.taskHelperClosure)('cancel-all', 'cancelAll', [cancelable, { reason: CANCEL_REASON }]);
+  }
+
+  exports.default = Ember.Helper.helper(cancelHelper);
+});
+;define('ember-concurrency/helpers/perform', ['exports', 'ember-concurrency/-helpers'], function (exports, _helpers) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.performHelper = performHelper;
+  function performHelper(args, hash) {
+    return (0, _helpers.taskHelperClosure)('perform', 'perform', args, hash);
+  }
+
+  exports.default = Ember.Helper.helper(performHelper);
+});
+;define('ember-concurrency/helpers/task', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+
+
+  function taskHelper([task, ...args]) {
+    return task._curry(...args);
+  }
+
+  exports.default = Ember.Helper.helper(taskHelper);
+});
+;define('ember-concurrency/index', ['exports', 'ember-concurrency/utils', 'ember-concurrency/-task-property', 'ember-concurrency/-task-instance', 'ember-concurrency/-task-group', 'ember-concurrency/-cancelable-promise-helpers', 'ember-concurrency/-wait-for'], function (exports, _utils, _taskProperty, _taskInstance, _taskGroup, _cancelablePromiseHelpers, _waitFor) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.waitForProperty = exports.waitForEvent = exports.waitForQueue = exports.timeout = exports.race = exports.hash = exports.didCancel = exports.allSettled = exports.all = undefined;
+  exports.task = task;
+  exports.taskGroup = taskGroup;
+
+
+  /**
+   * A Task is a cancelable, restartable, asynchronous operation that
+   * is driven by a generator function. Tasks are automatically canceled
+   * when the object they live on is destroyed (e.g. a Component
+   * is unrendered).
+   *
+   * To define a task, use the `task(...)` function, and pass in
+   * a generator function, which will be invoked when the task
+   * is performed. The reason generator functions are used is
+   * that they (like the proposed ES7 async-await syntax) can
+   * be used to elegantly express asynchronous, cancelable
+   * operations.
+   *
+   * You can also define an
+   * <a href="/#/docs/encapsulated-task">Encapsulated Task</a>
+   * by passing in an object that defined a `perform` generator
+   * function property.
+   *
+   * The following Component defines a task called `myTask` that,
+   * when performed, prints a message to the console, sleeps for 1 second,
+   * prints a final message to the console, and then completes.
+   *
+   * ```js
+   * import { task, timeout } from 'ember-concurrency';
+   * export default Component.extend({
+   *   myTask: task(function * () {
+   *     console.log("Pausing for a second...");
+   *     yield timeout(1000);
+   *     console.log("Done!");
+   *   })
+   * });
+   * ```
+   *
+   * ```hbs
+   * <button {{action myTask.perform}}>Perform Task</button>
+   * ```
+   *
+   * By default, tasks have no concurrency constraints
+   * (multiple instances of a task can be running at the same time)
+   * but much of a power of tasks lies in proper usage of Task Modifiers
+   * that you can apply to a task.
+   *
+   * @param {function} generatorFunction the generator function backing the task.
+   * @returns {TaskProperty}
+   */
+  function task(...args) {
+    return new _taskProperty.TaskProperty(...args);
+  }
+
+  /**
+   * "Task Groups" provide a means for applying
+   * task modifiers to groups of tasks. Once a {@linkcode Task} is declared
+   * as part of a group task, modifiers like `drop()` or `restartable()`
+   * will no longer affect the individual `Task`. Instead those
+   * modifiers can be applied to the entire group.
+   *
+   * ```js
+   * import { task, taskGroup } from 'ember-concurrency';
+   *
+   * export default Controller.extend({
+   *   chores: taskGroup().drop(),
+   *
+   *   mowLawn:       task(taskFn).group('chores'),
+   *   doDishes:      task(taskFn).group('chores'),
+   *   changeDiapers: task(taskFn).group('chores')
+   * });
+   * ```
+   *
+   * @returns {TaskGroup}
+  */
+  function taskGroup(...args) {
+    return new _taskGroup.TaskGroupProperty(...args);
+  }
+
+  exports.all = _cancelablePromiseHelpers.all;
+  exports.allSettled = _cancelablePromiseHelpers.allSettled;
+  exports.didCancel = _taskInstance.didCancel;
+  exports.hash = _cancelablePromiseHelpers.hash;
+  exports.race = _cancelablePromiseHelpers.race;
+  exports.timeout = _utils.timeout;
+  exports.waitForQueue = _waitFor.waitForQueue;
+  exports.waitForEvent = _waitFor.waitForEvent;
+  exports.waitForProperty = _waitFor.waitForProperty;
+});
+;define('ember-concurrency/initializers/ember-concurrency', ['exports', 'ember-concurrency'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = {
+    name: 'ember-concurrency',
+    initialize: function () {}
+  };
+});
+;define('ember-concurrency/utils', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.isEventedObject = isEventedObject;
+  exports.Arguments = Arguments;
+  exports._cleanupOnDestroy = _cleanupOnDestroy;
+  exports.timeout = timeout;
+  exports.RawValue = RawValue;
+  exports.raw = raw;
+  exports.rawTimeout = rawTimeout;
+  exports.yieldableToPromise = yieldableToPromise;
+  function isEventedObject(c) {
+    return c && (typeof c.one === 'function' && typeof c.off === 'function' || typeof c.addEventListener === 'function' && typeof c.removeEventListener === 'function');
+  }
+
+  function Arguments(args, defer) {
+    this.args = args;
+    this.defer = defer;
+  }
+
+  Arguments.prototype.resolve = function (value) {
+    if (this.defer) {
+      this.defer.resolve(value);
+    }
+  };
+
+  let objectAssign = exports.objectAssign = Object.assign || function objectAssign(target) {
+    'use strict';
+
+    if (target == null) {
+      throw new TypeError('Cannot convert undefined or null to object');
+    }
+
+    target = Object(target);
+    for (var index = 1; index < arguments.length; index++) {
+      var source = arguments[index];
+      if (source != null) {
+        for (var key in source) {
+          if (Object.prototype.hasOwnProperty.call(source, key)) {
+            target[key] = source[key];
+          }
+        }
+      }
+    }
+    return target;
+  };
+
+  function _cleanupOnDestroy(owner, object, cleanupMethodName, ...args) {
+    // TODO: find a non-mutate-y, non-hacky way of doing this.
+
+    if (!owner.willDestroy) {
+      // we're running in non Ember object (possibly in a test mock)
+      return;
+    }
+
+    if (!owner.willDestroy.__ember_processes_destroyers__) {
+      let oldWillDestroy = owner.willDestroy;
+      let disposers = [];
+
+      owner.willDestroy = function () {
+        for (let i = 0, l = disposers.length; i < l; i++) {
+          disposers[i]();
+        }
+        oldWillDestroy.apply(owner, arguments);
+      };
+      owner.willDestroy.__ember_processes_destroyers__ = disposers;
+    }
+
+    owner.willDestroy.__ember_processes_destroyers__.push(() => {
+      object[cleanupMethodName](...args);
+    });
+  }
+
+  let INVOKE = exports.INVOKE = "__invoke_symbol__";
+
+  let locations = ['ember-glimmer/helpers/action', 'ember-routing-htmlbars/keywords/closure-action', 'ember-routing/keywords/closure-action'];
+
+  for (let i = 0; i < locations.length; i++) {
+    if (locations[i] in Ember.__loader.registry) {
+      exports.INVOKE = INVOKE = Ember.__loader.require(locations[i])['INVOKE'];
+      break;
+    }
+  }
+
+  // TODO: Symbol polyfill?
+  const yieldableSymbol = exports.yieldableSymbol = "__ec_yieldable__";
+  const YIELDABLE_CONTINUE = exports.YIELDABLE_CONTINUE = "next";
+  const YIELDABLE_THROW = exports.YIELDABLE_THROW = "throw";
+  const YIELDABLE_RETURN = exports.YIELDABLE_RETURN = "return";
+  const YIELDABLE_CANCEL = exports.YIELDABLE_CANCEL = "cancel";
+
+  const _ComputedProperty = exports._ComputedProperty = Ember.ComputedProperty;
+
+  /**
+   *
+   * Yielding `timeout(ms)` will pause a task for the duration
+   * of time passed in, in milliseconds.
+   *
+   * The task below, when performed, will print a message to the
+   * console every second.
+   *
+   * ```js
+   * export default Component.extend({
+   *   myTask: task(function * () {
+   *     while (true) {
+   *       console.log("Hello!");
+   *       yield timeout(1000);
+   *     }
+   *   })
+   * });
+   * ```
+   *
+   * @param {number} ms - the amount of time to sleep before resuming
+   *   the task, in milliseconds
+   */
+  function timeout(ms) {
+    let timerId;
+    let promise = new Ember.RSVP.Promise(r => {
+      timerId = Ember.run.later(r, ms);
+    });
+    promise.__ec_cancel__ = () => {
+      Ember.run.cancel(timerId);
+    };
+    return promise;
+  }
+
+  function RawValue(value) {
+    this.value = value;
+  }
+
+  function raw(value) {
+    return new RawValue(value);
+  }
+
+  function rawTimeout(ms) {
+    return {
+      [yieldableSymbol](taskInstance, resumeIndex) {
+        let timerId = setTimeout(() => {
+          taskInstance.proceed(resumeIndex, YIELDABLE_CONTINUE, this._result);
+        }, ms);
+        return () => {
+          window.clearInterval(timerId);
+        };
+      }
+    };
+  }
+
+  function yieldableToPromise(yieldable) {
+    let def = Ember.RSVP.defer();
+
+    def.promise.__ec_cancel__ = yieldable[yieldableSymbol]({
+      proceed(_index, resumeType, value) {
+        if (resumeType == YIELDABLE_CONTINUE || resumeType == YIELDABLE_RETURN) {
+          def.resolve(value);
+        } else {
+          def.reject(value);
+        }
+      }
+    }, 0);
+
+    return def.promise;
+  }
 });
 ;define("ember-data/-debug/index", ["exports"], function (_exports) {
   "use strict";
@@ -84030,6 +99130,1227 @@ createDeprecatedModule('resolver');
     return Ember.Handlebars.makeBoundHelper(helperFunction);
   }
 });
+;define("ember-intl/-private/empty-object", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+  const proto = Object.create(null, {
+    constructor: {
+      value: undefined,
+      enumerable: false,
+      writable: true
+    }
+  });
+
+  function EmptyObject() {}
+
+  EmptyObject.prototype = proto;
+  var _default = EmptyObject;
+  _exports.default = _default;
+});
+;define("ember-intl/-private/formatters/-base", ["exports", "ember-intl/utils/links"], function (_exports, _links) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  /**
+   * Copyright 2015, Yahoo! Inc.
+   * Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
+   */
+  const EMPTY_OBJECT = {};
+
+  class FormatterBase {
+    get options() {
+      return Ember.A();
+    }
+    /**
+     * Filters out all of the whitelisted formatter options
+     *
+     * @method readOptions
+     * @param {Object} Options object
+     * @return {Object} Options object containing just whitelisted options
+     * @private
+     */
+
+
+    readOptions(options) {
+      if (!options) {
+        return EMPTY_OBJECT;
+      }
+
+      let found = {};
+
+      for (let key in options) {
+        let normalized = Ember.String.camelize(key);
+
+        if (this.options.includes(normalized)) {
+          found[normalized] = options[key];
+        }
+      }
+
+      return found;
+    }
+
+    format() {
+      throw new Error('not implemented');
+    }
+    /**
+     * Invokes the Intl formatter methods
+     *
+     * @method _format
+     * @param {value} Raw input value that needs formatting
+     * @return {Object} Formatter options hash
+     * @return {Object} Format options hash
+     * @private
+     */
+
+
+    _format(value, formatterOptions, formatOptions, {
+      locale
+    }) {
+      if (!locale) {
+        (true && Ember.warn(`[ember-intl] no locale has been set. Documentation: ${_links.default.unsetLocale}`, false, {
+          id: 'ember-intl-no-locale-set'
+        }));
+      }
+
+      const formatter = this.createNativeFormatter(locale, formatterOptions);
+      return formatter.format(value, formatOptions);
+    }
+
+  }
+
+  _exports.default = FormatterBase;
+});
+;define("ember-intl/-private/formatters/format-date", ["exports", "fast-memoize", "ember-intl/-private/formatters/-base"], function (_exports, _fastMemoize, _base) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  /**
+   * Copyright 2015, Yahoo! Inc.
+   * Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
+   */
+  class FormatDate extends _base.default {
+    constructor() {
+      super();
+      this.createNativeFormatter = (0, _fastMemoize.default)((locales, options) => {
+        return new Intl.DateTimeFormat(locales, options);
+      });
+    }
+
+    get options() {
+      return Ember.A(['locale', 'format', 'localeMatcher', 'timeZone', 'hour12', 'formatMatcher', 'weekday', 'era', 'year', 'month', 'day', 'hour', 'minute', 'second', 'timeZoneName']);
+    }
+
+    format(value, options, ctx) {
+      const dateTime = new Date(value);
+      const formatOptions = this.readOptions(options);
+      return this._format(dateTime, formatOptions, undefined, ctx);
+    }
+
+  }
+
+  _exports.default = FormatDate;
+});
+;define("ember-intl/-private/formatters/format-message", ["exports", "fast-memoize", "@ember-intl/intl-messageformat", "ember-intl/-private/formatters/-base"], function (_exports, _fastMemoize, _intlMessageformat, _base) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  /**
+   * Copyright 2015, Yahoo! Inc.
+   * Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
+   */
+  const {
+    keys
+  } = Object;
+  const {
+    Handlebars: {
+      Utils: {
+        escapeExpression
+      }
+    }
+  } = Ember;
+
+  function escape(hash) {
+    if (!hash) {
+      return;
+    }
+
+    return keys(hash).reduce((accum, key) => {
+      if (typeof hash[key] === 'string') {
+        accum[key] = escapeExpression(hash[key]);
+      }
+
+      return accum;
+    }, Ember.assign({}, hash));
+  }
+
+  class FormatMessage extends _base.default {
+    constructor() {
+      super();
+      this.createNativeFormatter = (0, _fastMemoize.default)((message, locales, formats) => {
+        return new _intlMessageformat.default(message, locales, formats);
+      });
+    }
+
+    format(message, options, {
+      formats,
+      locale
+    }) {
+      const isHTMLSafe = options && options.htmlSafe;
+      const formatter = this.createNativeFormatter(message, locale, formats);
+      const escapedOptions = isHTMLSafe ? escape(options) : options;
+      const result = formatter.format(escapedOptions);
+      return isHTMLSafe ? Ember.String.htmlSafe(result) : result;
+    }
+
+  }
+
+  _exports.default = FormatMessage;
+});
+;define("ember-intl/-private/formatters/format-number", ["exports", "fast-memoize", "ember-intl/-private/formatters/-base"], function (_exports, _fastMemoize, _base) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  /**
+   * Copyright 2015, Yahoo! Inc.
+   * Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
+   */
+  class FormatNumber extends _base.default {
+    get options() {
+      return Ember.A(['locale', 'format', 'localeMatcher', 'style', 'currency', 'currencyDisplay', 'useGrouping', 'minimumIntegerDigits', 'minimumFractionDigits', 'maximumFractionDigits', 'minimumSignificantDigits', 'maximumSignificantDigits']);
+    }
+
+    constructor() {
+      super();
+      this.createNativeFormatter = (0, _fastMemoize.default)((locales, options) => {
+        return new Intl.NumberFormat(locales, options);
+      });
+    }
+
+    format(value, options, ctx) {
+      return this._format(value, this.readOptions(options), undefined, ctx);
+    }
+
+  }
+
+  _exports.default = FormatNumber;
+});
+;define("ember-intl/-private/formatters/format-relative", ["exports", "fast-memoize", "@ember-intl/intl-relativeformat", "ember-intl/-private/formatters/-base"], function (_exports, _fastMemoize, _intlRelativeformat, _base) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  /**
+   * Copyright 2015, Yahoo! Inc.
+   * Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
+   */
+  class FormatRelative extends _base.default {
+    constructor() {
+      super();
+      this.createNativeFormatter = (0, _fastMemoize.default)((locales, options) => {
+        return new _intlRelativeformat.default(locales, options);
+      });
+    }
+
+    get options() {
+      return Ember.A(['locale', 'format', 'style', 'units']);
+    }
+
+    format(value, options, ctx) {
+      let dateValue = new Date(value);
+      let formatOptions;
+
+      if (options && typeof options.now !== 'undefined') {
+        formatOptions = {
+          now: options.now
+        };
+      }
+
+      return this._format(dateValue, this.readOptions(options), formatOptions, ctx);
+    }
+
+  }
+
+  _exports.default = FormatRelative;
+});
+;define("ember-intl/-private/formatters/format-time", ["exports", "ember-intl/-private/formatters/format-date"], function (_exports, _formatDate) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  /**
+   * Copyright 2015, Yahoo! Inc.
+   * Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
+   */
+  class FormatTime extends _formatDate.default {}
+
+  _exports.default = FormatTime;
+});
+;define("ember-intl/-private/formatters/index", ["exports", "ember-intl/-private/formatters/format-time", "ember-intl/-private/formatters/format-date", "ember-intl/-private/formatters/format-number", "ember-intl/-private/formatters/format-message", "ember-intl/-private/formatters/format-relative"], function (_exports, _formatTime, _formatDate, _formatNumber, _formatMessage, _formatRelative) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  Object.defineProperty(_exports, "FormatTime", {
+    enumerable: true,
+    get: function () {
+      return _formatTime.default;
+    }
+  });
+  Object.defineProperty(_exports, "FormatDate", {
+    enumerable: true,
+    get: function () {
+      return _formatDate.default;
+    }
+  });
+  Object.defineProperty(_exports, "FormatNumber", {
+    enumerable: true,
+    get: function () {
+      return _formatNumber.default;
+    }
+  });
+  Object.defineProperty(_exports, "FormatMessage", {
+    enumerable: true,
+    get: function () {
+      return _formatMessage.default;
+    }
+  });
+  Object.defineProperty(_exports, "FormatRelative", {
+    enumerable: true,
+    get: function () {
+      return _formatRelative.default;
+    }
+  });
+});
+;define("ember-intl/-private/is-array-equal", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = _default;
+
+  function _default(a, b) {
+    if (!Ember.isArray(a) || !Ember.isArray(b)) {
+      return false;
+    }
+
+    if (a === b) {
+      return true;
+    }
+
+    return a.toString() === b.toString();
+  }
+});
+;define("ember-intl/-private/normalize-locale", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = _default;
+
+  function _default(localeName) {
+    if (typeof localeName === 'string') {
+      return localeName.replace(/_/g, '-').toLowerCase();
+    }
+  }
+});
+;define("ember-intl/adapters/default", ["exports", "ember-intl/models/translation"], function (_exports, _translation) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  /**
+   * Copyright 2015, Yahoo! Inc.
+   * Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
+   */
+  var _default = Ember.Object.extend({
+    _seen: null,
+
+    /** @private **/
+    locales: Ember.computed('_seen.[]', function () {
+      return Ember.get(this, '_seen').map(l => l.localeName);
+    }).readOnly(),
+
+    /** @private **/
+    init() {
+      this._super();
+
+      this._seen = Ember.A();
+    },
+
+    /** @private **/
+    lookupLocale(localeName) {
+      return this._seen.findBy('localeName', localeName);
+    },
+
+    /** @private **/
+    localeFactory(localeName) {
+      const owner = Ember.getOwner(this);
+      const lookupName = `ember-intl@translation:${localeName}`;
+      let model = owner.lookup(lookupName);
+
+      if (model) {
+        return model;
+      }
+
+      let Klass;
+
+      if (owner.hasRegistration('model:ember-intl-translation')) {
+        Klass = owner.factoryFor('model:ember-intl-translation').class;
+      } else {
+        Klass = _translation.default;
+      }
+
+      const ModelKlass = Klass.extend();
+      Object.defineProperty(ModelKlass.proto(), 'localeName', {
+        writable: false,
+        enumerable: true,
+        value: localeName
+      });
+      owner.register(lookupName, ModelKlass);
+      model = owner.lookup(lookupName);
+
+      this._seen.pushObject(model);
+
+      return model;
+    },
+
+    /** @private **/
+    has(localeName, translationKey) {
+      const model = this.lookupLocale(localeName);
+      return model && model.has(translationKey);
+    },
+
+    /** @private **/
+    lookup(localeName, translationKey) {
+      const model = this.lookupLocale(localeName);
+
+      if (model && model.has(translationKey)) {
+        return model.getValue(translationKey);
+      }
+    }
+
+  });
+
+  _exports.default = _default;
+});
+;define("ember-intl/helpers/-format-base", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  /**
+   * Copyright 2015, Yahoo! Inc.
+   * Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
+   */
+  const AbstractHelper = Ember.Helper.extend({
+    intl: null,
+
+    init() {
+      if (this.constructor === AbstractHelper) {
+        throw new Error('FormatHelper is an abstract class, can not be instantiated directly.');
+      }
+
+      this._super();
+
+      this.intl = Ember.getOwner(this).lookup('service:intl');
+      this.intl.on('localeChanged', this, this.recompute);
+    },
+
+    format() {
+      throw new Error('not implemented');
+    },
+
+    compute([value], options) {
+      if (Ember.isEmpty(value)) {
+        if (Ember.getWithDefault(options, 'allowEmpty', this.allowEmpty)) {
+          return;
+        }
+
+        if (typeof value === 'undefined') {
+          throw new Error(`${this} helper requires value attribute.`);
+        }
+      }
+
+      return this.format(value, options);
+    },
+
+    willDestroy() {
+      this._super();
+
+      this.intl.off('localeChanged', this, this.recompute);
+    }
+
+  });
+  var _default = AbstractHelper;
+  _exports.default = _default;
+});
+;define("ember-intl/helpers/format-date", ["exports", "ember-intl/helpers/-format-base"], function (_exports, _formatBase) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  /**
+   * Copyright 2015, Yahoo! Inc.
+   * Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
+   */
+  var _default = _formatBase.default.extend({
+    allowEmpty: true,
+
+    format(value, options) {
+      return this.intl.formatDate(value, options);
+    }
+
+  });
+
+  _exports.default = _default;
+});
+;define("ember-intl/helpers/format-message", ["exports", "ember-intl/helpers/-format-base"], function (_exports, _formatBase) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  /**
+   * Copyright 2015, Yahoo! Inc.
+   * Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
+   */
+  var _default = _formatBase.default.extend({
+    format(value, options) {
+      return this.intl.formatMessage(value, options);
+    }
+
+  });
+
+  _exports.default = _default;
+});
+;define("ember-intl/helpers/format-number", ["exports", "ember-intl/helpers/-format-base"], function (_exports, _formatBase) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  /**
+   * Copyright 2015, Yahoo! Inc.
+   * Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
+   */
+  var _default = _formatBase.default.extend({
+    format(value, options) {
+      return this.intl.formatNumber(value, options);
+    }
+
+  });
+
+  _exports.default = _default;
+});
+;define("ember-intl/helpers/format-relative", ["exports", "ember-intl/helpers/-format-base"], function (_exports, _formatBase) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  /**
+   * Copyright 2015, Yahoo! Inc.
+   * Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
+   */
+  const runBind = Ember.run.bind;
+
+  var _default = _formatBase.default.extend({
+    format(params, hash) {
+      return this.intl.formatRelative(params, hash);
+    },
+
+    compute(params, hash) {
+      this.clearTimer();
+
+      if (hash && typeof hash.interval !== 'undefined') {
+        /* setTimeout versus Ember.run.later so tests will not wait infinitely */
+        this.timer = setTimeout(runBind(this, this.recompute), parseInt(hash.interval, 10));
+      }
+
+      return this._super(params, hash);
+    },
+
+    clearTimer() {
+      clearTimeout(this.timer);
+    },
+
+    willDestroy() {
+      this._super();
+
+      this.clearTimer();
+    }
+
+  });
+
+  _exports.default = _default;
+});
+;define("ember-intl/helpers/format-time", ["exports", "ember-intl/helpers/-format-base"], function (_exports, _formatBase) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  /**
+   * Copyright 2015, Yahoo! Inc.
+   * Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
+   */
+  var _default = _formatBase.default.extend({
+    format(value, options) {
+      return this.intl.formatTime(value, options);
+    }
+
+  });
+
+  _exports.default = _default;
+});
+;define("ember-intl/helpers/t", ["exports", "ember-intl/helpers/-format-base"], function (_exports, _formatBase) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  /**
+   * Copyright 2015, Yahoo! Inc.
+   * Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
+   */
+  var _default = _formatBase.default.extend({
+    format(value, options) {
+      (true && !(value) && Ember.assert('[ember-intl] translation lookup attempted but no translation key was provided.', value));
+      return this.intl.t(value, options);
+    }
+
+  });
+
+  _exports.default = _default;
+});
+;define("ember-intl/hydrate", ["exports", "ember-intl/utils/links"], function (_exports, _links) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.lookupByFactoryType = lookupByFactoryType;
+  _exports.default = _default;
+
+  /* globals requirejs */
+
+  /** @private **/
+  function lookupByFactoryType(type, modulePrefix) {
+    return Object.keys(requirejs.entries).filter(key => {
+      return key.indexOf(`${modulePrefix}/${type}/`) === 0;
+    });
+  }
+  /**
+   * Peeks into the requirejs map and registers all locale data (CLDR & Translations) found.
+   *
+   * @private
+   */
+
+
+  function _default(service, owner) {
+    const config = owner.resolveRegistration('config:environment');
+    const cldrs = lookupByFactoryType('cldrs', config.modulePrefix);
+    const translations = lookupByFactoryType('translations', config.modulePrefix);
+
+    if (!cldrs.length) {
+      (true && Ember.warn(`[ember-intl] project is missing CLDR data\nIf you are asynchronously loading translation,
+      see: ${_links.default.asyncTranslations}.`, false, {
+        id: 'ember-intl-missing-cldr-data'
+      }));
+    }
+
+    cldrs.map(moduleName => owner.resolveRegistration(`cldr:${moduleName.split('/').pop()}`)).forEach(data => data.forEach(service.addLocaleData));
+    translations.forEach(moduleName => {
+      const localeName = moduleName.split('/').pop();
+      service.addTranslations(localeName, owner.resolveRegistration(`translation:${localeName}`));
+    });
+  }
+});
+;define("ember-intl/index", ["exports", "ember-intl/services/intl", "ember-intl/macro"], function (_exports, _intl, _macro) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  Object.defineProperty(_exports, "Service", {
+    enumerable: true,
+    get: function () {
+      return _intl.default;
+    }
+  });
+  Object.defineProperty(_exports, "translationMacro", {
+    enumerable: true,
+    get: function () {
+      return _macro.default;
+    }
+  });
+  Object.defineProperty(_exports, "raw", {
+    enumerable: true,
+    get: function () {
+      return _macro.raw;
+    }
+  });
+});
+;define("ember-intl/initializer", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  /**
+   * Copyright 2015, Yahoo! Inc.
+   * Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
+   */
+  var _default = {
+    name: 'ember-intl',
+
+    initialize(instance) {
+      /*
+       * instantiate as early since hydration is async
+       * occurring too late could trigger a double-render if you did not instantiate
+       * up until rendering.  This is typically never the case, as you setup the locale
+       * when the app is initializing (route or initializer).  this is kept primary
+       * for ember-addons that do have an app-wide locale.
+       */
+      instance.lookup('service:intl');
+    }
+
+  };
+  _exports.default = _default;
+});
+;define("ember-intl/macro", ["exports", "ember-intl/-private/empty-object"], function (_exports, _emptyObject) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.raw = raw;
+  _exports.default = createTranslatedComputedProperty;
+
+  /*
+   * <3 ember-i18n <3
+   * https://github.com/jamesarosen/ember-i18n/blob/master/addon/utils/macro.js
+   */
+  function partitionDynamicValuesAndStaticValues(options) {
+    const dynamicValues = new _emptyObject.default();
+    const staticValues = new _emptyObject.default();
+    Object.keys(options).forEach(key => {
+      const value = options[key];
+
+      if (value instanceof Raw) {
+        staticValues[key] = value.valueOf();
+      } else {
+        dynamicValues[key] = value;
+      }
+    });
+    return [dynamicValues, staticValues];
+  }
+
+  function mapPropertiesByHash(object, hash) {
+    const result = new _emptyObject.default();
+    Object.keys(hash).forEach(key => {
+      result[key] = Ember.get(object, hash[key]);
+    });
+    return result;
+  }
+  /**
+   * This class is used to box primitive types and mark them as raw literals that
+   * should be used as is by the translation macro.
+   *
+   * This class is internal. Instead of using this class directly, use the `raw`
+   * utility function, that creates an instance of this class.
+   */
+
+
+  class Raw {
+    constructor(value) {
+      this._value = value;
+    }
+
+    valueOf() {
+      return this._value;
+    }
+
+    toString() {
+      return String(this._value);
+    }
+
+  }
+  /**
+   * Use this utility function to mark a value as a raw literal.
+   *
+   * @param {*} value The value to mark as a raw literal.
+   * @return The same value, but boxed in the `Raw` class so that the consuming
+   *  macro understands that this value should be used as is.
+   */
+
+
+  function raw(value) {
+    return new Raw(value);
+  }
+
+  function createTranslatedComputedProperty(key, options) {
+    const hash = options || new _emptyObject.default();
+    const [dynamicValues, staticValues] = partitionDynamicValuesAndStaticValues(hash);
+    const dependentKeys = ['intl.locale'].concat(Object.values(dynamicValues));
+    return Ember.computed(...dependentKeys, function () {
+      let intl = Ember.get(this, 'intl');
+
+      if (!intl) {
+        const owner = Ember.getOwner(this);
+        (true && !(owner) && Ember.assert(`Cannot translate "${key}".\n${this} does not have an 'intl' property set or an owner to look up the service from.`, owner));
+        intl = owner.lookup('service:intl');
+        (true && !(intl) && Ember.assert(`Cannot translate "${key}".\n${this} does not have an 'intl' property set and there is no 'intl' service registered with the owner.`, intl));
+      }
+
+      return intl.t(key, Ember.assign({}, staticValues, mapPropertiesByHash(this, dynamicValues)));
+    }).readOnly();
+  }
+});
+;define("ember-intl/models/translation", ["exports", "ember-intl/-private/empty-object"], function (_exports, _emptyObject) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  /**
+   * Copyright 2015, Yahoo! Inc.
+   * Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
+   */
+  const hasOwnProperty = Object.prototype.hasOwnProperty;
+
+  function flatten(src) {
+    const result = new _emptyObject.default();
+
+    for (const key in src) {
+      if (!hasOwnProperty.call(src, key)) {
+        continue;
+      }
+
+      const value = src[key];
+
+      if (typeof value === 'object' && value) {
+        const hash = flatten(value);
+
+        for (const suffix in hash) {
+          result[`${key}.${suffix}`] = hash[suffix];
+        }
+      } else {
+        result[key] = value;
+      }
+    }
+
+    return result;
+  }
+
+  const TranslationModel = Ember.Object.extend({
+    localeName: null,
+
+    init() {
+      this._super();
+
+      if (!this.translations) {
+        this.translations = new _emptyObject.default();
+      }
+    },
+
+    /**
+     * Adds a translation hash
+     */
+    addTranslations(translations) {
+      Ember.assign(this.translations, flatten(translations));
+    },
+
+    /**
+     * Custom accessor hook that can be overridden.
+     * This would enable consumers that have dot notated strings
+     * to implement this function as `return this[key];`
+     */
+    getValue(key) {
+      return this.translations[key];
+    },
+
+    /**
+     * Determines if the translation model contains a key
+     */
+    has(key) {
+      return hasOwnProperty.call(this.translations, key);
+    }
+
+  });
+  var _default = TranslationModel;
+  _exports.default = _default;
+});
+;define("ember-intl/services/intl", ["exports", "@ember-intl/intl-relativeformat", "@ember-intl/intl-messageformat", "ember-intl/-private/formatters", "ember-intl/-private/is-array-equal", "ember-intl/-private/normalize-locale", "ember-intl/utils/links", "ember-intl/hydrate", "ember-intl/utils/get-dom"], function (_exports, _intlRelativeformat, _intlMessageformat, _formatters, _isArrayEqual, _normalizeLocale, _links, _hydrate, _getDom) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  /* globals Intl */
+
+  /**
+   * Copyright 2015, Yahoo! Inc.
+   * Copyrights licensed under the New BSD License. See the accompanying LICENSE file for terms.
+   */
+  var _default = Ember.Service.extend(Ember.Evented, {
+    /** @private **/
+    _locale: ['en-us'],
+
+    /** @private **/
+    _adapter: null,
+
+    /** @public **/
+    formats: null,
+    _timer: null,
+
+    /** @public **/
+    locale: Ember.computed({
+      set(_, localeName) {
+        const proposed = Ember.makeArray(localeName).map(_normalizeLocale.default);
+
+        if (!(0, _isArrayEqual.default)(proposed, this._locale)) {
+          this._locale = proposed;
+          Ember.run.cancel(this._timer);
+          this._timer = Ember.run.next(() => this.trigger('localeChanged'));
+          this.updateDocumentLanguage(this._locale);
+          return this._locale;
+        }
+
+        return this._locale;
+      },
+
+      get() {
+        return this._locale;
+      }
+
+    }),
+
+    /** @public **/
+    formatRelative: formatter('relative'),
+
+    /** @public **/
+    formatMessage: formatter('message'),
+
+    /** @public **/
+    formatNumber: formatter('number'),
+
+    /** @public **/
+    formatTime: formatter('time'),
+
+    /** @public **/
+    formatDate: formatter('date'),
+
+    /**
+     * Returns an array of registered locale names
+     *
+     * @property locales
+     * @public
+     */
+    locales: Ember.computed.readOnly('_adapter.locales'),
+
+    /** @public **/
+    init() {
+      this._super();
+
+      if (typeof Intl === 'undefined') {
+        (true && Ember.warn(`[ember-intl] Intl API was not found.\nSee: ${_links.default.polyfill}`, false, {
+          id: 'ember-intl-undefined-intljs'
+        }));
+      }
+
+      this._owner = Ember.getOwner(this);
+      this._adapter = this._owner.lookup('ember-intl@adapter:default');
+      this._formatters = {
+        message: new _formatters.FormatMessage(),
+        relative: new _formatters.FormatRelative(),
+        number: new _formatters.FormatNumber(),
+        time: new _formatters.FormatTime(),
+        date: new _formatters.FormatDate()
+      };
+
+      if (!this.formats) {
+        this.formats = this._owner.resolveRegistration('formats:main') || {};
+      }
+
+      (0, _hydrate.default)(this, this._owner);
+    },
+
+    willDestroy() {
+      this._super(...arguments);
+
+      Ember.run.cancel(this._timer);
+    },
+
+    /** @public **/
+    lookup(key, localeName, options = {}) {
+      const localeNames = this.localeWithDefault(localeName);
+      let translation;
+
+      for (let i = 0; i < localeNames.length; i++) {
+        translation = this._adapter.lookup(localeNames[i], key);
+
+        if (translation !== undefined) {
+          break;
+        }
+      }
+
+      if (!options.resilient && translation === undefined) {
+        const missingMessage = this._owner.resolveRegistration('util:intl/missing-message');
+
+        return missingMessage.call(this, key, localeNames, options);
+      }
+
+      return translation;
+    },
+
+    /** @public **/
+    t(key, options = {}) {
+      let defaults = [key];
+      let msg;
+
+      if (options.default) {
+        defaults = defaults.concat(options.default);
+      }
+
+      while (!msg && defaults.length) {
+        msg = this.lookup(defaults.shift(), options.locale, Ember.assign({}, options, {
+          resilient: defaults.length > 0
+        }));
+      }
+      /* Avoids passing msg to intl-messageformat if it is not a string */
+
+
+      if (typeof msg === 'string') {
+        return this.formatMessage(msg, options);
+      }
+
+      return msg;
+    },
+
+    /** @public **/
+    exists(key, localeName) {
+      const localeNames = this.localeWithDefault(localeName);
+      (true && !(Array.isArray(localeNames) && localeNames.length) && Ember.assert(`[ember-intl] locale is unset, cannot lookup '${key}'`, Array.isArray(localeNames) && localeNames.length));
+      return localeNames.some(localeName => this._adapter.has(localeName, key));
+    },
+
+    /** @public */
+    setLocale(locale) {
+      Ember.set(this, 'locale', locale);
+    },
+
+    /**
+     * A utility method for registering CLDR data for
+     * intl-messageformat and intl-relativeformat.  This data is derived
+     * from formatjs-extract-cldr-data
+     *
+     * @method addLocaleData
+     * @param {Object} locale data
+     * @public
+     */
+    addLocaleData(data) {
+      _intlMessageformat.default.__addLocaleData(data);
+
+      _intlRelativeformat.default.__addLocaleData(data);
+    },
+
+    /** @public **/
+    addTranslations(localeName, payload) {
+      const locale = this.translationsFor(localeName);
+      return locale.addTranslations(payload);
+    },
+
+    /** @public **/
+    translationsFor(localeName) {
+      return this._adapter.localeFactory((0, _normalizeLocale.default)(localeName));
+    },
+
+    /** @private **/
+    getFormat(formatType, format) {
+      const formats = Ember.get(this, 'formats');
+
+      if (formats && formatType && typeof format === 'string') {
+        return Ember.get(formats, `${formatType}.${format}`);
+      }
+    },
+
+    /** @private **/
+    localeWithDefault(localeName) {
+      if (!localeName) {
+        return this._locale || [];
+      }
+
+      if (typeof localeName === 'string') {
+        return Ember.makeArray(localeName).map(_normalizeLocale.default);
+      }
+
+      if (Array.isArray(localeName)) {
+        return localeName.map(_normalizeLocale.default);
+      }
+    },
+
+    /** @private **/
+    updateDocumentLanguage(locales) {
+      const dom = (0, _getDom.default)(this);
+
+      if (dom) {
+        const [primaryLocale] = locales;
+        const html = dom.documentElement;
+        html.setAttribute('lang', primaryLocale);
+      }
+    }
+
+  });
+
+  _exports.default = _default;
+
+  function formatter(name) {
+    return function (value, options, formats) {
+      let formatOptions = options;
+
+      if (options && typeof options.format === 'string') {
+        formatOptions = Ember.assign({}, this.getFormat(name, formatOptions.format), formatOptions);
+      }
+
+      return this._formatters[name].format(value, formatOptions, {
+        formats: formats || this.formats,
+        locale: this.localeWithDefault(formatOptions && formatOptions.locale)
+      });
+    };
+  }
+});
+;define("ember-intl/utils/get-dom", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = getDOM;
+
+  // adjusted from https://github.com/yapplabs/ember-wormhole/blob/0.5.4/addon/utils/dom.js#L45-L63
+  //
+  // Private Ember API usage. Get the dom implementation used by the current
+  // renderer, be it native browser DOM or Fastboot SimpleDOM
+  function getDOM(context) {
+    let {
+      renderer
+    } = context;
+
+    if (!renderer || !renderer._dom) {
+      // pre glimmer2
+      let container = Ember.getOwner ? Ember.getOwner(context) : context.container;
+      let documentService = container.lookup('service:-document');
+
+      if (documentService) {
+        return documentService;
+      }
+
+      renderer = container.lookup('renderer:-dom');
+    }
+
+    if (renderer._dom && renderer._dom.document) {
+      // pre Ember 2.6
+      return renderer._dom.document;
+    }
+
+    return null;
+  }
+});
+;define("ember-intl/utils/links", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+  const PROJECT_URL = 'https://github.com/jasonmit/ember-intl';
+  var _default = {
+    unsetLocale: `${PROJECT_URL}#setting-runtime-locale`,
+    asyncTranslations: `${PROJECT_URL}/blob/master/docs/asynchronously-loading-translations.md#asynchronous-loading-of-translations`,
+    polyfill: `${PROJECT_URL}/blob/master/docs/intljs-polyfill.md`
+  };
+  _exports.default = _default;
+});
+;define("ember-intl/utils/missing-message", ["exports", "ember-intl/utils/links"], function (_exports, _links) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = missingMessage;
+
+  function missingMessage(key, locales
+  /*, options */
+  ) {
+    if (Ember.isEmpty(locales)) {
+      (true && Ember.warn(`[ember-intl] no locale has been set. Documentation: ${_links.default.unsetLocale}`, false, {
+        id: 'ember-intl-no-locale-set'
+      }));
+      return `No locale defined.  Unable to resolve translation: "${key}"`;
+    }
+
+    const localeNames = locales.join(', ');
+    (true && Ember.warn(`[ember-intl] translation: "${key}" on locale: "${localeNames}" was not found.`, false, {
+      id: 'ember-intl-missing-translation'
+    }));
+    return `Missing translation "${key}" for locale "${localeNames}"`;
+  }
+});
 ;define('ember-load-initializers/index', ['exports'], function (exports) {
   'use strict';
 
@@ -84089,6 +100410,2066 @@ createDeprecatedModule('resolver');
   function _endsWith(str, suffix) {
     return str.indexOf(suffix, str.length - suffix.length) !== -1;
   }
+});
+;define('ember-macro-helpers/-build-computed', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+
+  exports.default = function ({ collapseKeys, getValue, flattenKeys, isLazy }) {
+    return function (...args) {
+      let { keys, callback: incomingCallback } = parseComputedArgs(args);
+
+      let collapsedKeys = collapseKeys(keys);
+
+      function createArgs(context, key) {
+        let bundledKeys = collapsedKeys.map(macro => ({ context, macro, key }));
+        let values;
+        if (isLazy) {
+          values = bundledKeys.slice();
+          values.splice(0, 0, getValue);
+        } else {
+          values = bundledKeys.map(getValue);
+        }
+        return values;
+      }
+
+      let newCallback = buildCallback({ incomingCallback, createArgs });
+
+      return Ember.computed(...flattenKeys(keys), newCallback);
+    };
+  };
+
+  exports.buildCurriedComputed = buildCurriedComputed;
+
+
+  function parseComputedArgs(args) {
+    return {
+      keys: args.slice(0, -1),
+      callback: args[args.length - 1]
+    };
+  }
+
+  function buildCallback({ incomingCallback, createArgs }) {
+    let newCallback;
+
+    if (typeof incomingCallback === 'function') {
+      newCallback = function (key) {
+        return incomingCallback.apply(this, createArgs(this, key));
+      };
+    } else {
+      newCallback = {};
+      if (incomingCallback.get) {
+        newCallback.get = function (key) {
+          return incomingCallback.get.apply(this, createArgs(this, key));
+        };
+      }
+      if (incomingCallback.set) {
+        newCallback.set = function (key, value) {
+          return incomingCallback.set.call(this, value, ...createArgs(this, key));
+        };
+      }
+    }
+
+    return newCallback;
+  }
+
+  function buildCurriedComputed(computed) {
+    return function (callback) {
+      return function () {
+        return computed(...arguments, callback).readOnly();
+      };
+    };
+  }
+});
+;define('ember-macro-helpers/-constants', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  const ARRAY_EACH = exports.ARRAY_EACH = '@each.';
+  const ARRAY_LENGTH = exports.ARRAY_LENGTH = '[]';
+});
+;define('ember-macro-helpers/collapse-key', ['exports', 'ember-macro-helpers/expand-property', 'ember-macro-helpers/-constants'], function (exports, _expandProperty, _constants) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = collapseKey;
+
+
+  function collapseAndPruneDuplicates(expandedProperties) {
+    return expandedProperties.map(collapseKey).reduce((properties, collapsedProperties) => {
+      let uniqueProperties = collapsedProperties.filter(collapsedProperty => {
+        return properties.indexOf(collapsedProperty) === -1;
+      });
+      return properties.concat(uniqueProperties);
+    }, []);
+  }
+
+  function collapseKey(property) {
+    if (typeof property !== 'string') {
+      return [property];
+    }
+
+    let expandedProperties = (0, _expandProperty.default)(property);
+    if (expandedProperties.length > 1) {
+      return collapseAndPruneDuplicates(expandedProperties);
+    }
+
+    let arrayIndex = property.indexOf(_constants.ARRAY_EACH);
+    if (arrayIndex === -1) {
+      arrayIndex = property.indexOf(_constants.ARRAY_LENGTH);
+    }
+
+    if (arrayIndex === 0) {
+      // empty string will be handled later by `getValue`
+      // and will convert to `this`
+      return [''];
+    } else if (arrayIndex > 0) {
+      return [property.slice(0, arrayIndex - 1)];
+    }
+
+    return (0, _expandProperty.default)(property);
+  }
+});
+;define('ember-macro-helpers/collapse-keys', ['exports', 'ember-macro-helpers/collapse-key'], function (exports, _collapseKey) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.collapseKeysWithMap = collapseKeysWithMap;
+
+  exports.default = function (keys) {
+    return collapseKeysWithMap(keys).collapsedKeys;
+  };
+
+  function collapseKeysWithMap(keys) {
+    let collapsedKeys = [];
+    let keyMap = [];
+
+    keys.forEach(key => {
+      let array = (0, _collapseKey.default)(key);
+
+      collapsedKeys = collapsedKeys.concat(array);
+
+      let i;
+      if (keyMap.length) {
+        i = keyMap[keyMap.length - 1] + 1;
+      } else {
+        i = 0;
+      }
+      keyMap = keyMap.concat(array.map(() => i));
+    });
+
+    return {
+      collapsedKeys,
+      keyMap
+    };
+  }
+});
+;define('ember-macro-helpers/computed-unsafe', ['exports', 'ember-macro-helpers/-build-computed', 'ember-macro-helpers/get-value-unsafe', 'ember-macro-helpers/flatten-keys-unsafe'], function (exports, _buildComputed, _getValueUnsafe, _flattenKeysUnsafe) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+
+
+  const collapseKeys = keys => keys;
+
+  exports.default = (0, _buildComputed.default)({ collapseKeys, getValue: _getValueUnsafe.default, flattenKeys: _flattenKeysUnsafe.default });
+});
+;define('ember-macro-helpers/computed', ['exports', 'ember-macro-helpers/-build-computed', 'ember-macro-helpers/collapse-keys', 'ember-macro-helpers/get-value', 'ember-macro-helpers/flatten-keys'], function (exports, _buildComputed, _collapseKeys, _getValue, _flattenKeys) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = (0, _buildComputed.default)({ collapseKeys: _collapseKeys.default, getValue: _getValue.default, flattenKeys: _flattenKeys.default });
+});
+;define('ember-macro-helpers/create-class-computed', ['exports', 'ember-macro-helpers/get-value', 'ember-macro-helpers/collapse-keys', 'ember-macro-helpers/flatten-keys', 'ember-macro-helpers/-constants'], function (exports, _getValue, _collapseKeys, _flattenKeys, _constants) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+
+  exports.default = function (observerBools, macroGenerator) {
+    return function (...keys) {
+      let { collapsedKeys, keyMap } = (0, _collapseKeys.collapseKeysWithMap)(keys);
+
+      function getOriginalArrayDecorator(key, i) {
+        if (typeof key === 'string') {
+          let originalKey = keys[keyMap[i]];
+          if (originalKey.indexOf(_constants.ARRAY_EACH) !== -1 || originalKey.indexOf(_constants.ARRAY_LENGTH) !== -1) {
+            return originalKey;
+          }
+        }
+        return key;
+      }
+
+      let mappedKeys = [];
+
+      function rewriteComputed(obj, key) {
+        let mappedWithResolvedOberverKeys = mappedKeys.map((macro, i) => {
+          let shouldObserve = observerBools[i];
+          if (shouldObserve) {
+            macro = (0, _getValue.default)({ context: this, macro, key });
+          }
+          return macro;
+        });
+
+        let cp = macroGenerator.apply(this, mappedWithResolvedOberverKeys);
+        Ember.defineProperty(this, 'computed', cp);
+      }
+
+      let classProperties = {};
+
+      collapsedKeys.forEach((key, i) => {
+        let shouldObserve = observerBools[i];
+        if (!shouldObserve) {
+          key = getOriginalArrayDecorator(key, i);
+        }
+
+        let mappedKey = resolveMappedLocation(key, i);
+
+        mappedKeys.push(mappedKey);
+        if (shouldObserve) {
+          classProperties[`key${i}DidChange`] = Ember.observer(mappedKey, rewriteComputed);
+        }
+      });
+
+      let ObserverClass = BaseClass.extend(classProperties, {
+        // can't use rewriteComputed directly, maybe a bug
+        // https://github.com/emberjs/ember.js/issues/15246
+        onInit: Ember.on('init', function () {
+          rewriteComputed.call(this);
+        })
+      });
+
+      let cp = Ember.computed(...(0, _flattenKeys.default)(keys), function (key) {
+        let propertyInstance = findOrCreatePropertyInstance(this, ObserverClass, key, cp);
+
+        let properties = collapsedKeys.reduce((properties, macro, i) => {
+          if (typeof macro !== 'string') {
+            properties[i.toString()] = (0, _getValue.default)({ context: this, macro, key });
+          }
+          return properties;
+        }, {});
+
+        // eslint-disable-next-line ember/no-side-effects
+        Ember.set(propertyInstance, 'preventDoubleRender', true);
+
+        Ember.setProperties(propertyInstance.nonStrings, properties);
+
+        // eslint-disable-next-line ember/no-side-effects
+        Ember.set(propertyInstance, 'preventDoubleRender', false);
+
+        return Ember.get(propertyInstance, 'computed');
+      }).readOnly();
+
+      return cp;
+    };
+  };
+
+  // import { getOwner } from '@ember/application';
+  const {
+    WeakMap
+  } = Ember;
+
+  const PROPERTIES = new WeakMap();
+
+  function findOrCreatePropertyInstance(context, propertyClass, key, cp) {
+    let propertiesForContext = PROPERTIES.get(context);
+    if (!propertiesForContext) {
+      propertiesForContext = new WeakMap();
+      PROPERTIES.set(context, propertiesForContext);
+    }
+
+    let property = propertiesForContext.get(cp);
+    if (property) {
+      return property;
+    }
+
+    // let owner = getOwner(context);
+    property = propertyClass.create( /* owner.ownerInjection(), */{
+      key,
+      context,
+      nonStrings: Ember.Object.create()
+    });
+
+    propertiesForContext.set(cp, property);
+
+    if (context instanceof Ember.Component) {
+      context.one('willDestroyElement', () => {
+        property.destroy();
+      });
+    }
+
+    return property;
+  }
+
+  const BaseClass = Ember.Object.extend({
+    computedDidChange: Ember.observer('computed', function () {
+      let {
+        context,
+        key,
+        preventDoubleRender
+      } = this;
+
+      if (context.isDestroying) {
+        // controllers can get into this state
+        this.destroy();
+
+        return;
+      }
+
+      if (preventDoubleRender) {
+        return;
+      }
+
+      context.notifyPropertyChange(key);
+    })
+  });
+
+  function resolveMappedLocation(key, i) {
+    if (typeof key === 'string') {
+      return `context.${key}`;
+    } else {
+      return `nonStrings.${i}`;
+    }
+  }
+});
+;define('ember-macro-helpers/curried-computed', ['exports', 'ember-macro-helpers/-build-computed', 'ember-macro-helpers/computed'], function (exports, _buildComputed, _computed) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = (0, _buildComputed.buildCurriedComputed)(_computed.default);
+});
+;define('ember-macro-helpers/expand-property-list', ['exports', 'ember-macro-helpers/expand-property'], function (exports, _expandProperty) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+
+  exports.default = function (propertyList) {
+    return propertyList.reduce((newPropertyList, property) => {
+      return newPropertyList.concat((0, _expandProperty.default)(property));
+    }, []);
+  };
+});
+;define('ember-macro-helpers/expand-property', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+
+  exports.default = function (property) {
+    let newPropertyList = [];
+    Ember.expandProperties(property, expandedProperties => {
+      newPropertyList = newPropertyList.concat(expandedProperties);
+    });
+    return newPropertyList;
+  };
+});
+;define('ember-macro-helpers/flatten-keys-unsafe', ['exports', 'ember-macro-helpers/flatten-keys'], function (exports, _flattenKeys) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+
+  exports.default = function (keys) {
+    let flattenedKeys = (0, _flattenKeys.default)(keys);
+
+    return flattenedKeys.reduce((flattenedKeys, key) => {
+      // keys with spaces throw an exception
+      // treat as a literal and ignore
+      let hasSpaces = key.indexOf(' ') !== -1;
+      if (!hasSpaces) {
+        flattenedKeys.push(key);
+      }
+      return flattenedKeys;
+    }, []);
+  };
+});
+;define('ember-macro-helpers/flatten-keys', ['exports', 'ember-macro-helpers/is-computed'], function (exports, _isComputed) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+
+  exports.default = function (keys) {
+    let flattenedKeys = [];
+    _flattenKeys(keys.slice(0, -1), flattenedKeys);
+    let lastKey = keys[keys.length - 1];
+    if (lastKey) {
+      let lastValue = flattenKey(lastKey, flattenedKeys);
+      if (lastValue) {
+        if (lastValue.get) {
+          flattenKey(lastValue.get, flattenedKeys);
+        }
+        if (lastValue.set) {
+          flattenKey(lastValue.set, flattenedKeys);
+        }
+      }
+    }
+    return flattenedKeys;
+  };
+
+  function flattenKey(key, flattenedKeys) {
+    if ((0, _isComputed.default)(key)) {
+      let dependentKeys = key._dependentKeys;
+      if (dependentKeys === undefined) {
+        // when there are no keys (raw)
+        return;
+      }
+
+      return _flattenKeys(dependentKeys, flattenedKeys);
+    }
+
+    if (typeof key !== 'string') {
+      return key;
+    }
+
+    flattenedKeys.push(key);
+  }
+
+  function _flattenKeys(keys, flattenedKeys) {
+    keys.forEach(key => {
+      flattenKey(key, flattenedKeys);
+    });
+  }
+});
+;define('ember-macro-helpers/get-value-unsafe', ['exports', 'ember-macro-helpers/get-value'], function (exports, _getValue) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+
+  exports.default = function (options = {}) {
+    let value = (0, _getValue.default)(options);
+    if (value !== undefined) {
+      return value;
+    }
+
+    return options.macro;
+  };
+});
+;define('ember-macro-helpers/get-value', ['exports', 'ember-macro-helpers/is-computed'], function (exports, _isComputed) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+
+  exports.default = function ({ context, macro, key } = {}) {
+    if ((0, _isComputed.default)(macro)) {
+      return macro._getter.call(context, key);
+    }
+
+    if (typeof macro !== 'string') {
+      return macro;
+    }
+
+    if (Ember.isBlank(macro)) {
+      // the macro was `[]' or `@each.key', which has been trimmed, leaving a
+      // blank string, so return the context (which is likely an ArrayProxy)
+      return context;
+    }
+
+    return Ember.get(context, macro);
+  };
+});
+;define('ember-macro-helpers/index', ['exports', 'ember-macro-helpers/computed', 'ember-macro-helpers/create-class-computed', 'ember-macro-helpers/curried-computed', 'ember-macro-helpers/lazy-computed', 'ember-macro-helpers/lazy-curried-computed', 'ember-macro-helpers/literal', 'ember-macro-helpers/raw', 'ember-macro-helpers/reads', 'ember-macro-helpers/writable'], function (exports, _computed, _createClassComputed, _curriedComputed, _lazyComputed, _lazyCurriedComputed, _literal, _raw, _reads, _writable) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  Object.defineProperty(exports, 'computed', {
+    enumerable: true,
+    get: function () {
+      return _computed.default;
+    }
+  });
+  Object.defineProperty(exports, 'createClassComputed', {
+    enumerable: true,
+    get: function () {
+      return _createClassComputed.default;
+    }
+  });
+  Object.defineProperty(exports, 'curriedComputed', {
+    enumerable: true,
+    get: function () {
+      return _curriedComputed.default;
+    }
+  });
+  Object.defineProperty(exports, 'lazyComputed', {
+    enumerable: true,
+    get: function () {
+      return _lazyComputed.default;
+    }
+  });
+  Object.defineProperty(exports, 'lazyCurriedComputed', {
+    enumerable: true,
+    get: function () {
+      return _lazyCurriedComputed.default;
+    }
+  });
+  Object.defineProperty(exports, 'literal', {
+    enumerable: true,
+    get: function () {
+      return _literal.default;
+    }
+  });
+  Object.defineProperty(exports, 'raw', {
+    enumerable: true,
+    get: function () {
+      return _raw.default;
+    }
+  });
+  Object.defineProperty(exports, 'reads', {
+    enumerable: true,
+    get: function () {
+      return _reads.default;
+    }
+  });
+  Object.defineProperty(exports, 'writable', {
+    enumerable: true,
+    get: function () {
+      return _writable.default;
+    }
+  });
+});
+;define('ember-macro-helpers/is-computed', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+
+  exports.default = function (key) {
+    return key instanceof Ember.ComputedProperty;
+  };
+});
+;define('ember-macro-helpers/lazy-computed', ['exports', 'ember-macro-helpers/-build-computed', 'ember-macro-helpers/collapse-keys', 'ember-macro-helpers/get-value', 'ember-macro-helpers/flatten-keys'], function (exports, _buildComputed, _collapseKeys, _getValue, _flattenKeys) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = (0, _buildComputed.default)({ collapseKeys: _collapseKeys.default, getValue: _getValue.default, flattenKeys: _flattenKeys.default, isLazy: true });
+});
+;define('ember-macro-helpers/lazy-curried-computed', ['exports', 'ember-macro-helpers/-build-computed', 'ember-macro-helpers/lazy-computed'], function (exports, _buildComputed, _lazyComputed) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = (0, _buildComputed.buildCurriedComputed)(_lazyComputed.default);
+});
+;define('ember-macro-helpers/literal', ['exports', 'ember-macro-helpers/raw'], function (exports, _raw) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  Object.defineProperty(exports, 'default', {
+    enumerable: true,
+    get: function () {
+      return _raw.default;
+    }
+  });
+});
+;define('ember-macro-helpers/normalize-array-key', ['exports', 'ember-macro-helpers/-constants'], function (exports, _constants) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+
+  exports.default = function (array, keys = []) {
+    // this macro support should be extracted out
+    // we should only deal with string keys in here
+    if (typeof array !== 'string') {
+      return array;
+    }
+
+    let props;
+
+    let i = array.indexOf(_constants.ARRAY_EACH);
+    if (i !== -1) {
+      let chain = array.split('.');
+      let end = chain[chain.length - 1];
+      if (end.indexOf('{') === 0) {
+        props = end.substring(1, end.length - 1).split(',');
+      } else {
+        props = [end];
+      }
+    } else {
+      i = array.indexOf(_constants.ARRAY_LENGTH);
+      props = [];
+    }
+
+    if (i === 0) {
+      // empty string will be handled later by `getValue`
+      // and will convert to `this`
+      array = '';
+    } else if (i > 0) {
+      array = array.slice(0, i - 1);
+    }
+
+    keys.forEach(key => {
+      // key could be a promise proxy and not resolved yet
+      if (key === undefined) {
+        return;
+      }
+
+      if (props.indexOf(key) === -1) {
+        props.push(key);
+      }
+    });
+
+    let suffix;
+    if (props.length === 0) {
+      suffix = _constants.ARRAY_LENGTH;
+    } else {
+      suffix = _constants.ARRAY_EACH;
+      if (props.length === 1) {
+        suffix += props[0];
+      } else {
+        suffix += `{${props.join(',')}}`;
+      }
+    }
+
+    return Ember.isBlank(array) ? suffix : `${array}.${suffix}`;
+  };
+});
+;define('ember-macro-helpers/raw', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+
+  exports.default = function (key) {
+    return Ember.computed(() => key).readOnly();
+  };
+});
+;define('ember-macro-helpers/reads', ['exports', 'ember-macro-helpers/writable'], function (exports, _writable) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  Object.defineProperty(exports, 'default', {
+    enumerable: true,
+    get: function () {
+      return _writable.default;
+    }
+  });
+});
+;define('ember-macro-helpers/writable', ['exports', 'ember-macro-helpers/computed'], function (exports, _computed) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+
+  exports.default = function (getter, setterCallback) {
+    let newCallback = {
+      get(val) {
+        return val;
+      }
+    };
+
+    if (setterCallback) {
+      if (typeof setterCallback === 'object' && setterCallback.set) {
+        newCallback.set = setterCallback.set;
+      } else {
+        newCallback.set = function () {
+          return setterCallback.apply(this, arguments);
+        };
+      }
+    }
+
+    return (0, _computed.default)(getter, newCallback);
+  };
+});
+;define('ember-moment/computeds/-base', ['exports', 'ember-macro-helpers/computed-unsafe'], function (exports, _computedUnsafe) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = computedFactory;
+  function computedFactory(fn) {
+    return function (...args) {
+      return (0, _computedUnsafe.default)(...args, function (...vals) {
+        return fn.call(this, vals);
+      });
+    };
+  }
+});
+;define('ember-moment/computeds/calendar', ['exports', 'moment', 'ember-moment/computeds/-base'], function (exports, _moment, _base) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = (0, _base.default)(function calendarComputed(params, formatHash = {}) {
+    if (!params || params && params.length > 3) {
+      throw new TypeError('ember-moment: Invalid Number of arguments, at most 3');
+    }
+
+    const [date, referenceTime, formats] = params;
+    const clone = Object.create(formatHash);
+    const mergedFormats = Ember.merge(clone, formats);
+
+    return (0, _moment.default)(date).calendar(referenceTime, mergedFormats);
+  });
+});
+;define('ember-moment/computeds/duration', ['exports', 'moment', 'ember-moment/computeds/-base'], function (exports, _moment, _base) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = (0, _base.default)(function durationComputed(params) {
+    return _moment.default.duration(...params);
+  });
+});
+;define('ember-moment/computeds/format', ['exports', 'moment', 'ember-moment/computeds/-base'], function (exports, _moment, _base) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+
+
+  const CONFIG_KEY = 'config:environment';
+
+  exports.default = (0, _base.default)(function formatComputed([value, optionalFormat]) {
+    if (!optionalFormat) {
+      const owner = Ember.getOwner(this);
+
+      if (owner && owner.hasRegistration && owner.hasRegistration(CONFIG_KEY)) {
+        const config = owner.resolveRegistration(CONFIG_KEY);
+
+        if (config) {
+          optionalFormat = Ember.get(config, 'moment.outputFormat');
+        }
+      }
+    }
+
+    return (0, _moment.default)(value).format(optionalFormat);
+  });
+});
+;define('ember-moment/computeds/from-now', ['exports', 'moment', 'ember-moment/computeds/-base'], function (exports, _moment, _base) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = (0, _base.default)(function fromNowComputed(params) {
+    let maybeHideSuffix;
+
+    if (params.length > 1) {
+      maybeHideSuffix = params.pop();
+    }
+
+    return (0, _moment.default)(...params).fromNow(maybeHideSuffix);
+  });
+});
+;define('ember-moment/computeds/humanize', ['exports', 'moment', 'ember-moment/computeds/-base'], function (exports, _moment, _base) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = (0, _base.default)(function humanizeComputed([duration, suffixless]) {
+    if (!_moment.default.isDuration(duration)) {
+      duration = _moment.default.duration(duration);
+    }
+
+    return duration.humanize(suffixless);
+  });
+});
+;define('ember-moment/computeds/locale', ['exports', 'moment', 'ember-moment/computeds/-base'], function (exports, _moment, _base) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = (0, _base.default)(function localeComputed([date, locale]) {
+    if (!_moment.default.isDuration(date)) {
+      date = (0, _moment.default)(date);
+    }
+
+    return date.locale(locale);
+  });
+});
+;define('ember-moment/computeds/moment', ['exports', 'moment', 'ember-moment/computeds/-base'], function (exports, _moment, _base) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = (0, _base.default)(function momentComputed(params) {
+    return (0, _moment.default)(...params);
+  });
+});
+;define('ember-moment/computeds/to-now', ['exports', 'moment', 'ember-moment/computeds/-base'], function (exports, _moment, _base) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = (0, _base.default)(function toNowComputed(params) {
+    let maybeHidePrefix;
+
+    if (params.length > 1) {
+      maybeHidePrefix = params.pop();
+    }
+
+    return (0, _moment.default)(...params).toNow(maybeHidePrefix);
+  });
+});
+;define('ember-moment/computeds/tz', ['exports', 'moment', 'ember-moment/computeds/-base'], function (exports, _moment, _base) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = (0, _base.default)(function tzComputed([date, tz]) {
+    return (0, _moment.default)(date).tz(tz);
+  });
+});
+;define('ember-moment/computeds/utc', ['exports', 'moment', 'ember-moment/computeds/-base'], function (exports, _moment, _base) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = (0, _base.default)(function utcComputed(params) {
+    return _moment.default.utc(...params);
+  });
+});
+;define('ember-moment/helpers/-base', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Helper.extend({
+    moment: Ember.inject.service(),
+    disableInterval: false,
+    globalAllowEmpty: Ember.computed.bool('moment.__config__.allowEmpty'),
+    supportsGlobalAllowEmpty: true,
+    localeOrTimeZoneChanged: Ember.observer('moment.locale', 'moment.timeZone', function () {
+      this.recompute();
+    }),
+
+    compute(value, { interval }) {
+      if (Ember.get(this, 'disableInterval')) {
+        return;
+      }
+
+      this.clearTimer();
+
+      if (interval) {
+        /*
+         * NOTE: intentionally a setTimeout so tests do not block on it
+         * as the run loop queue is never clear so tests will stay locked waiting
+         * for queue to clear.
+         */
+        this.intervalTimer = setTimeout(() => {
+          Ember.run(() => this.recompute());
+        }, parseInt(interval, 10));
+      }
+    },
+
+    morphMoment(time, { locale, timeZone }) {
+      const momentService = Ember.get(this, 'moment');
+
+      locale = locale || Ember.get(momentService, 'locale');
+      timeZone = timeZone || Ember.get(momentService, 'timeZone');
+
+      if (locale && time.locale) {
+        time = time.locale(locale);
+      }
+
+      if (timeZone && time.tz) {
+        time = time.tz(timeZone);
+      }
+
+      return time;
+    },
+
+    clearTimer() {
+      clearTimeout(this.intervalTimer);
+    },
+
+    destroy() {
+      this.clearTimer();
+      this._super(...arguments);
+    }
+  });
+});
+;define('ember-moment/helpers/is-after', ['exports', 'ember-moment/helpers/-base', 'ember-moment/utils/helper-compute'], function (exports, _base, _helperCompute) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _base.default.extend({
+    compute: (0, _helperCompute.default)(function (params, { precision, locale, timeZone }) {
+      this._super(...arguments);
+
+      const moment = Ember.get(this, 'moment');
+      const { length } = params;
+      const args = [];
+      const comparisonArgs = [];
+
+      if (length === 1) {
+        comparisonArgs.push(params[0]);
+      } else if (length === 2) {
+        args.push(params[0]);
+        comparisonArgs.push(params[1]);
+      }
+
+      return this.morphMoment(moment.moment(...args), { locale, timeZone }).isAfter(...comparisonArgs, precision);
+    })
+  });
+});
+;define('ember-moment/helpers/is-before', ['exports', 'ember-moment/utils/helper-compute', 'ember-moment/helpers/-base'], function (exports, _helperCompute, _base) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _base.default.extend({
+    compute: (0, _helperCompute.default)(function (params, { precision, locale, timeZone }) {
+      this._super(...arguments);
+
+      const moment = Ember.get(this, 'moment');
+      const { length } = params;
+      const args = [];
+      const comparisonArgs = [];
+
+      if (length === 1) {
+        comparisonArgs.push(params[0]);
+      } else if (length === 2) {
+        args.push(params[0]);
+        comparisonArgs.push(params[1]);
+      }
+
+      return this.morphMoment(moment.moment(...args), { locale, timeZone }).isBefore(...comparisonArgs, precision);
+    })
+  });
+});
+;define('ember-moment/helpers/is-between', ['exports', 'ember-moment/utils/helper-compute', 'ember-moment/helpers/-base'], function (exports, _helperCompute, _base) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _base.default.extend({
+    compute: (0, _helperCompute.default)(function (params, { precision, inclusivity, locale, timeZone }) {
+      this._super(...arguments);
+
+      const moment = Ember.get(this, 'moment');
+      const _params = [].concat(params);
+      const { length } = params;
+
+      if (length < 2 || length > 3) {
+        throw new TypeError('ember-moment: Invalid Number of arguments, expected 2 or 3');
+      }
+
+      const args = [];
+
+      if (length > 2) {
+        args.push(_params.shift());
+      }
+
+      return this.morphMoment(moment.moment(...args), { locale, timeZone }).isBetween(..._params, precision, inclusivity);
+    })
+  });
+});
+;define('ember-moment/helpers/is-same-or-after', ['exports', 'ember-moment/utils/helper-compute', 'ember-moment/helpers/-base'], function (exports, _helperCompute, _base) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _base.default.extend({
+    compute: (0, _helperCompute.default)(function (params, { precision, locale, timeZone }) {
+      this._super(...arguments);
+
+      const moment = Ember.get(this, 'moment');
+      const { length } = params;
+      const args = [];
+      const comparisonArgs = [];
+
+      if (length === 1) {
+        comparisonArgs.push(params[0]);
+      } else if (length === 2) {
+        args.push(params[0]);
+        comparisonArgs.push(params[1]);
+      }
+
+      return this.morphMoment(moment.moment(...args), { locale, timeZone }).isSameOrAfter(...comparisonArgs, precision);
+    })
+  });
+});
+;define('ember-moment/helpers/is-same-or-before', ['exports', 'ember-moment/utils/helper-compute', 'ember-moment/helpers/-base'], function (exports, _helperCompute, _base) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _base.default.extend({
+    compute: (0, _helperCompute.default)(function (params, { precision, locale, timeZone }) {
+      this._super(...arguments);
+
+      const moment = Ember.get(this, 'moment');
+      const { length } = params;
+      const args = [];
+      const comparisonArgs = [];
+
+      if (length === 1) {
+        comparisonArgs.push(params[0]);
+      } else if (length === 2) {
+        args.push(params[0]);
+        comparisonArgs.push(params[1]);
+      }
+
+      return this.morphMoment(moment.moment(...args), { locale, timeZone }).isSameOrBefore(...comparisonArgs, precision);
+    })
+  });
+});
+;define('ember-moment/helpers/is-same', ['exports', 'ember-moment/utils/helper-compute', 'ember-moment/helpers/-base'], function (exports, _helperCompute, _base) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _base.default.extend({
+    compute: (0, _helperCompute.default)(function (params, { precision, locale, timeZone }) {
+      this._super(...arguments);
+
+      const moment = Ember.get(this, 'moment');
+      const { length } = params;
+      const args = [];
+      const comparisonArgs = [];
+
+      if (length === 1) {
+        comparisonArgs.push(params[0]);
+      } else if (length === 2) {
+        args.push(params[0]);
+        comparisonArgs.push(params[1]);
+      }
+
+      return this.morphMoment(moment.moment(...args), { locale, timeZone }).isSame(...comparisonArgs, precision);
+    })
+  });
+});
+;define('ember-moment/helpers/moment-add', ['exports', 'ember-moment/utils/helper-compute', 'ember-moment/helpers/-base'], function (exports, _helperCompute, _base) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _base.default.extend({
+    compute: (0, _helperCompute.default)(function (params, { precision, locale, timeZone }) {
+      this._super(...arguments);
+
+      const moment = Ember.get(this, 'moment');
+      const { length } = params;
+      const args = [];
+      const additionArgs = [];
+
+      if (length === 1) {
+        additionArgs.push(params[0]);
+      } else if (length === 2 && Ember.typeOf(params[0]) === 'number' && Ember.typeOf(params[1]) === 'string') {
+        additionArgs.push(...params);
+      } else {
+        args.push(params[0]);
+        additionArgs.push(...params.slice(1));
+      }
+
+      return this.morphMoment(moment.moment(...args), { locale, timeZone }).add(...additionArgs, precision);
+    })
+  });
+});
+;define('ember-moment/helpers/moment-calendar', ['exports', 'ember-moment/utils/helper-compute', 'ember-moment/helpers/-base'], function (exports, _helperCompute, _base) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _base.default.extend({
+    compute: (0, _helperCompute.default)(function (params, formatHash = {}) {
+      this._super(...arguments);
+
+      if (!params || params && params.length > 3) {
+        throw new TypeError('ember-moment: Invalid Number of arguments, at most 3');
+      }
+
+      const moment = Ember.get(this, 'moment');
+      const { locale, timeZone } = formatHash;
+      const [date, referenceTime, formats] = params;
+      const clone = Object.create(formatHash);
+
+      delete clone.locale;
+      delete clone.timeZone;
+
+      const mergedFormats = Ember.merge(clone, formats);
+
+      return this.morphMoment(moment.moment(date), { locale, timeZone }).calendar(referenceTime, mergedFormats);
+    })
+  });
+});
+;define('ember-moment/helpers/moment-diff', ['exports', 'ember-moment/utils/helper-compute', 'ember-moment/helpers/-base'], function (exports, _helperCompute, _base) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _base.default.extend({
+    compute: (0, _helperCompute.default)(function (params, { precision, float, locale, timeZone }) {
+      this._super(...arguments);
+
+      if (!params || params && params.length !== 2) {
+        throw new TypeError('ember-moment: Invalid Number of arguments, must be 2');
+      }
+
+      const moment = Ember.get(this, 'moment');
+      const [dateA, dateB] = params;
+
+      return this.morphMoment(moment.moment(dateB), { locale, timeZone }).diff(dateA, precision, float);
+    })
+  });
+});
+;define('ember-moment/helpers/moment-duration', ['exports', 'moment', 'ember-moment/helpers/-base'], function (exports, _moment, _base) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _base.default.extend({
+    compute(params, { locale, timeZone }) {
+      this._super(...arguments);
+      const momentService = Ember.get(this, 'moment');
+
+      if (!params || params && params.length > 2) {
+        throw new TypeError('ember-moment: Invalid Number of arguments, at most 2');
+      }
+
+      const result = momentService.moment(_moment.default.duration(...params));
+
+      return this.morphMoment(result._i, { locale, timeZone }).humanize();
+    }
+  });
+});
+;define('ember-moment/helpers/moment-format', ['exports', 'ember-moment/utils/helper-compute', 'ember-moment/helpers/-base'], function (exports, _helperCompute, _base) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _base.default.extend({
+    defaultFormatDidChange: Ember.observer('moment.defaultFormat', function () {
+      this.recompute();
+    }),
+
+    compute: (0, _helperCompute.default)(function (params, { locale, timeZone }) {
+      this._super(...arguments);
+
+      const moment = Ember.get(this, 'moment');
+      const { length } = params;
+
+      if (length > 3) {
+        throw new TypeError('ember-moment: Invalid number of arguments, expected at most 3');
+      }
+
+      const args = [];
+      const formatArgs = [];
+      const defaultFormat = Ember.get(this, 'moment.defaultFormat');
+
+      args.push(params[0]);
+
+      if (length === 1 && !Ember.isEmpty(defaultFormat)) {
+        formatArgs.push(defaultFormat);
+      } else if (length === 2) {
+        formatArgs.push(params[1]);
+      } else if (length > 2) {
+        args.push(params[2]);
+        formatArgs.push(params[1]);
+      }
+
+      return this.morphMoment(moment.moment(...args), { locale, timeZone }).format(...formatArgs);
+    })
+  });
+});
+;define('ember-moment/helpers/moment-from-now', ['exports', 'ember-moment/utils/helper-compute', 'ember-moment/helpers/-base'], function (exports, _helperCompute, _base) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _base.default.extend({
+    compute: (0, _helperCompute.default)(function (params, { hideSuffix, hideAffix, locale, timeZone }) {
+      Ember.deprecate('hideSuffix is deprecated in favour of hideAffix', hideSuffix === undefined, // display if this is false
+      { id: 'ember-moment.addon.helpers.moment-from-now', until: '8.0.0' });
+
+      this._super(...arguments);
+
+      const moment = Ember.get(this, 'moment');
+      const hide = hideSuffix || hideAffix;
+      return this.morphMoment(moment.moment(...params), { locale, timeZone }).fromNow(hide);
+    })
+  });
+});
+;define('ember-moment/helpers/moment-from', ['exports', 'ember-moment/utils/helper-compute', 'ember-moment/helpers/-base'], function (exports, _helperCompute, _base) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _base.default.extend({
+    compute: (0, _helperCompute.default)(function ([datetime, ...params], { hideAffix, locale, timeZone }) {
+      this._super(...arguments);
+
+      const moment = Ember.get(this, 'moment');
+
+      return this.morphMoment(moment.moment(datetime), { locale, timeZone }).from(...params, hideAffix);
+    })
+  });
+});
+;define('ember-moment/helpers/moment-subtract', ['exports', 'ember-moment/utils/helper-compute', 'ember-moment/helpers/-base'], function (exports, _helperCompute, _base) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _base.default.extend({
+    compute: (0, _helperCompute.default)(function (params, { precision, locale, timeZone }) {
+      this._super(...arguments);
+
+      const moment = Ember.get(this, 'moment');
+      const { length } = params;
+      const args = [];
+      const subtractionArgs = [];
+
+      if (length === 1) {
+        subtractionArgs.push(params[0]);
+      } else if (length === 2 && Ember.typeOf(params[0]) === 'number' && Ember.typeOf(params[1]) === 'string') {
+        subtractionArgs.push(...params);
+      } else {
+        args.push(params[0]);
+        subtractionArgs.push(...params.slice(1));
+      }
+
+      return this.morphMoment(moment.moment(...args), { locale, timeZone }).subtract(...subtractionArgs, precision);
+    })
+  });
+});
+;define('ember-moment/helpers/moment-to-date', ['exports', 'ember-moment/utils/helper-compute', 'ember-moment/helpers/-base'], function (exports, _helperCompute, _base) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _base.default.extend({
+    compute: (0, _helperCompute.default)(function (params, { hidePrefix, locale, timeZone }) {
+      this._super(...arguments);
+
+      const moment = Ember.get(this, 'moment');
+
+      return this.morphMoment(moment.moment(), { locale, timeZone }).to(...params, hidePrefix);
+    })
+  });
+});
+;define('ember-moment/helpers/moment-to-now', ['exports', 'ember-moment/utils/helper-compute', 'ember-moment/helpers/-base'], function (exports, _helperCompute, _base) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _base.default.extend({
+    compute: (0, _helperCompute.default)(function (params, { hidePrefix, hideAffix, locale, timeZone }) {
+      Ember.deprecate('hidePrefix is deprecated in favour of hideAffix', hidePrefix === undefined, // display if this is false
+      { id: 'ember-moment.addon.helpers.moment-to-now', until: '8.0.0' });
+
+      this._super(...arguments);
+
+      const moment = Ember.get(this, 'moment');
+      const hide = hidePrefix || hideAffix;
+      return this.morphMoment(moment.moment(...params), { locale, timeZone }).toNow(hide);
+    })
+  });
+});
+;define('ember-moment/helpers/moment-to', ['exports', 'ember-moment/utils/helper-compute', 'ember-moment/helpers/-base'], function (exports, _helperCompute, _base) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _base.default.extend({
+    compute: (0, _helperCompute.default)(function ([datetime, ...params], { hideAffix, locale, timeZone }) {
+      this._super(...arguments);
+
+      const moment = Ember.get(this, 'moment');
+
+      return this.morphMoment(moment.moment(datetime), { locale, timeZone }).to(...params, hideAffix);
+    })
+  });
+});
+;define('ember-moment/helpers/moment', ['exports', 'ember-moment/helpers/-base'], function (exports, _base) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _base.default.extend({
+    compute(params, { locale, timeZone }) {
+      this._super(...arguments);
+
+      const moment = Ember.get(this, 'moment');
+
+      return this.morphMoment(moment.moment(...params), { locale, timeZone });
+    }
+  });
+});
+;define('ember-moment/helpers/now', ['exports', 'moment', 'ember-moment/helpers/-base'], function (exports, _moment, _base) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _base.default.extend({
+    compute() {
+      this._super(...arguments);
+
+      const momentService = Ember.get(this, 'moment');
+
+      return momentService.moment(_moment.default.now());
+    }
+  });
+});
+;define('ember-moment/helpers/unix', ['exports', 'moment', 'ember-moment/helpers/-base'], function (exports, _moment, _base) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _base.default.extend({
+    compute([unixTimeStamp]) {
+      this._super(...arguments);
+
+      return Ember.get(this, 'moment').moment(_moment.default.unix(unixTimeStamp));
+    }
+  });
+});
+;define('ember-moment/helpers/utc', ['exports', 'moment', 'ember-moment/helpers/-base'], function (exports, _moment, _base) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _base.default.extend({
+    compute([utcTime, format]) {
+      this._super(...arguments);
+
+      return Ember.get(this, 'moment').utc(_moment.default.utc(utcTime, format));
+    }
+  });
+});
+;define('ember-moment/services/moment', ['exports', 'moment'], function (exports, _moment) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Service.extend(Ember.Evented, {
+    _timeZone: null,
+
+    locale: null,
+    localeOptions: null,
+    defaultFormat: null,
+
+    __config__: Ember.computed(function () {
+      let config = Ember.getOwner(this).factoryFor('config:environment').class || {};
+
+      return Ember.get(config, 'moment') || {};
+    }).readOnly(),
+
+    timeZone: Ember.computed('_timeZone', {
+      get() {
+        return Ember.get(this, '_timeZone');
+      },
+
+      set(propertyKey, timeZone) {
+        if (!_moment.default.tz) {
+          /* eslint-disable no-console */
+          console.warn('[ember-moment] attempted to set timezone, but moment-timezone is not setup.');
+          return;
+        }
+
+        Ember.set(this, '_timeZone', timeZone);
+
+        return timeZone;
+      }
+    }),
+
+    setLocale(locale) {
+      this.changeLocale(locale);
+    },
+
+    updateLocale(locale, localeOptions = {}) {
+      this.changeLocale(locale, localeOptions);
+    },
+
+    changeLocale(locale, localeOptions = {}) {
+      Ember.setProperties(this, {
+        locale,
+        localeOptions
+      });
+      _moment.default.updateLocale(locale, localeOptions);
+      this.trigger('localeChanged', locale);
+    },
+
+    setTimeZone(timeZone) {
+      this.changeTimeZone(timeZone);
+    },
+
+    changeTimeZone(timeZone) {
+      Ember.set(this, 'timeZone', timeZone);
+      this.trigger('timeZoneChanged', timeZone);
+    },
+
+    isMoment(obj) {
+      return _moment.default.isMoment(obj);
+    },
+
+    moment() {
+      let momentObj = (0, _moment.default)(...arguments);
+      let { locale, timeZone } = Ember.getProperties(this, 'locale', 'timeZone');
+
+      if (locale && momentObj.locale) {
+        momentObj = momentObj.locale(locale);
+      }
+
+      if (timeZone && momentObj.tz) {
+        momentObj = momentObj.tz(timeZone);
+      }
+
+      return momentObj;
+    },
+
+    utc() {
+      let momentObj = _moment.default.utc(...arguments);
+
+      let { locale } = Ember.getProperties(this, 'locale');
+
+      if (locale && momentObj.locale) {
+        momentObj = momentObj.locale(locale);
+      }
+
+      return momentObj;
+    }
+  });
+});
+;define('ember-moment/utils/helper-compute', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+
+  exports.default = function (cb) {
+    return function (params, hash) {
+      if (!params || params && params.length === 0) {
+        throw new TypeError('ember-moment: Invalid Number of arguments, expected at least 1');
+      }
+
+      const datetime = params[0];
+
+      let allowEmpty = hash.allowEmpty || hash['allow-empty'];
+
+      if (allowEmpty === undefined || allowEmpty === null) {
+        allowEmpty = Ember.get(this, 'globalAllowEmpty');
+      }
+
+      if (Ember.isBlank(datetime)) {
+        if (allowEmpty) {
+          return;
+        }
+
+        /* eslint-disable no-console */
+        console.warn(`ember-moment: an empty value (null, undefined, or "") was passed to ember-moment helper`);
+      }
+
+      return cb.apply(this, arguments);
+    };
+  };
+});
+;define('ember-popper/components/ember-popper-base', ['exports', 'ember-popper/templates/components/ember-popper', 'ember-raf-scheduler'], function (exports, _emberPopper, _emberRafScheduler) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = Ember.Component.extend({
+    layout: _emberPopper.default,
+
+    tagName: '',
+
+    // ================== PUBLIC CONFIG OPTIONS ==================
+
+    /**
+     * Whether event listeners, resize and scroll, for repositioning the popper are initially enabled.
+     * @argument({ defaultIfUndefined: true })
+     * @type('boolean')
+     */
+    eventsEnabled: true,
+
+    /**
+     * Whether the Popper element should be hidden. Use this and CSS for `[hidden]` instead of
+     * an `{{if}}` if you want to animate the Popper's entry and/or exit.
+     * @argument({ defaultIfUndefined: false })
+     * @type('boolean')
+     */
+    hidden: false,
+
+    /**
+     * Modifiers that will be merged into the Popper instance's options hash.
+     * https://popper.js.org/popper-documentation.html#Popper.DEFAULTS
+     * @argument
+     * @type(optional('object'))
+     */
+    modifiers: null,
+
+    /**
+     * onCreate callback merged (if present) into the Popper instance's options hash.
+     * https://popper.js.org/popper-documentation.html#Popper.Defaults.onCreate
+     * @argument
+     * @type(optional(Function))
+     */
+    onCreate: null,
+
+    /**
+     * onUpdate callback merged (if present) into the Popper instance's options hash.
+     * https://popper.js.org/popper-documentation.html#Popper.Defaults.onUpdate
+     * @argument
+     * @type(optional(Function))
+     */
+    onUpdate: null,
+
+    /**
+     * Placement of the popper. One of ['top', 'right', 'bottom', 'left'].
+     * @argument({ defaultIfUndefined: true })
+     * @type('string')
+     */
+    placement: 'bottom',
+
+    /**
+     * The popper element needs to be moved higher in the DOM tree to avoid z-index issues.
+     * See the block-comment in the template for more details. `.ember-application` is applied
+     * to the root element of the ember app by default, so we move it up to there.
+     * @argument({ defaultIfUndefined: true })
+     * @type(Selector)
+     */
+    popperContainer: '.ember-application',
+
+    /**
+     * An optional function to be called when a new target is located.
+     * The target is passed in as an argument to the function.
+     * @argument
+     * @type(optional(Action))
+     */
+    registerAPI: null,
+
+    /**
+     * If `true`, the popper element will not be moved to popperContainer. WARNING: This can cause
+     * z-index issues where your popper will be overlapped by DOM elements that aren't nested as
+     * deeply in the DOM tree.
+     * @argument({ defaultIfUndefined: true })
+     * @type('boolean')
+     */
+    renderInPlace: false,
+
+    // ================== PRIVATE PROPERTIES ==================
+
+    /**
+     * Tracks current/previous state of `_renderInPlace`.
+     */
+    _didRenderInPlace: false,
+
+    /**
+     * Tracks current/previous value of `eventsEnabled` option
+     */
+    _eventsEnabled: null,
+
+    /**
+     * Parent of the element on didInsertElement, before it may have been moved
+     */
+    _initialParentNode: null,
+
+    /**
+     * Tracks current/previous value of `modifiers` option
+     */
+    _modifiers: null,
+
+    /**
+     * Tracks current/previous value of `onCreate` callback
+     */
+    _onCreate: null,
+
+    /**
+     * Tracks current/previous value of `onUpdate` callback
+     */
+    _onUpdate: null,
+
+    /**
+     * Tracks current/previous value of `placement` option
+     */
+    _placement: null,
+
+    /**
+     * Set in didInsertElement() once the Popper is initialized.
+     * Passed to consumers via a named yield.
+     */
+    _popper: null,
+
+    /**
+     * Tracks current/previous value of popper target
+     */
+    _popperTarget: null,
+
+    /**
+     * Public API of the popper sent to external components in `registerAPI`
+     */
+    _publicAPI: null,
+
+    /**
+     * ID for the requestAnimationFrame used for updates, used to cancel
+     * the RAF on component destruction
+     */
+    _updateRAF: null,
+
+    // ================== LIFECYCLE HOOKS ==================
+
+    didRender() {
+      this._updatePopper();
+    },
+
+    willDestroyElement() {
+      this._super(...arguments);
+      this._popper.destroy();
+      _emberRafScheduler.scheduler.forget(this._updateRAF);
+    },
+
+    update() {
+      this._popper.update();
+    },
+
+    scheduleUpdate() {
+      if (this._updateRAF !== null) {
+        return;
+      }
+
+      this._updateRAF = _emberRafScheduler.scheduler.schedule('affect', () => {
+        this._updateRAF = null;
+        this._popper.update();
+      });
+    },
+
+    enableEventListeners() {
+      this._popper.enableEventListeners();
+    },
+
+    disableEventListeners() {
+      this._popper.disableEventListeners();
+    },
+
+    /**
+     * ================== ACTIONS ==================
+     */
+
+    actions: {
+      update() {
+        this.update();
+      },
+
+      scheduleUpdate() {
+        this.scheduleUpdate();
+      },
+
+      enableEventListeners() {
+        this.enableEventListeners();
+      },
+
+      disableEventListeners() {
+        this.disableEventListeners();
+      }
+    },
+
+    // ================== PRIVATE IMPLEMENTATION DETAILS ==================
+
+    _updatePopper() {
+      if (this.isDestroying || this.isDestroyed) {
+        return;
+      }
+
+      const eventsEnabled = this.get('eventsEnabled');
+      const modifiers = this.get('modifiers');
+      const onCreate = this.get('onCreate');
+      const onUpdate = this.get('onUpdate');
+      const placement = this.get('placement');
+      const popperTarget = this._getPopperTarget();
+      const renderInPlace = this.get('_renderInPlace');
+
+      // Compare against previous values to see if anything has changed
+      const didChange = renderInPlace !== this._didRenderInPlace || popperTarget !== this._popperTarget || eventsEnabled !== this._eventsEnabled || modifiers !== this._modifiers || placement !== this._placement || onCreate !== this._onCreate || onUpdate !== this._onUpdate;
+
+      if (didChange === true) {
+        if (this._popper !== null) {
+          this._popper.destroy();
+        }
+
+        const popperElement = this._getPopperElement();
+
+        // Store current values to check against on updates
+        this._didRenderInPlace = renderInPlace;
+        this._eventsEnabled = eventsEnabled;
+        this._modifiers = modifiers;
+        this._onCreate = onCreate;
+        this._onUpdate = onUpdate;
+        this._placement = placement;
+        this._popperTarget = popperTarget;
+
+        const options = {
+          eventsEnabled,
+          modifiers,
+          placement
+        };
+
+        if (onCreate) {
+          (true && !(typeof onCreate === 'function') && Ember.assert('onCreate of ember-popper must be a function', typeof onCreate === 'function'));
+
+          options.onCreate = onCreate;
+        }
+
+        if (onUpdate) {
+          (true && !(typeof onUpdate === 'function') && Ember.assert('onUpdate of ember-popper must be a function', typeof onUpdate === 'function'));
+
+          options.onUpdate = onUpdate;
+        }
+
+        this._popper = new Popper(popperTarget, popperElement, options);
+
+        // Execute the registerAPI hook last to ensure the Popper is initialized on the target
+        if (this.get('registerAPI') !== null) {
+          /* eslint-disable ember/closure-actions */
+          this.get('registerAPI')(this._getPublicAPI());
+        }
+      }
+    },
+
+    /**
+     * Used to get the popper element
+     */
+    _getPopperElement() {
+      return self.document.getElementById(this.id);
+    },
+
+    _getPopperTarget() {
+      return this.get('popperTarget');
+    },
+
+    _getPublicAPI() {
+      if (this._publicAPI === null) {
+        // bootstrap the public API with fields that are guaranteed to be static,
+        // such as imperative actions
+        this._publicAPI = {
+          disableEventListeners: this.disableEventListeners.bind(this),
+          enableEventListeners: this.enableEventListeners.bind(this),
+          scheduleUpdate: this.scheduleUpdate.bind(this),
+          update: this.update.bind(this)
+        };
+      }
+
+      this._publicAPI.popperElement = this._getPopperElement();
+      this._publicAPI.popperTarget = this._popperTarget;
+
+      return this._publicAPI;
+    },
+
+    _popperContainer: Ember.computed('_renderInPlace', 'popperContainer', function () {
+      const renderInPlace = this.get('_renderInPlace');
+      const maybeContainer = this.get('popperContainer');
+
+      let popperContainer;
+
+      if (renderInPlace) {
+        popperContainer = this._initialParentNode;
+      } else if (maybeContainer instanceof Element) {
+        popperContainer = maybeContainer;
+      } else if (typeof maybeContainer === 'string') {
+        const selector = maybeContainer;
+        const possibleContainers = self.document.querySelectorAll(selector);
+
+        (true && !(possibleContainers.length === 1) && Ember.assert(`ember-popper with popperContainer selector "${selector}" found ` + `${possibleContainers.length} possible containers when there should be exactly 1`, possibleContainers.length === 1));
+
+
+        popperContainer = possibleContainers[0];
+      }
+
+      return popperContainer;
+    }),
+
+    _renderInPlace: Ember.computed('renderInPlace', function () {
+      // self.document is undefined in Fastboot, so we have to render in
+      // place for the popper to show up at all.
+      return self.document ? !!this.get('renderInPlace') : true;
+    })
+  });
+});
+;define('ember-popper/components/ember-popper-targeting-parent', ['exports', 'ember-popper/components/ember-popper-base', 'ember-popper/templates/components/ember-popper-targeting-parent'], function (exports, _emberPopperBase, _emberPopperTargetingParent) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _emberPopperBase.default.extend({
+    layout: _emberPopperTargetingParent.default,
+
+    // ================== LIFECYCLE HOOKS ==================
+
+    init() {
+      this.id = this.id || `${Ember.guidFor(this)}-popper`;
+      this._parentFinder = self.document ? self.document.createTextNode('') : '';
+      this._super(...arguments);
+    },
+
+    didInsertElement() {
+      this._super(...arguments);
+      this._initialParentNode = this._parentFinder.parentNode;
+    },
+
+    /**
+     * Used to get the popper target whenever updating the Popper
+     */
+    _getPopperTarget() {
+      return this._initialParentNode;
+    }
+  });
+});
+;define('ember-popper/components/ember-popper', ['exports', 'ember-popper/components/ember-popper-base'], function (exports, _emberPopperBase) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  exports.default = _emberPopperBase.default.extend({
+    /**
+     * The element the popper will target.
+     * @argument
+     * @type(Element)
+     */
+    popperTarget: null,
+
+    // ================== LIFECYCLE HOOKS ==================
+
+    init() {
+      this.id = this.id || `${Ember.guidFor(this)}-popper`;
+      this._super(...arguments);
+    }
+  });
+});
+;define("ember-popper/templates/components/ember-popper-targeting-parent", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "3Mp9Cc/E",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[1,[27,\"unbound\",[[23,[\"_parentFinder\"]]],null],false],[0,\"\\n\\n\"],[4,\"if\",[[23,[\"renderInPlace\"]]],null,{\"statements\":[[0,\"  \"],[7,\"div\"],[12,\"id\",[21,\"id\"]],[12,\"class\",[21,\"class\"]],[12,\"hidden\",[21,\"hidden\"]],[12,\"role\",[21,\"ariaRole\"]],[9],[0,\"\\n    \"],[14,1,[[27,\"hash\",null,[[\"disableEventListeners\",\"enableEventListeners\",\"scheduleUpdate\",\"update\"],[[27,\"action\",[[22,0,[]],\"disableEventListeners\"],null],[27,\"action\",[[22,0,[]],\"enableEventListeners\"],null],[27,\"action\",[[22,0,[]],\"scheduleUpdate\"],null],[27,\"action\",[[22,0,[]],\"update\"],null]]]]]],[0,\"\\n  \"],[10],[0,\"\\n\"]],\"parameters\":[]},{\"statements\":[[4,\"in-element\",[[23,[\"_popperContainer\"]]],[[\"guid\",\"nextSibling\"],[\"%cursor:0%\",null]],{\"statements\":[[0,\"  \"],[7,\"div\"],[12,\"id\",[21,\"id\"]],[12,\"class\",[21,\"class\"]],[12,\"hidden\",[21,\"hidden\"]],[12,\"role\",[21,\"ariaRole\"]],[9],[0,\"\\n    \"],[14,1,[[27,\"hash\",null,[[\"disableEventListeners\",\"enableEventListeners\",\"scheduleUpdate\",\"update\"],[[27,\"action\",[[22,0,[]],\"disableEventListeners\"],null],[27,\"action\",[[22,0,[]],\"enableEventListeners\"],null],[27,\"action\",[[22,0,[]],\"scheduleUpdate\"],null],[27,\"action\",[[22,0,[]],\"update\"],null]]]]]],[0,\"\\n  \"],[10],[0,\"\\n\"]],\"parameters\":[]},null]],\"parameters\":[]}]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-popper/templates/components/ember-popper-targeting-parent.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define("ember-popper/templates/components/ember-popper", ["exports"], function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = void 0;
+
+  var _default = Ember.HTMLBars.template({
+    "id": "cYplTmSv",
+    "block": "{\"symbols\":[\"&default\"],\"statements\":[[4,\"if\",[[23,[\"renderInPlace\"]]],null,{\"statements\":[[0,\"  \"],[7,\"div\"],[12,\"id\",[21,\"id\"]],[12,\"class\",[21,\"class\"]],[12,\"hidden\",[21,\"hidden\"]],[12,\"role\",[21,\"ariaRole\"]],[9],[0,\"\\n    \"],[14,1,[[27,\"hash\",null,[[\"disableEventListeners\",\"enableEventListeners\",\"scheduleUpdate\",\"update\"],[[27,\"action\",[[22,0,[]],\"disableEventListeners\"],null],[27,\"action\",[[22,0,[]],\"enableEventListeners\"],null],[27,\"action\",[[22,0,[]],\"scheduleUpdate\"],null],[27,\"action\",[[22,0,[]],\"update\"],null]]]]]],[0,\"\\n  \"],[10],[0,\"\\n\"]],\"parameters\":[]},{\"statements\":[[4,\"in-element\",[[23,[\"_popperContainer\"]]],[[\"guid\",\"nextSibling\"],[\"%cursor:0%\",null]],{\"statements\":[[0,\"  \"],[7,\"div\"],[12,\"id\",[21,\"id\"]],[12,\"class\",[21,\"class\"]],[12,\"hidden\",[21,\"hidden\"]],[12,\"role\",[21,\"ariaRole\"]],[9],[0,\"\\n    \"],[14,1,[[27,\"hash\",null,[[\"disableEventListeners\",\"enableEventListeners\",\"scheduleUpdate\",\"update\"],[[27,\"action\",[[22,0,[]],\"disableEventListeners\"],null],[27,\"action\",[[22,0,[]],\"enableEventListeners\"],null],[27,\"action\",[[22,0,[]],\"scheduleUpdate\"],null],[27,\"action\",[[22,0,[]],\"update\"],null]]]]]],[0,\"\\n  \"],[10],[0,\"\\n\"]],\"parameters\":[]},null]],\"parameters\":[]}]],\"hasEval\":false}",
+    "meta": {
+      "moduleName": "ember-popper/templates/components/ember-popper.hbs"
+    }
+  });
+
+  _exports.default = _default;
+});
+;define('ember-raf-scheduler/index', ['exports'], function (exports) {
+  'use strict';
+
+  Object.defineProperty(exports, "__esModule", {
+    value: true
+  });
+  class Token {
+    constructor(parent) {
+      this._parent = parent;
+      this._cancelled = false;
+
+      if (true) {
+        Object.seal(this);
+      }
+    }
+
+    get cancelled() {
+      return this._cancelled || (this._cancelled = this._parent ? this._parent.cancelled : false);
+    }
+
+    cancel() {
+      this._cancelled = true;
+    }
+  }
+
+  exports.Token = Token;
+  function job(cb, token) {
+    return function execJob() {
+      if (token.cancelled === false) {
+        cb();
+      }
+    };
+  }
+
+  class Scheduler {
+    constructor() {
+      this.sync = [];
+      this.layout = [];
+      this.measure = [];
+      this.affect = [];
+      this.jobs = 0;
+      this._nextFlush = null;
+      this.ticks = 0;
+
+      if (true) {
+        Object.seal(this);
+      }
+    }
+
+    schedule(queueName, cb, parent) {
+      (true && !(queueName in this) && Ember.assert(`Attempted to schedule to unknown queue: ${queueName}`, queueName in this));
+
+
+      this.jobs++;
+      let token = new Token(parent);
+
+      this[queueName].push(job(cb, token));
+      this._flush();
+
+      return token;
+    }
+
+    forget(token) {
+      // TODO add explicit test
+      if (token) {
+        token.cancel();
+      }
+    }
+
+    _flush() {
+      if (this._nextFlush !== null) {
+        return;
+      }
+
+      this._nextFlush = requestAnimationFrame(() => {
+        this.flush();
+      });
+    }
+
+    flush() {
+      let i, q;
+      this.jobs = 0;
+
+      if (this.sync.length > 0) {
+        Ember.run.begin();
+        q = this.sync;
+        this.sync = [];
+
+        for (i = 0; i < q.length; i++) {
+          q[i]();
+        }
+        Ember.run.end();
+      }
+
+      if (this.layout.length > 0) {
+        q = this.layout;
+        this.layout = [];
+
+        for (i = 0; i < q.length; i++) {
+          q[i]();
+        }
+      }
+
+      if (this.measure.length > 0) {
+        q = this.measure;
+        this.measure = [];
+
+        for (i = 0; i < q.length; i++) {
+          q[i]();
+        }
+      }
+
+      if (this.affect.length > 0) {
+        q = this.affect;
+        this.affect = [];
+
+        for (i = 0; i < q.length; i++) {
+          q[i]();
+        }
+      }
+
+      this._nextFlush = null;
+      if (this.jobs > 0) {
+        this._flush();
+      }
+    }
+  }
+
+  exports.Scheduler = Scheduler;
+  const scheduler = exports.scheduler = new Scheduler();
+
+  exports.default = scheduler;
 });
 ;/*
  * This is a stub file, it must be on disk b/c babel-plugin-debug-macros
@@ -84729,4 +103110,423 @@ define("ember-resolver/features", [], function () {
   _exports.default = _default;
 });
 ;
-//# sourceMappingURL=vendor.map
+;
+var __ember_auto_import__ =
+/******/ (function(modules) { // webpackBootstrap
+/******/ 	// install a JSONP callback for chunk loading
+/******/ 	function webpackJsonpCallback(data) {
+/******/ 		var chunkIds = data[0];
+/******/ 		var moreModules = data[1];
+/******/ 		var executeModules = data[2];
+/******/
+/******/ 		// add "moreModules" to the modules object,
+/******/ 		// then flag all "chunkIds" as loaded and fire callback
+/******/ 		var moduleId, chunkId, i = 0, resolves = [];
+/******/ 		for(;i < chunkIds.length; i++) {
+/******/ 			chunkId = chunkIds[i];
+/******/ 			if(installedChunks[chunkId]) {
+/******/ 				resolves.push(installedChunks[chunkId][0]);
+/******/ 			}
+/******/ 			installedChunks[chunkId] = 0;
+/******/ 		}
+/******/ 		for(moduleId in moreModules) {
+/******/ 			if(Object.prototype.hasOwnProperty.call(moreModules, moduleId)) {
+/******/ 				modules[moduleId] = moreModules[moduleId];
+/******/ 			}
+/******/ 		}
+/******/ 		if(parentJsonpFunction) parentJsonpFunction(data);
+/******/
+/******/ 		while(resolves.length) {
+/******/ 			resolves.shift()();
+/******/ 		}
+/******/
+/******/ 		// add entry modules from loaded chunk to deferred list
+/******/ 		deferredModules.push.apply(deferredModules, executeModules || []);
+/******/
+/******/ 		// run deferred modules when all chunks ready
+/******/ 		return checkDeferredModules();
+/******/ 	};
+/******/ 	function checkDeferredModules() {
+/******/ 		var result;
+/******/ 		for(var i = 0; i < deferredModules.length; i++) {
+/******/ 			var deferredModule = deferredModules[i];
+/******/ 			var fulfilled = true;
+/******/ 			for(var j = 1; j < deferredModule.length; j++) {
+/******/ 				var depId = deferredModule[j];
+/******/ 				if(installedChunks[depId] !== 0) fulfilled = false;
+/******/ 			}
+/******/ 			if(fulfilled) {
+/******/ 				deferredModules.splice(i--, 1);
+/******/ 				result = __webpack_require__(__webpack_require__.s = deferredModule[0]);
+/******/ 			}
+/******/ 		}
+/******/ 		return result;
+/******/ 	}
+/******/
+/******/ 	// The module cache
+/******/ 	var installedModules = {};
+/******/
+/******/ 	// object to store loaded and loading chunks
+/******/ 	// undefined = chunk not loaded, null = chunk preloaded/prefetched
+/******/ 	// Promise = chunk loading, 0 = chunk loaded
+/******/ 	var installedChunks = {
+/******/ 		"app": 0
+/******/ 	};
+/******/
+/******/ 	var deferredModules = [];
+/******/
+/******/ 	// The require function
+/******/ 	function __webpack_require__(moduleId) {
+/******/
+/******/ 		// Check if module is in cache
+/******/ 		if(installedModules[moduleId]) {
+/******/ 			return installedModules[moduleId].exports;
+/******/ 		}
+/******/ 		// Create a new module (and put it into the cache)
+/******/ 		var module = installedModules[moduleId] = {
+/******/ 			i: moduleId,
+/******/ 			l: false,
+/******/ 			exports: {}
+/******/ 		};
+/******/
+/******/ 		// Execute the module function
+/******/ 		modules[moduleId].call(module.exports, module, module.exports, __webpack_require__);
+/******/
+/******/ 		// Flag the module as loaded
+/******/ 		module.l = true;
+/******/
+/******/ 		// Return the exports of the module
+/******/ 		return module.exports;
+/******/ 	}
+/******/
+/******/
+/******/ 	// expose the modules object (__webpack_modules__)
+/******/ 	__webpack_require__.m = modules;
+/******/
+/******/ 	// expose the module cache
+/******/ 	__webpack_require__.c = installedModules;
+/******/
+/******/ 	// define getter function for harmony exports
+/******/ 	__webpack_require__.d = function(exports, name, getter) {
+/******/ 		if(!__webpack_require__.o(exports, name)) {
+/******/ 			Object.defineProperty(exports, name, { enumerable: true, get: getter });
+/******/ 		}
+/******/ 	};
+/******/
+/******/ 	// define __esModule on exports
+/******/ 	__webpack_require__.r = function(exports) {
+/******/ 		if(typeof Symbol !== 'undefined' && Symbol.toStringTag) {
+/******/ 			Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
+/******/ 		}
+/******/ 		Object.defineProperty(exports, '__esModule', { value: true });
+/******/ 	};
+/******/
+/******/ 	// create a fake namespace object
+/******/ 	// mode & 1: value is a module id, require it
+/******/ 	// mode & 2: merge all properties of value into the ns
+/******/ 	// mode & 4: return value when already ns object
+/******/ 	// mode & 8|1: behave like require
+/******/ 	__webpack_require__.t = function(value, mode) {
+/******/ 		if(mode & 1) value = __webpack_require__(value);
+/******/ 		if(mode & 8) return value;
+/******/ 		if((mode & 4) && typeof value === 'object' && value && value.__esModule) return value;
+/******/ 		var ns = Object.create(null);
+/******/ 		__webpack_require__.r(ns);
+/******/ 		Object.defineProperty(ns, 'default', { enumerable: true, value: value });
+/******/ 		if(mode & 2 && typeof value != 'string') for(var key in value) __webpack_require__.d(ns, key, function(key) { return value[key]; }.bind(null, key));
+/******/ 		return ns;
+/******/ 	};
+/******/
+/******/ 	// getDefaultExport function for compatibility with non-harmony modules
+/******/ 	__webpack_require__.n = function(module) {
+/******/ 		var getter = module && module.__esModule ?
+/******/ 			function getDefault() { return module['default']; } :
+/******/ 			function getModuleExports() { return module; };
+/******/ 		__webpack_require__.d(getter, 'a', getter);
+/******/ 		return getter;
+/******/ 	};
+/******/
+/******/ 	// Object.prototype.hasOwnProperty.call
+/******/ 	__webpack_require__.o = function(object, property) { return Object.prototype.hasOwnProperty.call(object, property); };
+/******/
+/******/ 	// __webpack_public_path__
+/******/ 	__webpack_require__.p = "";
+/******/
+/******/ 	var jsonpArray = window["webpackJsonp_ember_auto_import_"] = window["webpackJsonp_ember_auto_import_"] || [];
+/******/ 	var oldJsonpFunction = jsonpArray.push.bind(jsonpArray);
+/******/ 	jsonpArray.push = webpackJsonpCallback;
+/******/ 	jsonpArray = jsonpArray.slice();
+/******/ 	for(var i = 0; i < jsonpArray.length; i++) webpackJsonpCallback(jsonpArray[i]);
+/******/ 	var parentJsonpFunction = oldJsonpFunction;
+/******/
+/******/
+/******/ 	// add entry module to deferred list
+/******/ 	deferredModules.push([0,"vendors~app"]);
+/******/ 	// run deferred modules when ready
+/******/ 	return checkDeferredModules();
+/******/ })
+/************************************************************************/
+/******/ ({
+
+/***/ "../../../../../private/var/folders/tq/4wfj_vnd3l76v_3xtl18t41r0000gn/T/broccoli-28099D5Ee5mEHrp5j/cache-283-bundler/staging/app.js":
+/*!****************************************************************************************************************************!*\
+  !*** /private/var/folders/tq/4wfj_vnd3l76v_3xtl18t41r0000gn/T/broccoli-28099D5Ee5mEHrp5j/cache-283-bundler/staging/app.js ***!
+  \****************************************************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+eval("\nif (typeof document !== 'undefined') {\n  __webpack_require__.p = (function(){\n    var scripts = document.querySelectorAll('script');\n    return scripts[scripts.length - 1].src.replace(/\\/[^/]*$/, '/');\n  })();\n}\n\nmodule.exports = (function(){\n  var d = _eai_d;\n  var r = _eai_r;\n  window.emberAutoImportDynamic = function(specifier) {\n    return r('_eai_dyn_' + specifier);\n  };\n    d('@ember-intl/intl-messageformat', [], function() { return __webpack_require__(/*! ./node_modules/@ember-intl/intl-messageformat/index.js */ \"./node_modules/@ember-intl/intl-messageformat/index.js\"); });\n    d('@ember-intl/intl-relativeformat', [], function() { return __webpack_require__(/*! ./node_modules/@ember-intl/intl-relativeformat/index.js */ \"./node_modules/@ember-intl/intl-relativeformat/index.js\"); });\n    d('fast-memoize', [], function() { return __webpack_require__(/*! ./node_modules/fast-memoize/src/index.js */ \"./node_modules/fast-memoize/src/index.js\"); });\n})();\n\n\n//# sourceURL=webpack://__ember_auto_import__//private/var/folders/tq/4wfj_vnd3l76v_3xtl18t41r0000gn/T/broccoli-28099D5Ee5mEHrp5j/cache-283-bundler/staging/app.js?");
+
+/***/ }),
+
+/***/ "../../../../../private/var/folders/tq/4wfj_vnd3l76v_3xtl18t41r0000gn/T/broccoli-28099D5Ee5mEHrp5j/cache-283-bundler/staging/l.js":
+/*!**************************************************************************************************************************!*\
+  !*** /private/var/folders/tq/4wfj_vnd3l76v_3xtl18t41r0000gn/T/broccoli-28099D5Ee5mEHrp5j/cache-283-bundler/staging/l.js ***!
+  \**************************************************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+eval("\nwindow._eai_r = require;\nwindow._eai_d = define;\n\n\n//# sourceURL=webpack://__ember_auto_import__//private/var/folders/tq/4wfj_vnd3l76v_3xtl18t41r0000gn/T/broccoli-28099D5Ee5mEHrp5j/cache-283-bundler/staging/l.js?");
+
+/***/ }),
+
+/***/ 0:
+/*!*****************************************************************************************************************************************************************************************************************************************************!*\
+  !*** multi /private/var/folders/tq/4wfj_vnd3l76v_3xtl18t41r0000gn/T/broccoli-28099D5Ee5mEHrp5j/cache-283-bundler/staging/l.js /private/var/folders/tq/4wfj_vnd3l76v_3xtl18t41r0000gn/T/broccoli-28099D5Ee5mEHrp5j/cache-283-bundler/staging/app.js ***!
+  \*****************************************************************************************************************************************************************************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+eval("__webpack_require__(/*! /private/var/folders/tq/4wfj_vnd3l76v_3xtl18t41r0000gn/T/broccoli-28099D5Ee5mEHrp5j/cache-283-bundler/staging/l.js */\"../../../../../private/var/folders/tq/4wfj_vnd3l76v_3xtl18t41r0000gn/T/broccoli-28099D5Ee5mEHrp5j/cache-283-bundler/staging/l.js\");\nmodule.exports = __webpack_require__(/*! /private/var/folders/tq/4wfj_vnd3l76v_3xtl18t41r0000gn/T/broccoli-28099D5Ee5mEHrp5j/cache-283-bundler/staging/app.js */\"../../../../../private/var/folders/tq/4wfj_vnd3l76v_3xtl18t41r0000gn/T/broccoli-28099D5Ee5mEHrp5j/cache-283-bundler/staging/app.js\");\n\n\n//# sourceURL=webpack://__ember_auto_import__/multi_/private/var/folders/tq/4wfj_vnd3l76v_3xtl18t41r0000gn/T/broccoli-28099D5Ee5mEHrp5j/cache-283-bundler/staging/l.js_/private/var/folders/tq/4wfj_vnd3l76v_3xtl18t41r0000gn/T/broccoli-28099D5Ee5mEHrp5j/cache-283-bundler/staging/app.js?");
+
+/***/ }),
+
+/***/ 1:
+/*!*******************************!*\
+  !*** ./lib/locales (ignored) ***!
+  \*******************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+eval("/* (ignored) */\n\n//# sourceURL=webpack://__ember_auto_import__/./lib/locales_(ignored)?");
+
+/***/ }),
+
+/***/ 2:
+/*!*******************************!*\
+  !*** ./lib/locales (ignored) ***!
+  \*******************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+eval("/* (ignored) */\n\n//# sourceURL=webpack://__ember_auto_import__/./lib/locales_(ignored)?");
+
+/***/ })
+
+/******/ });;
+(window["webpackJsonp_ember_auto_import_"] = window["webpackJsonp_ember_auto_import_"] || []).push([["vendors~app"],{
+
+/***/ "./node_modules/@ember-intl/intl-messageformat-parser/index.js":
+/*!*********************************************************************!*\
+  !*** ./node_modules/@ember-intl/intl-messageformat-parser/index.js ***!
+  \*********************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\n\nexports = module.exports = __webpack_require__(/*! ./lib/parser */ \"./node_modules/@ember-intl/intl-messageformat-parser/lib/parser.js\")['default'];\nexports['default'] = exports;\n\n\n//# sourceURL=webpack://__ember_auto_import__/./node_modules/@ember-intl/intl-messageformat-parser/index.js?");
+
+/***/ }),
+
+/***/ "./node_modules/@ember-intl/intl-messageformat-parser/lib/parser.js":
+/*!**************************************************************************!*\
+  !*** ./node_modules/@ember-intl/intl-messageformat-parser/lib/parser.js ***!
+  \**************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("\n\nexports[\"default\"] = (function() {\n  \"use strict\";\n\n  /*\n   * Generated by PEG.js 0.9.0.\n   *\n   * http://pegjs.org/\n   */\n\n  function peg$subclass(child, parent) {\n    function ctor() { this.constructor = child; }\n    ctor.prototype = parent.prototype;\n    child.prototype = new ctor();\n  }\n\n  function peg$SyntaxError(message, expected, found, location) {\n    this.message  = message;\n    this.expected = expected;\n    this.found    = found;\n    this.location = location;\n    this.name     = \"SyntaxError\";\n\n    if (typeof Error.captureStackTrace === \"function\") {\n      Error.captureStackTrace(this, peg$SyntaxError);\n    }\n  }\n\n  peg$subclass(peg$SyntaxError, Error);\n\n  function peg$parse(input) {\n    var options = arguments.length > 1 ? arguments[1] : {},\n        parser  = this,\n\n        peg$FAILED = {},\n\n        peg$startRuleFunctions = { start: peg$parsestart },\n        peg$startRuleFunction  = peg$parsestart,\n\n        peg$c0 = function(elements) {\n                return {\n                    type    : 'messageFormatPattern',\n                    elements: elements,\n                    location: location()\n                };\n            },\n        peg$c1 = function(text) {\n                var string = '',\n                    i, j, outerLen, inner, innerLen;\n\n                for (i = 0, outerLen = text.length; i < outerLen; i += 1) {\n                    inner = text[i];\n\n                    for (j = 0, innerLen = inner.length; j < innerLen; j += 1) {\n                        string += inner[j];\n                    }\n                }\n\n                return string;\n            },\n        peg$c2 = function(messageText) {\n                return {\n                    type : 'messageTextElement',\n                    value: messageText,\n                    location: location()\n                };\n            },\n        peg$c3 = /^[^ \\t\\n\\r,.+={}#]/,\n        peg$c4 = { type: \"class\", value: \"[^ \\\\t\\\\n\\\\r,.+={}#]\", description: \"[^ \\\\t\\\\n\\\\r,.+={}#]\" },\n        peg$c5 = \"{\",\n        peg$c6 = { type: \"literal\", value: \"{\", description: \"\\\"{\\\"\" },\n        peg$c7 = \",\",\n        peg$c8 = { type: \"literal\", value: \",\", description: \"\\\",\\\"\" },\n        peg$c9 = \"}\",\n        peg$c10 = { type: \"literal\", value: \"}\", description: \"\\\"}\\\"\" },\n        peg$c11 = function(id, format) {\n                return {\n                    type  : 'argumentElement',\n                    id    : id,\n                    format: format && format[2],\n                    location: location()\n                };\n            },\n        peg$c12 = \"number\",\n        peg$c13 = { type: \"literal\", value: \"number\", description: \"\\\"number\\\"\" },\n        peg$c14 = \"date\",\n        peg$c15 = { type: \"literal\", value: \"date\", description: \"\\\"date\\\"\" },\n        peg$c16 = \"time\",\n        peg$c17 = { type: \"literal\", value: \"time\", description: \"\\\"time\\\"\" },\n        peg$c18 = \"shortNumber\",\n        peg$c19 = { type: \"literal\", value: \"shortNumber\", description: \"\\\"shortNumber\\\"\" },\n        peg$c20 = function(type, style) {\n                return {\n                    type : type + 'Format',\n                    style: style && style[2],\n                    location: location()\n                };\n            },\n        peg$c21 = \"plural\",\n        peg$c22 = { type: \"literal\", value: \"plural\", description: \"\\\"plural\\\"\" },\n        peg$c23 = function(pluralStyle) {\n                return {\n                    type   : pluralStyle.type,\n                    ordinal: false,\n                    offset : pluralStyle.offset || 0,\n                    options: pluralStyle.options,\n                    location: location()\n                };\n            },\n        peg$c24 = \"selectordinal\",\n        peg$c25 = { type: \"literal\", value: \"selectordinal\", description: \"\\\"selectordinal\\\"\" },\n        peg$c26 = function(pluralStyle) {\n                return {\n                    type   : pluralStyle.type,\n                    ordinal: true,\n                    offset : pluralStyle.offset || 0,\n                    options: pluralStyle.options,\n                    location: location()\n                }\n            },\n        peg$c27 = \"select\",\n        peg$c28 = { type: \"literal\", value: \"select\", description: \"\\\"select\\\"\" },\n        peg$c29 = function(options) {\n                return {\n                    type   : 'selectFormat',\n                    options: options,\n                    location: location()\n                };\n            },\n        peg$c30 = \"=\",\n        peg$c31 = { type: \"literal\", value: \"=\", description: \"\\\"=\\\"\" },\n        peg$c32 = function(selector, pattern) {\n                return {\n                    type    : 'optionalFormatPattern',\n                    selector: selector,\n                    value   : pattern,\n                    location: location()\n                };\n            },\n        peg$c33 = \"offset:\",\n        peg$c34 = { type: \"literal\", value: \"offset:\", description: \"\\\"offset:\\\"\" },\n        peg$c35 = function(number) {\n                return number;\n            },\n        peg$c36 = function(offset, options) {\n                return {\n                    type   : 'pluralFormat',\n                    offset : offset,\n                    options: options,\n                    location: location()\n                };\n            },\n        peg$c37 = { type: \"other\", description: \"whitespace\" },\n        peg$c38 = /^[ \\t\\n\\r]/,\n        peg$c39 = { type: \"class\", value: \"[ \\\\t\\\\n\\\\r]\", description: \"[ \\\\t\\\\n\\\\r]\" },\n        peg$c40 = { type: \"other\", description: \"optionalWhitespace\" },\n        peg$c41 = /^[0-9]/,\n        peg$c42 = { type: \"class\", value: \"[0-9]\", description: \"[0-9]\" },\n        peg$c43 = /^[0-9a-f]/i,\n        peg$c44 = { type: \"class\", value: \"[0-9a-f]i\", description: \"[0-9a-f]i\" },\n        peg$c45 = \"0\",\n        peg$c46 = { type: \"literal\", value: \"0\", description: \"\\\"0\\\"\" },\n        peg$c47 = /^[1-9]/,\n        peg$c48 = { type: \"class\", value: \"[1-9]\", description: \"[1-9]\" },\n        peg$c49 = function(digits) {\n            return parseInt(digits, 10);\n        },\n        peg$c50 = /^[^{}\\\\\\0-\\x1F \\t\\n\\r]/,\n        peg$c51 = { type: \"class\", value: \"[^{}\\\\\\\\\\\\0-\\\\x1F\\\\x7f \\\\t\\\\n\\\\r]\", description: \"[^{}\\\\\\\\\\\\0-\\\\x1F\\\\x7f \\\\t\\\\n\\\\r]\" },\n        peg$c52 = \"\\\\\\\\\",\n        peg$c53 = { type: \"literal\", value: \"\\\\\\\\\", description: \"\\\"\\\\\\\\\\\\\\\\\\\"\" },\n        peg$c54 = function() { return '\\\\'; },\n        peg$c55 = \"\\\\#\",\n        peg$c56 = { type: \"literal\", value: \"\\\\#\", description: \"\\\"\\\\\\\\#\\\"\" },\n        peg$c57 = function() { return '\\\\#'; },\n        peg$c58 = \"\\\\{\",\n        peg$c59 = { type: \"literal\", value: \"\\\\{\", description: \"\\\"\\\\\\\\{\\\"\" },\n        peg$c60 = function() { return '\\u007B'; },\n        peg$c61 = \"\\\\}\",\n        peg$c62 = { type: \"literal\", value: \"\\\\}\", description: \"\\\"\\\\\\\\}\\\"\" },\n        peg$c63 = function() { return '\\u007D'; },\n        peg$c64 = \"\\\\u\",\n        peg$c65 = { type: \"literal\", value: \"\\\\u\", description: \"\\\"\\\\\\\\u\\\"\" },\n        peg$c66 = function(digits) {\n                return String.fromCharCode(parseInt(digits, 16));\n            },\n        peg$c67 = function(chars) { return chars.join(''); },\n\n        peg$currPos          = 0,\n        peg$savedPos         = 0,\n        peg$posDetailsCache  = [{ line: 1, column: 1, seenCR: false }],\n        peg$maxFailPos       = 0,\n        peg$maxFailExpected  = [],\n        peg$silentFails      = 0,\n\n        peg$result;\n\n    if (\"startRule\" in options) {\n      if (!(options.startRule in peg$startRuleFunctions)) {\n        throw new Error(\"Can't start parsing from rule \\\"\" + options.startRule + \"\\\".\");\n      }\n\n      peg$startRuleFunction = peg$startRuleFunctions[options.startRule];\n    }\n\n    function text() {\n      return input.substring(peg$savedPos, peg$currPos);\n    }\n\n    function location() {\n      return peg$computeLocation(peg$savedPos, peg$currPos);\n    }\n\n    function expected(description) {\n      throw peg$buildException(\n        null,\n        [{ type: \"other\", description: description }],\n        input.substring(peg$savedPos, peg$currPos),\n        peg$computeLocation(peg$savedPos, peg$currPos)\n      );\n    }\n\n    function error(message) {\n      throw peg$buildException(\n        message,\n        null,\n        input.substring(peg$savedPos, peg$currPos),\n        peg$computeLocation(peg$savedPos, peg$currPos)\n      );\n    }\n\n    function peg$computePosDetails(pos) {\n      var details = peg$posDetailsCache[pos],\n          p, ch;\n\n      if (details) {\n        return details;\n      } else {\n        p = pos - 1;\n        while (!peg$posDetailsCache[p]) {\n          p--;\n        }\n\n        details = peg$posDetailsCache[p];\n        details = {\n          line:   details.line,\n          column: details.column,\n          seenCR: details.seenCR\n        };\n\n        while (p < pos) {\n          ch = input.charAt(p);\n          if (ch === \"\\n\") {\n            if (!details.seenCR) { details.line++; }\n            details.column = 1;\n            details.seenCR = false;\n          } else if (ch === \"\\r\" || ch === \"\\u2028\" || ch === \"\\u2029\") {\n            details.line++;\n            details.column = 1;\n            details.seenCR = true;\n          } else {\n            details.column++;\n            details.seenCR = false;\n          }\n\n          p++;\n        }\n\n        peg$posDetailsCache[pos] = details;\n        return details;\n      }\n    }\n\n    function peg$computeLocation(startPos, endPos) {\n      var startPosDetails = peg$computePosDetails(startPos),\n          endPosDetails   = peg$computePosDetails(endPos);\n\n      return {\n        start: {\n          offset: startPos,\n          line:   startPosDetails.line,\n          column: startPosDetails.column\n        },\n        end: {\n          offset: endPos,\n          line:   endPosDetails.line,\n          column: endPosDetails.column\n        }\n      };\n    }\n\n    function peg$fail(expected) {\n      if (peg$currPos < peg$maxFailPos) { return; }\n\n      if (peg$currPos > peg$maxFailPos) {\n        peg$maxFailPos = peg$currPos;\n        peg$maxFailExpected = [];\n      }\n\n      peg$maxFailExpected.push(expected);\n    }\n\n    function peg$buildException(message, expected, found, location) {\n      function cleanupExpected(expected) {\n        var i = 1;\n\n        expected.sort(function(a, b) {\n          if (a.description < b.description) {\n            return -1;\n          } else if (a.description > b.description) {\n            return 1;\n          } else {\n            return 0;\n          }\n        });\n\n        while (i < expected.length) {\n          if (expected[i - 1] === expected[i]) {\n            expected.splice(i, 1);\n          } else {\n            i++;\n          }\n        }\n      }\n\n      function buildMessage(expected, found) {\n        function stringEscape(s) {\n          function hex(ch) { return ch.charCodeAt(0).toString(16).toUpperCase(); }\n\n          return s\n            .replace(/\\\\/g,   '\\\\\\\\')\n            .replace(/\"/g,    '\\\\\"')\n            .replace(/\\x08/g, '\\\\b')\n            .replace(/\\t/g,   '\\\\t')\n            .replace(/\\n/g,   '\\\\n')\n            .replace(/\\f/g,   '\\\\f')\n            .replace(/\\r/g,   '\\\\r')\n            .replace(/[\\x00-\\x07\\x0B\\x0E\\x0F]/g, function(ch) { return '\\\\x0' + hex(ch); })\n            .replace(/[\\x10-\\x1F\\x80-\\xFF]/g,    function(ch) { return '\\\\x'  + hex(ch); })\n            .replace(/[\\u0100-\\u0FFF]/g,         function(ch) { return '\\\\u0' + hex(ch); })\n            .replace(/[\\u1000-\\uFFFF]/g,         function(ch) { return '\\\\u'  + hex(ch); });\n        }\n\n        var expectedDescs = new Array(expected.length),\n            expectedDesc, foundDesc, i;\n\n        for (i = 0; i < expected.length; i++) {\n          expectedDescs[i] = expected[i].description;\n        }\n\n        expectedDesc = expected.length > 1\n          ? expectedDescs.slice(0, -1).join(\", \")\n              + \" or \"\n              + expectedDescs[expected.length - 1]\n          : expectedDescs[0];\n\n        foundDesc = found ? \"\\\"\" + stringEscape(found) + \"\\\"\" : \"end of input\";\n\n        return \"Expected \" + expectedDesc + \" but \" + foundDesc + \" found.\";\n      }\n\n      if (expected !== null) {\n        cleanupExpected(expected);\n      }\n\n      return new peg$SyntaxError(\n        message !== null ? message : buildMessage(expected, found),\n        expected,\n        found,\n        location\n      );\n    }\n\n    function peg$parsestart() {\n      var s0;\n\n      s0 = peg$parsemessageFormatPattern();\n\n      return s0;\n    }\n\n    function peg$parsemessageFormatPattern() {\n      var s0, s1, s2;\n\n      s0 = peg$currPos;\n      s1 = [];\n      s2 = peg$parsemessageFormatElement();\n      while (s2 !== peg$FAILED) {\n        s1.push(s2);\n        s2 = peg$parsemessageFormatElement();\n      }\n      if (s1 !== peg$FAILED) {\n        peg$savedPos = s0;\n        s1 = peg$c0(s1);\n      }\n      s0 = s1;\n\n      return s0;\n    }\n\n    function peg$parsemessageFormatElement() {\n      var s0;\n\n      s0 = peg$parsemessageTextElement();\n      if (s0 === peg$FAILED) {\n        s0 = peg$parseargumentElement();\n      }\n\n      return s0;\n    }\n\n    function peg$parsemessageText() {\n      var s0, s1, s2, s3, s4, s5;\n\n      s0 = peg$currPos;\n      s1 = [];\n      s2 = peg$currPos;\n      s3 = peg$parse_();\n      if (s3 !== peg$FAILED) {\n        s4 = peg$parsechars();\n        if (s4 !== peg$FAILED) {\n          s5 = peg$parse_();\n          if (s5 !== peg$FAILED) {\n            s3 = [s3, s4, s5];\n            s2 = s3;\n          } else {\n            peg$currPos = s2;\n            s2 = peg$FAILED;\n          }\n        } else {\n          peg$currPos = s2;\n          s2 = peg$FAILED;\n        }\n      } else {\n        peg$currPos = s2;\n        s2 = peg$FAILED;\n      }\n      if (s2 !== peg$FAILED) {\n        while (s2 !== peg$FAILED) {\n          s1.push(s2);\n          s2 = peg$currPos;\n          s3 = peg$parse_();\n          if (s3 !== peg$FAILED) {\n            s4 = peg$parsechars();\n            if (s4 !== peg$FAILED) {\n              s5 = peg$parse_();\n              if (s5 !== peg$FAILED) {\n                s3 = [s3, s4, s5];\n                s2 = s3;\n              } else {\n                peg$currPos = s2;\n                s2 = peg$FAILED;\n              }\n            } else {\n              peg$currPos = s2;\n              s2 = peg$FAILED;\n            }\n          } else {\n            peg$currPos = s2;\n            s2 = peg$FAILED;\n          }\n        }\n      } else {\n        s1 = peg$FAILED;\n      }\n      if (s1 !== peg$FAILED) {\n        peg$savedPos = s0;\n        s1 = peg$c1(s1);\n      }\n      s0 = s1;\n      if (s0 === peg$FAILED) {\n        s0 = peg$currPos;\n        s1 = peg$parsews();\n        if (s1 !== peg$FAILED) {\n          s0 = input.substring(s0, peg$currPos);\n        } else {\n          s0 = s1;\n        }\n      }\n\n      return s0;\n    }\n\n    function peg$parsemessageTextElement() {\n      var s0, s1;\n\n      s0 = peg$currPos;\n      s1 = peg$parsemessageText();\n      if (s1 !== peg$FAILED) {\n        peg$savedPos = s0;\n        s1 = peg$c2(s1);\n      }\n      s0 = s1;\n\n      return s0;\n    }\n\n    function peg$parseargument() {\n      var s0, s1, s2;\n\n      s0 = peg$parsenumber();\n      if (s0 === peg$FAILED) {\n        s0 = peg$currPos;\n        s1 = [];\n        if (peg$c3.test(input.charAt(peg$currPos))) {\n          s2 = input.charAt(peg$currPos);\n          peg$currPos++;\n        } else {\n          s2 = peg$FAILED;\n          if (peg$silentFails === 0) { peg$fail(peg$c4); }\n        }\n        if (s2 !== peg$FAILED) {\n          while (s2 !== peg$FAILED) {\n            s1.push(s2);\n            if (peg$c3.test(input.charAt(peg$currPos))) {\n              s2 = input.charAt(peg$currPos);\n              peg$currPos++;\n            } else {\n              s2 = peg$FAILED;\n              if (peg$silentFails === 0) { peg$fail(peg$c4); }\n            }\n          }\n        } else {\n          s1 = peg$FAILED;\n        }\n        if (s1 !== peg$FAILED) {\n          s0 = input.substring(s0, peg$currPos);\n        } else {\n          s0 = s1;\n        }\n      }\n\n      return s0;\n    }\n\n    function peg$parseargumentElement() {\n      var s0, s1, s2, s3, s4, s5, s6, s7, s8;\n\n      s0 = peg$currPos;\n      if (input.charCodeAt(peg$currPos) === 123) {\n        s1 = peg$c5;\n        peg$currPos++;\n      } else {\n        s1 = peg$FAILED;\n        if (peg$silentFails === 0) { peg$fail(peg$c6); }\n      }\n      if (s1 !== peg$FAILED) {\n        s2 = peg$parse_();\n        if (s2 !== peg$FAILED) {\n          s3 = peg$parseargument();\n          if (s3 !== peg$FAILED) {\n            s4 = peg$parse_();\n            if (s4 !== peg$FAILED) {\n              s5 = peg$currPos;\n              if (input.charCodeAt(peg$currPos) === 44) {\n                s6 = peg$c7;\n                peg$currPos++;\n              } else {\n                s6 = peg$FAILED;\n                if (peg$silentFails === 0) { peg$fail(peg$c8); }\n              }\n              if (s6 !== peg$FAILED) {\n                s7 = peg$parse_();\n                if (s7 !== peg$FAILED) {\n                  s8 = peg$parseelementFormat();\n                  if (s8 !== peg$FAILED) {\n                    s6 = [s6, s7, s8];\n                    s5 = s6;\n                  } else {\n                    peg$currPos = s5;\n                    s5 = peg$FAILED;\n                  }\n                } else {\n                  peg$currPos = s5;\n                  s5 = peg$FAILED;\n                }\n              } else {\n                peg$currPos = s5;\n                s5 = peg$FAILED;\n              }\n              if (s5 === peg$FAILED) {\n                s5 = null;\n              }\n              if (s5 !== peg$FAILED) {\n                s6 = peg$parse_();\n                if (s6 !== peg$FAILED) {\n                  if (input.charCodeAt(peg$currPos) === 125) {\n                    s7 = peg$c9;\n                    peg$currPos++;\n                  } else {\n                    s7 = peg$FAILED;\n                    if (peg$silentFails === 0) { peg$fail(peg$c10); }\n                  }\n                  if (s7 !== peg$FAILED) {\n                    peg$savedPos = s0;\n                    s1 = peg$c11(s3, s5);\n                    s0 = s1;\n                  } else {\n                    peg$currPos = s0;\n                    s0 = peg$FAILED;\n                  }\n                } else {\n                  peg$currPos = s0;\n                  s0 = peg$FAILED;\n                }\n              } else {\n                peg$currPos = s0;\n                s0 = peg$FAILED;\n              }\n            } else {\n              peg$currPos = s0;\n              s0 = peg$FAILED;\n            }\n          } else {\n            peg$currPos = s0;\n            s0 = peg$FAILED;\n          }\n        } else {\n          peg$currPos = s0;\n          s0 = peg$FAILED;\n        }\n      } else {\n        peg$currPos = s0;\n        s0 = peg$FAILED;\n      }\n\n      return s0;\n    }\n\n    function peg$parseelementFormat() {\n      var s0;\n\n      s0 = peg$parsesimpleFormat();\n      if (s0 === peg$FAILED) {\n        s0 = peg$parsepluralFormat();\n        if (s0 === peg$FAILED) {\n          s0 = peg$parseselectOrdinalFormat();\n          if (s0 === peg$FAILED) {\n            s0 = peg$parseselectFormat();\n          }\n        }\n      }\n\n      return s0;\n    }\n\n    function peg$parsesimpleFormat() {\n      var s0, s1, s2, s3, s4, s5, s6;\n\n      s0 = peg$currPos;\n      if (input.substr(peg$currPos, 6) === peg$c12) {\n        s1 = peg$c12;\n        peg$currPos += 6;\n      } else {\n        s1 = peg$FAILED;\n        if (peg$silentFails === 0) { peg$fail(peg$c13); }\n      }\n      if (s1 === peg$FAILED) {\n        if (input.substr(peg$currPos, 4) === peg$c14) {\n          s1 = peg$c14;\n          peg$currPos += 4;\n        } else {\n          s1 = peg$FAILED;\n          if (peg$silentFails === 0) { peg$fail(peg$c15); }\n        }\n        if (s1 === peg$FAILED) {\n          if (input.substr(peg$currPos, 4) === peg$c16) {\n            s1 = peg$c16;\n            peg$currPos += 4;\n          } else {\n            s1 = peg$FAILED;\n            if (peg$silentFails === 0) { peg$fail(peg$c17); }\n          }\n          if (s1 === peg$FAILED) {\n            if (input.substr(peg$currPos, 11) === peg$c18) {\n              s1 = peg$c18;\n              peg$currPos += 11;\n            } else {\n              s1 = peg$FAILED;\n              if (peg$silentFails === 0) { peg$fail(peg$c19); }\n            }\n          }\n        }\n      }\n      if (s1 !== peg$FAILED) {\n        s2 = peg$parse_();\n        if (s2 !== peg$FAILED) {\n          s3 = peg$currPos;\n          if (input.charCodeAt(peg$currPos) === 44) {\n            s4 = peg$c7;\n            peg$currPos++;\n          } else {\n            s4 = peg$FAILED;\n            if (peg$silentFails === 0) { peg$fail(peg$c8); }\n          }\n          if (s4 !== peg$FAILED) {\n            s5 = peg$parse_();\n            if (s5 !== peg$FAILED) {\n              s6 = peg$parsechars();\n              if (s6 !== peg$FAILED) {\n                s4 = [s4, s5, s6];\n                s3 = s4;\n              } else {\n                peg$currPos = s3;\n                s3 = peg$FAILED;\n              }\n            } else {\n              peg$currPos = s3;\n              s3 = peg$FAILED;\n            }\n          } else {\n            peg$currPos = s3;\n            s3 = peg$FAILED;\n          }\n          if (s3 === peg$FAILED) {\n            s3 = null;\n          }\n          if (s3 !== peg$FAILED) {\n            peg$savedPos = s0;\n            s1 = peg$c20(s1, s3);\n            s0 = s1;\n          } else {\n            peg$currPos = s0;\n            s0 = peg$FAILED;\n          }\n        } else {\n          peg$currPos = s0;\n          s0 = peg$FAILED;\n        }\n      } else {\n        peg$currPos = s0;\n        s0 = peg$FAILED;\n      }\n\n      return s0;\n    }\n\n    function peg$parsepluralFormat() {\n      var s0, s1, s2, s3, s4, s5;\n\n      s0 = peg$currPos;\n      if (input.substr(peg$currPos, 6) === peg$c21) {\n        s1 = peg$c21;\n        peg$currPos += 6;\n      } else {\n        s1 = peg$FAILED;\n        if (peg$silentFails === 0) { peg$fail(peg$c22); }\n      }\n      if (s1 !== peg$FAILED) {\n        s2 = peg$parse_();\n        if (s2 !== peg$FAILED) {\n          if (input.charCodeAt(peg$currPos) === 44) {\n            s3 = peg$c7;\n            peg$currPos++;\n          } else {\n            s3 = peg$FAILED;\n            if (peg$silentFails === 0) { peg$fail(peg$c8); }\n          }\n          if (s3 !== peg$FAILED) {\n            s4 = peg$parse_();\n            if (s4 !== peg$FAILED) {\n              s5 = peg$parsepluralStyle();\n              if (s5 !== peg$FAILED) {\n                peg$savedPos = s0;\n                s1 = peg$c23(s5);\n                s0 = s1;\n              } else {\n                peg$currPos = s0;\n                s0 = peg$FAILED;\n              }\n            } else {\n              peg$currPos = s0;\n              s0 = peg$FAILED;\n            }\n          } else {\n            peg$currPos = s0;\n            s0 = peg$FAILED;\n          }\n        } else {\n          peg$currPos = s0;\n          s0 = peg$FAILED;\n        }\n      } else {\n        peg$currPos = s0;\n        s0 = peg$FAILED;\n      }\n\n      return s0;\n    }\n\n    function peg$parseselectOrdinalFormat() {\n      var s0, s1, s2, s3, s4, s5;\n\n      s0 = peg$currPos;\n      if (input.substr(peg$currPos, 13) === peg$c24) {\n        s1 = peg$c24;\n        peg$currPos += 13;\n      } else {\n        s1 = peg$FAILED;\n        if (peg$silentFails === 0) { peg$fail(peg$c25); }\n      }\n      if (s1 !== peg$FAILED) {\n        s2 = peg$parse_();\n        if (s2 !== peg$FAILED) {\n          if (input.charCodeAt(peg$currPos) === 44) {\n            s3 = peg$c7;\n            peg$currPos++;\n          } else {\n            s3 = peg$FAILED;\n            if (peg$silentFails === 0) { peg$fail(peg$c8); }\n          }\n          if (s3 !== peg$FAILED) {\n            s4 = peg$parse_();\n            if (s4 !== peg$FAILED) {\n              s5 = peg$parsepluralStyle();\n              if (s5 !== peg$FAILED) {\n                peg$savedPos = s0;\n                s1 = peg$c26(s5);\n                s0 = s1;\n              } else {\n                peg$currPos = s0;\n                s0 = peg$FAILED;\n              }\n            } else {\n              peg$currPos = s0;\n              s0 = peg$FAILED;\n            }\n          } else {\n            peg$currPos = s0;\n            s0 = peg$FAILED;\n          }\n        } else {\n          peg$currPos = s0;\n          s0 = peg$FAILED;\n        }\n      } else {\n        peg$currPos = s0;\n        s0 = peg$FAILED;\n      }\n\n      return s0;\n    }\n\n    function peg$parseselectFormat() {\n      var s0, s1, s2, s3, s4, s5, s6;\n\n      s0 = peg$currPos;\n      if (input.substr(peg$currPos, 6) === peg$c27) {\n        s1 = peg$c27;\n        peg$currPos += 6;\n      } else {\n        s1 = peg$FAILED;\n        if (peg$silentFails === 0) { peg$fail(peg$c28); }\n      }\n      if (s1 !== peg$FAILED) {\n        s2 = peg$parse_();\n        if (s2 !== peg$FAILED) {\n          if (input.charCodeAt(peg$currPos) === 44) {\n            s3 = peg$c7;\n            peg$currPos++;\n          } else {\n            s3 = peg$FAILED;\n            if (peg$silentFails === 0) { peg$fail(peg$c8); }\n          }\n          if (s3 !== peg$FAILED) {\n            s4 = peg$parse_();\n            if (s4 !== peg$FAILED) {\n              s5 = [];\n              s6 = peg$parseoptionalFormatPattern();\n              if (s6 !== peg$FAILED) {\n                while (s6 !== peg$FAILED) {\n                  s5.push(s6);\n                  s6 = peg$parseoptionalFormatPattern();\n                }\n              } else {\n                s5 = peg$FAILED;\n              }\n              if (s5 !== peg$FAILED) {\n                peg$savedPos = s0;\n                s1 = peg$c29(s5);\n                s0 = s1;\n              } else {\n                peg$currPos = s0;\n                s0 = peg$FAILED;\n              }\n            } else {\n              peg$currPos = s0;\n              s0 = peg$FAILED;\n            }\n          } else {\n            peg$currPos = s0;\n            s0 = peg$FAILED;\n          }\n        } else {\n          peg$currPos = s0;\n          s0 = peg$FAILED;\n        }\n      } else {\n        peg$currPos = s0;\n        s0 = peg$FAILED;\n      }\n\n      return s0;\n    }\n\n    function peg$parseselector() {\n      var s0, s1, s2, s3;\n\n      s0 = peg$currPos;\n      s1 = peg$currPos;\n      if (input.charCodeAt(peg$currPos) === 61) {\n        s2 = peg$c30;\n        peg$currPos++;\n      } else {\n        s2 = peg$FAILED;\n        if (peg$silentFails === 0) { peg$fail(peg$c31); }\n      }\n      if (s2 !== peg$FAILED) {\n        s3 = peg$parsenumber();\n        if (s3 !== peg$FAILED) {\n          s2 = [s2, s3];\n          s1 = s2;\n        } else {\n          peg$currPos = s1;\n          s1 = peg$FAILED;\n        }\n      } else {\n        peg$currPos = s1;\n        s1 = peg$FAILED;\n      }\n      if (s1 !== peg$FAILED) {\n        s0 = input.substring(s0, peg$currPos);\n      } else {\n        s0 = s1;\n      }\n      if (s0 === peg$FAILED) {\n        s0 = peg$parsechars();\n      }\n\n      return s0;\n    }\n\n    function peg$parseoptionalFormatPattern() {\n      var s0, s1, s2, s3, s4, s5, s6, s7, s8;\n\n      s0 = peg$currPos;\n      s1 = peg$parse_();\n      if (s1 !== peg$FAILED) {\n        s2 = peg$parseselector();\n        if (s2 !== peg$FAILED) {\n          s3 = peg$parse_();\n          if (s3 !== peg$FAILED) {\n            if (input.charCodeAt(peg$currPos) === 123) {\n              s4 = peg$c5;\n              peg$currPos++;\n            } else {\n              s4 = peg$FAILED;\n              if (peg$silentFails === 0) { peg$fail(peg$c6); }\n            }\n            if (s4 !== peg$FAILED) {\n              s5 = peg$parse_();\n              if (s5 !== peg$FAILED) {\n                s6 = peg$parsemessageFormatPattern();\n                if (s6 !== peg$FAILED) {\n                  s7 = peg$parse_();\n                  if (s7 !== peg$FAILED) {\n                    if (input.charCodeAt(peg$currPos) === 125) {\n                      s8 = peg$c9;\n                      peg$currPos++;\n                    } else {\n                      s8 = peg$FAILED;\n                      if (peg$silentFails === 0) { peg$fail(peg$c10); }\n                    }\n                    if (s8 !== peg$FAILED) {\n                      peg$savedPos = s0;\n                      s1 = peg$c32(s2, s6);\n                      s0 = s1;\n                    } else {\n                      peg$currPos = s0;\n                      s0 = peg$FAILED;\n                    }\n                  } else {\n                    peg$currPos = s0;\n                    s0 = peg$FAILED;\n                  }\n                } else {\n                  peg$currPos = s0;\n                  s0 = peg$FAILED;\n                }\n              } else {\n                peg$currPos = s0;\n                s0 = peg$FAILED;\n              }\n            } else {\n              peg$currPos = s0;\n              s0 = peg$FAILED;\n            }\n          } else {\n            peg$currPos = s0;\n            s0 = peg$FAILED;\n          }\n        } else {\n          peg$currPos = s0;\n          s0 = peg$FAILED;\n        }\n      } else {\n        peg$currPos = s0;\n        s0 = peg$FAILED;\n      }\n\n      return s0;\n    }\n\n    function peg$parseoffset() {\n      var s0, s1, s2, s3;\n\n      s0 = peg$currPos;\n      if (input.substr(peg$currPos, 7) === peg$c33) {\n        s1 = peg$c33;\n        peg$currPos += 7;\n      } else {\n        s1 = peg$FAILED;\n        if (peg$silentFails === 0) { peg$fail(peg$c34); }\n      }\n      if (s1 !== peg$FAILED) {\n        s2 = peg$parse_();\n        if (s2 !== peg$FAILED) {\n          s3 = peg$parsenumber();\n          if (s3 !== peg$FAILED) {\n            peg$savedPos = s0;\n            s1 = peg$c35(s3);\n            s0 = s1;\n          } else {\n            peg$currPos = s0;\n            s0 = peg$FAILED;\n          }\n        } else {\n          peg$currPos = s0;\n          s0 = peg$FAILED;\n        }\n      } else {\n        peg$currPos = s0;\n        s0 = peg$FAILED;\n      }\n\n      return s0;\n    }\n\n    function peg$parsepluralStyle() {\n      var s0, s1, s2, s3, s4;\n\n      s0 = peg$currPos;\n      s1 = peg$parseoffset();\n      if (s1 === peg$FAILED) {\n        s1 = null;\n      }\n      if (s1 !== peg$FAILED) {\n        s2 = peg$parse_();\n        if (s2 !== peg$FAILED) {\n          s3 = [];\n          s4 = peg$parseoptionalFormatPattern();\n          if (s4 !== peg$FAILED) {\n            while (s4 !== peg$FAILED) {\n              s3.push(s4);\n              s4 = peg$parseoptionalFormatPattern();\n            }\n          } else {\n            s3 = peg$FAILED;\n          }\n          if (s3 !== peg$FAILED) {\n            peg$savedPos = s0;\n            s1 = peg$c36(s1, s3);\n            s0 = s1;\n          } else {\n            peg$currPos = s0;\n            s0 = peg$FAILED;\n          }\n        } else {\n          peg$currPos = s0;\n          s0 = peg$FAILED;\n        }\n      } else {\n        peg$currPos = s0;\n        s0 = peg$FAILED;\n      }\n\n      return s0;\n    }\n\n    function peg$parsews() {\n      var s0, s1;\n\n      peg$silentFails++;\n      s0 = [];\n      if (peg$c38.test(input.charAt(peg$currPos))) {\n        s1 = input.charAt(peg$currPos);\n        peg$currPos++;\n      } else {\n        s1 = peg$FAILED;\n        if (peg$silentFails === 0) { peg$fail(peg$c39); }\n      }\n      if (s1 !== peg$FAILED) {\n        while (s1 !== peg$FAILED) {\n          s0.push(s1);\n          if (peg$c38.test(input.charAt(peg$currPos))) {\n            s1 = input.charAt(peg$currPos);\n            peg$currPos++;\n          } else {\n            s1 = peg$FAILED;\n            if (peg$silentFails === 0) { peg$fail(peg$c39); }\n          }\n        }\n      } else {\n        s0 = peg$FAILED;\n      }\n      peg$silentFails--;\n      if (s0 === peg$FAILED) {\n        s1 = peg$FAILED;\n        if (peg$silentFails === 0) { peg$fail(peg$c37); }\n      }\n\n      return s0;\n    }\n\n    function peg$parse_() {\n      var s0, s1, s2;\n\n      peg$silentFails++;\n      s0 = peg$currPos;\n      s1 = [];\n      s2 = peg$parsews();\n      while (s2 !== peg$FAILED) {\n        s1.push(s2);\n        s2 = peg$parsews();\n      }\n      if (s1 !== peg$FAILED) {\n        s0 = input.substring(s0, peg$currPos);\n      } else {\n        s0 = s1;\n      }\n      peg$silentFails--;\n      if (s0 === peg$FAILED) {\n        s1 = peg$FAILED;\n        if (peg$silentFails === 0) { peg$fail(peg$c40); }\n      }\n\n      return s0;\n    }\n\n    function peg$parsedigit() {\n      var s0;\n\n      if (peg$c41.test(input.charAt(peg$currPos))) {\n        s0 = input.charAt(peg$currPos);\n        peg$currPos++;\n      } else {\n        s0 = peg$FAILED;\n        if (peg$silentFails === 0) { peg$fail(peg$c42); }\n      }\n\n      return s0;\n    }\n\n    function peg$parsehexDigit() {\n      var s0;\n\n      if (peg$c43.test(input.charAt(peg$currPos))) {\n        s0 = input.charAt(peg$currPos);\n        peg$currPos++;\n      } else {\n        s0 = peg$FAILED;\n        if (peg$silentFails === 0) { peg$fail(peg$c44); }\n      }\n\n      return s0;\n    }\n\n    function peg$parsenumber() {\n      var s0, s1, s2, s3, s4, s5;\n\n      s0 = peg$currPos;\n      if (input.charCodeAt(peg$currPos) === 48) {\n        s1 = peg$c45;\n        peg$currPos++;\n      } else {\n        s1 = peg$FAILED;\n        if (peg$silentFails === 0) { peg$fail(peg$c46); }\n      }\n      if (s1 === peg$FAILED) {\n        s1 = peg$currPos;\n        s2 = peg$currPos;\n        if (peg$c47.test(input.charAt(peg$currPos))) {\n          s3 = input.charAt(peg$currPos);\n          peg$currPos++;\n        } else {\n          s3 = peg$FAILED;\n          if (peg$silentFails === 0) { peg$fail(peg$c48); }\n        }\n        if (s3 !== peg$FAILED) {\n          s4 = [];\n          s5 = peg$parsedigit();\n          while (s5 !== peg$FAILED) {\n            s4.push(s5);\n            s5 = peg$parsedigit();\n          }\n          if (s4 !== peg$FAILED) {\n            s3 = [s3, s4];\n            s2 = s3;\n          } else {\n            peg$currPos = s2;\n            s2 = peg$FAILED;\n          }\n        } else {\n          peg$currPos = s2;\n          s2 = peg$FAILED;\n        }\n        if (s2 !== peg$FAILED) {\n          s1 = input.substring(s1, peg$currPos);\n        } else {\n          s1 = s2;\n        }\n      }\n      if (s1 !== peg$FAILED) {\n        peg$savedPos = s0;\n        s1 = peg$c49(s1);\n      }\n      s0 = s1;\n\n      return s0;\n    }\n\n    function peg$parsechar() {\n      var s0, s1, s2, s3, s4, s5, s6, s7;\n\n      if (peg$c50.test(input.charAt(peg$currPos))) {\n        s0 = input.charAt(peg$currPos);\n        peg$currPos++;\n      } else {\n        s0 = peg$FAILED;\n        if (peg$silentFails === 0) { peg$fail(peg$c51); }\n      }\n      if (s0 === peg$FAILED) {\n        s0 = peg$currPos;\n        if (input.substr(peg$currPos, 2) === peg$c52) {\n          s1 = peg$c52;\n          peg$currPos += 2;\n        } else {\n          s1 = peg$FAILED;\n          if (peg$silentFails === 0) { peg$fail(peg$c53); }\n        }\n        if (s1 !== peg$FAILED) {\n          peg$savedPos = s0;\n          s1 = peg$c54();\n        }\n        s0 = s1;\n        if (s0 === peg$FAILED) {\n          s0 = peg$currPos;\n          if (input.substr(peg$currPos, 2) === peg$c55) {\n            s1 = peg$c55;\n            peg$currPos += 2;\n          } else {\n            s1 = peg$FAILED;\n            if (peg$silentFails === 0) { peg$fail(peg$c56); }\n          }\n          if (s1 !== peg$FAILED) {\n            peg$savedPos = s0;\n            s1 = peg$c57();\n          }\n          s0 = s1;\n          if (s0 === peg$FAILED) {\n            s0 = peg$currPos;\n            if (input.substr(peg$currPos, 2) === peg$c58) {\n              s1 = peg$c58;\n              peg$currPos += 2;\n            } else {\n              s1 = peg$FAILED;\n              if (peg$silentFails === 0) { peg$fail(peg$c59); }\n            }\n            if (s1 !== peg$FAILED) {\n              peg$savedPos = s0;\n              s1 = peg$c60();\n            }\n            s0 = s1;\n            if (s0 === peg$FAILED) {\n              s0 = peg$currPos;\n              if (input.substr(peg$currPos, 2) === peg$c61) {\n                s1 = peg$c61;\n                peg$currPos += 2;\n              } else {\n                s1 = peg$FAILED;\n                if (peg$silentFails === 0) { peg$fail(peg$c62); }\n              }\n              if (s1 !== peg$FAILED) {\n                peg$savedPos = s0;\n                s1 = peg$c63();\n              }\n              s0 = s1;\n              if (s0 === peg$FAILED) {\n                s0 = peg$currPos;\n                if (input.substr(peg$currPos, 2) === peg$c64) {\n                  s1 = peg$c64;\n                  peg$currPos += 2;\n                } else {\n                  s1 = peg$FAILED;\n                  if (peg$silentFails === 0) { peg$fail(peg$c65); }\n                }\n                if (s1 !== peg$FAILED) {\n                  s2 = peg$currPos;\n                  s3 = peg$currPos;\n                  s4 = peg$parsehexDigit();\n                  if (s4 !== peg$FAILED) {\n                    s5 = peg$parsehexDigit();\n                    if (s5 !== peg$FAILED) {\n                      s6 = peg$parsehexDigit();\n                      if (s6 !== peg$FAILED) {\n                        s7 = peg$parsehexDigit();\n                        if (s7 !== peg$FAILED) {\n                          s4 = [s4, s5, s6, s7];\n                          s3 = s4;\n                        } else {\n                          peg$currPos = s3;\n                          s3 = peg$FAILED;\n                        }\n                      } else {\n                        peg$currPos = s3;\n                        s3 = peg$FAILED;\n                      }\n                    } else {\n                      peg$currPos = s3;\n                      s3 = peg$FAILED;\n                    }\n                  } else {\n                    peg$currPos = s3;\n                    s3 = peg$FAILED;\n                  }\n                  if (s3 !== peg$FAILED) {\n                    s2 = input.substring(s2, peg$currPos);\n                  } else {\n                    s2 = s3;\n                  }\n                  if (s2 !== peg$FAILED) {\n                    peg$savedPos = s0;\n                    s1 = peg$c66(s2);\n                    s0 = s1;\n                  } else {\n                    peg$currPos = s0;\n                    s0 = peg$FAILED;\n                  }\n                } else {\n                  peg$currPos = s0;\n                  s0 = peg$FAILED;\n                }\n              }\n            }\n          }\n        }\n      }\n\n      return s0;\n    }\n\n    function peg$parsechars() {\n      var s0, s1, s2;\n\n      s0 = peg$currPos;\n      s1 = [];\n      s2 = peg$parsechar();\n      if (s2 !== peg$FAILED) {\n        while (s2 !== peg$FAILED) {\n          s1.push(s2);\n          s2 = peg$parsechar();\n        }\n      } else {\n        s1 = peg$FAILED;\n      }\n      if (s1 !== peg$FAILED) {\n        peg$savedPos = s0;\n        s1 = peg$c67(s1);\n      }\n      s0 = s1;\n\n      return s0;\n    }\n\n    peg$result = peg$startRuleFunction();\n\n    if (peg$result !== peg$FAILED && peg$currPos === input.length) {\n      return peg$result;\n    } else {\n      if (peg$result !== peg$FAILED && peg$currPos < input.length) {\n        peg$fail({ type: \"end\", description: \"end of input\" });\n      }\n\n      throw peg$buildException(\n        null,\n        peg$maxFailExpected,\n        peg$maxFailPos < input.length ? input.charAt(peg$maxFailPos) : null,\n        peg$maxFailPos < input.length\n          ? peg$computeLocation(peg$maxFailPos, peg$maxFailPos + 1)\n          : peg$computeLocation(peg$maxFailPos, peg$maxFailPos)\n      );\n    }\n  }\n\n  return {\n    SyntaxError: peg$SyntaxError,\n    parse:       peg$parse\n  };\n})();\n\n//# sourceMappingURL=parser.js.map\n\n//# sourceURL=webpack://__ember_auto_import__/./node_modules/@ember-intl/intl-messageformat-parser/lib/parser.js?");
+
+/***/ }),
+
+/***/ "./node_modules/@ember-intl/intl-messageformat/index.js":
+/*!**************************************************************!*\
+  !*** ./node_modules/@ember-intl/intl-messageformat/index.js ***!
+  \**************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("/* jshint node:true */\n\n\n\nvar IntlMessageFormat = __webpack_require__(/*! ./lib/main */ \"./node_modules/@ember-intl/intl-messageformat/lib/main.js\")['default'];\n\n// Add all locale data to `IntlMessageFormat`. This module will be ignored when\n// bundling for the browser with Browserify/Webpack.\n__webpack_require__(/*! ./lib/locales */ 1);\n\n// Re-export `IntlMessageFormat` as the CommonJS default exports with all the\n// locale data registered, and with English set as the default locale. Define\n// the `default` prop for use with other compiled ES6 Modules.\nexports = module.exports = IntlMessageFormat;\nexports['default'] = exports;\n\n\n//# sourceURL=webpack://__ember_auto_import__/./node_modules/@ember-intl/intl-messageformat/index.js?");
+
+/***/ }),
+
+/***/ "./node_modules/@ember-intl/intl-messageformat/lib/compiler.js":
+/*!*********************************************************************!*\
+  !*** ./node_modules/@ember-intl/intl-messageformat/lib/compiler.js ***!
+  \*********************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("/*\nCopyright (c) 2014, Yahoo! Inc. All rights reserved.\nCopyrights licensed under the New BSD License.\nSee the accompanying LICENSE file for terms.\n*/\n\n/* jslint esnext: true */\n\n\nvar src$core$$ = __webpack_require__(/*! ./core */ \"./node_modules/@ember-intl/intl-messageformat/lib/core.js\"), cldr$compact$number$$ = __webpack_require__(/*! cldr-compact-number */ \"./node_modules/cldr-compact-number/dist/cldr-compact-number.es5.js\");\nexports[\"default\"] = Compiler;\n\nfunction Compiler(locales, formats, pluralFn) {\n    this.locales  = locales;\n    this.formats  = formats;\n    this.pluralFn = pluralFn;\n}\n\nCompiler.prototype.compile = function (ast) {\n    this.pluralStack        = [];\n    this.currentPlural      = null;\n    this.pluralNumberFormat = null;\n\n    return this.compileMessage(ast);\n};\n\nCompiler.prototype.compileMessage = function (ast) {\n    if (!(ast && ast.type === 'messageFormatPattern')) {\n        throw new Error('Message AST is not of type: \"messageFormatPattern\"');\n    }\n\n    var elements = ast.elements,\n        pattern  = [];\n\n    var i, len, element;\n\n    for (i = 0, len = elements.length; i < len; i += 1) {\n        element = elements[i];\n\n        switch (element.type) {\n            case 'messageTextElement':\n                pattern.push(this.compileMessageText(element));\n                break;\n\n            case 'argumentElement':\n                pattern.push(this.compileArgument(element));\n                break;\n\n            default:\n                throw new Error('Message element does not have a valid type');\n        }\n    }\n\n    return pattern;\n};\n\nCompiler.prototype.compileMessageText = function (element) {\n    // When this `element` is part of plural sub-pattern and its value contains\n    // an unescaped '#', use a `PluralOffsetString` helper to properly output\n    // the number with the correct offset in the string.\n    if (this.currentPlural && /(^|[^\\\\])#/g.test(element.value)) {\n        // Create a cache a NumberFormat instance that can be reused for any\n        // PluralOffsetString instance in this message.\n        if (!this.pluralNumberFormat) {\n            this.pluralNumberFormat = new Intl.NumberFormat(this.locales);\n        }\n\n        return new PluralOffsetString(\n                this.currentPlural.id,\n                this.currentPlural.format.offset,\n                this.pluralNumberFormat,\n                element.value);\n    }\n\n    // Unescape the escaped '#'s in the message text.\n    return element.value.replace(/\\\\#/g, '#');\n};\n\nCompiler.prototype.compileArgument = function (element) {\n    var format = element.format;\n\n    if (!format) {\n        return new StringFormat(element.id);\n    }\n\n    var formats  = this.formats,\n        locales  = this.locales,\n        pluralFn = this.pluralFn,\n        options;\n\n    switch (format.type) {\n        case 'numberFormat':\n            options = formats.number[format.style];\n            return {\n                id    : element.id,\n                format: new Intl.NumberFormat(locales, options).format\n            };\n\n        case 'shortNumberFormat':\n            options = formats.shortNumber[format.style];\n            var shortNumberInstance = new ShortNumberFormat(locales, options);\n            return {\n                id    : element.id,\n                format: shortNumberInstance.format.bind(shortNumberInstance)\n            };\n\n        case 'dateFormat':\n            options = formats.date[format.style];\n            return {\n                id    : element.id,\n                format: new Intl.DateTimeFormat(locales, options).format\n            };\n\n        case 'timeFormat':\n            options = formats.time[format.style];\n            return {\n                id    : element.id,\n                format: new Intl.DateTimeFormat(locales, options).format\n            };\n\n        case 'pluralFormat':\n            options = this.compileOptions(element);\n            return new PluralFormat(\n                element.id, format.ordinal, format.offset, options, pluralFn\n            );\n\n        case 'selectFormat':\n            options = this.compileOptions(element);\n            return new SelectFormat(element.id, options);\n\n        default:\n            throw new Error('Message element does not have a valid format type');\n    }\n};\n\nCompiler.prototype.compileOptions = function (element) {\n    var format      = element.format,\n        options     = format.options,\n        optionsHash = {};\n\n    // Save the current plural element, if any, then set it to a new value when\n    // compiling the options sub-patterns. This conforms the spec's algorithm\n    // for handling `\"#\"` syntax in message text.\n    this.pluralStack.push(this.currentPlural);\n    this.currentPlural = format.type === 'pluralFormat' ? element : null;\n\n    var i, len, option;\n\n    for (i = 0, len = options.length; i < len; i += 1) {\n        option = options[i];\n\n        // Compile the sub-pattern and save it under the options's selector.\n        optionsHash[option.selector] = this.compileMessage(option.value);\n    }\n\n    // Pop the plural stack to put back the original current plural value.\n    this.currentPlural = this.pluralStack.pop();\n\n    return optionsHash;\n};\n\n// -- Compiler Helper Classes --------------------------------------------------\n\nfunction StringFormat(id) {\n    this.id = id;\n}\n\nStringFormat.prototype.format = function (value) {\n    if (!value && typeof value !== 'number') {\n        return '';\n    }\n\n    return typeof value === 'string' ? value : String(value);\n};\n\nfunction PluralFormat(id, useOrdinal, offset, options, pluralFn) {\n    this.id         = id;\n    this.useOrdinal = useOrdinal;\n    this.offset     = offset;\n    this.options    = options;\n    this.pluralFn   = pluralFn;\n}\n\nPluralFormat.prototype.getOption = function (value) {\n    var options = this.options;\n\n    var option = options['=' + value] ||\n            options[this.pluralFn(value - this.offset, this.useOrdinal)];\n\n    return option || options.other;\n};\n\nfunction PluralOffsetString(id, offset, numberFormat, string) {\n    this.id           = id;\n    this.offset       = offset;\n    this.numberFormat = numberFormat;\n    this.string       = string;\n}\n\nPluralOffsetString.prototype.format = function (value) {\n    var number = this.numberFormat.format(value - this.offset);\n\n    return this.string\n            .replace(/(^|[^\\\\])#/g, '$1' + number)\n            .replace(/\\\\#/g, '#');\n};\n\nfunction SelectFormat(id, options) {\n    this.id      = id;\n    this.options = options;\n}\n\nSelectFormat.prototype.getOption = function (value) {\n    var options = this.options;\n    return options[value] || options.other;\n};\n\nfunction ShortNumberFormat(locales, options) {\n    this.__locales__    = locales;\n    this.__options__    = options;\n    this.__localeData__ = src$core$$[\"default\"].__localeData__;\n}\n\nShortNumberFormat.prototype.format = function (value, locale) {\n  return cldr$compact$number$$.compactFormat(value, this.__locales__, this.__localeData__, this.__options__);\n};\n\n//# sourceMappingURL=compiler.js.map\n\n//# sourceURL=webpack://__ember_auto_import__/./node_modules/@ember-intl/intl-messageformat/lib/compiler.js?");
+
+/***/ }),
+
+/***/ "./node_modules/@ember-intl/intl-messageformat/lib/core.js":
+/*!*****************************************************************!*\
+  !*** ./node_modules/@ember-intl/intl-messageformat/lib/core.js ***!
+  \*****************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("/*\nCopyright (c) 2014, Yahoo! Inc. All rights reserved.\nCopyrights licensed under the New BSD License.\nSee the accompanying LICENSE file for terms.\n*/\n\n/* jslint esnext: true */\n\n\nvar src$utils$$ = __webpack_require__(/*! ./utils */ \"./node_modules/@ember-intl/intl-messageformat/lib/utils.js\"), src$es5$$ = __webpack_require__(/*! ./es5 */ \"./node_modules/@ember-intl/intl-messageformat/lib/es5.js\"), src$compiler$$ = __webpack_require__(/*! ./compiler */ \"./node_modules/@ember-intl/intl-messageformat/lib/compiler.js\"), $ember$intl$intl$messageformat$parser$$ = __webpack_require__(/*! @ember-intl/intl-messageformat-parser */ \"./node_modules/@ember-intl/intl-messageformat-parser/index.js\");\nexports[\"default\"] = MessageFormat;\n\n// -- MessageFormat --------------------------------------------------------\n\nfunction MessageFormat(message, locales, formats) {\n    // Parse string messages into an AST.\n    var ast = typeof message === 'string' ?\n            MessageFormat.__parse(message) : message;\n\n    if (!(ast && ast.type === 'messageFormatPattern')) {\n        throw new TypeError('A message must be provided as a String or AST.');\n    }\n\n    // Creates a new object with the specified `formats` merged with the default\n    // formats.\n    formats = this._mergeFormats(MessageFormat.formats, formats);\n\n    // Defined first because it's used to build the format pattern.\n    src$es5$$.defineProperty(this, '_locale',  {value: this._resolveLocale(locales)});\n\n    // Compile the `ast` to a pattern that is highly optimized for repeated\n    // `format()` invocations. **Note:** This passes the `locales` set provided\n    // to the constructor instead of just the resolved locale.\n    var pluralFn = this._findPluralRuleFunction(this._locale);\n    var pattern  = this._compilePattern(ast, locales, formats, pluralFn);\n\n    // \"Bind\" `format()` method to `this` so it can be passed by reference like\n    // the other `Intl` APIs.\n    var messageFormat = this;\n    this.format = function (values) {\n      try {\n        return messageFormat._format(pattern, values);\n      } catch (e) {\n        if (e.variableId) {\n          throw new Error(\n            'The intl string context variable \\'' + e.variableId + '\\'' +\n            ' was not provided to the string \\'' + message + '\\''\n          );\n        } else {\n          throw e;\n        }\n      }\n    };\n}\n\n// Default format options used as the prototype of the `formats` provided to the\n// constructor. These are used when constructing the internal Intl.NumberFormat\n// and Intl.DateTimeFormat instances.\nsrc$es5$$.defineProperty(MessageFormat, 'formats', {\n    enumerable: true,\n\n    value: {\n        number: {\n            'currency': {\n                style: 'currency'\n            },\n\n            'percent': {\n                style: 'percent'\n            }\n        },\n\n        shortNumber: {},\n\n        date: {\n            'short': {\n                month: 'numeric',\n                day  : 'numeric',\n                year : '2-digit'\n            },\n\n            'medium': {\n                month: 'short',\n                day  : 'numeric',\n                year : 'numeric'\n            },\n\n            'long': {\n                month: 'long',\n                day  : 'numeric',\n                year : 'numeric'\n            },\n\n            'full': {\n                weekday: 'long',\n                month  : 'long',\n                day    : 'numeric',\n                year   : 'numeric'\n            }\n        },\n\n        time: {\n            'short': {\n                hour  : 'numeric',\n                minute: 'numeric'\n            },\n\n            'medium':  {\n                hour  : 'numeric',\n                minute: 'numeric',\n                second: 'numeric'\n            },\n\n            'long': {\n                hour        : 'numeric',\n                minute      : 'numeric',\n                second      : 'numeric',\n                timeZoneName: 'short'\n            },\n\n            'full': {\n                hour        : 'numeric',\n                minute      : 'numeric',\n                second      : 'numeric',\n                timeZoneName: 'short'\n            }\n        }\n    }\n});\n\n// Define internal private properties for dealing with locale data.\nsrc$es5$$.defineProperty(MessageFormat, '__localeData__', {value: src$es5$$.objCreate(null)});\nsrc$es5$$.defineProperty(MessageFormat, '__addLocaleData', {value: function (data) {\n    if (!(data && data.locale)) {\n        throw new Error(\n            'Locale data provided to IntlMessageFormat is missing a ' +\n            '`locale` property'\n        );\n    }\n\n    MessageFormat.__localeData__[data.locale.toLowerCase()] = data;\n}});\n\n// Defines `__parse()` static method as an exposed private.\nsrc$es5$$.defineProperty(MessageFormat, '__parse', {value: $ember$intl$intl$messageformat$parser$$[\"default\"].parse});\n\n// Define public `defaultLocale` property which defaults to English, but can be\n// set by the developer.\nsrc$es5$$.defineProperty(MessageFormat, 'defaultLocale', {\n    enumerable: true,\n    writable  : true,\n    value     : undefined\n});\n\nMessageFormat.prototype.resolvedOptions = function () {\n    // TODO: Provide anything else?\n    return {\n        locale: this._locale\n    };\n};\n\nMessageFormat.prototype._compilePattern = function (ast, locales, formats, pluralFn) {\n    var compiler = new src$compiler$$[\"default\"](locales, formats, pluralFn);\n    return compiler.compile(ast);\n};\n\nMessageFormat.prototype._findPluralRuleFunction = function (locale) {\n    var localeData = MessageFormat.__localeData__;\n    var data       = localeData[locale.toLowerCase()];\n\n    // The locale data is de-duplicated, so we have to traverse the locale's\n    // hierarchy until we find a `pluralRuleFunction` to return.\n    while (data) {\n        if (data.pluralRuleFunction) {\n            return data.pluralRuleFunction;\n        }\n\n        data = data.parentLocale && localeData[data.parentLocale.toLowerCase()];\n    }\n\n    throw new Error(\n        'Locale data added to IntlMessageFormat is missing a ' +\n        '`pluralRuleFunction` for :' + locale\n    );\n};\n\nMessageFormat.prototype._format = function (pattern, values) {\n    var result = '',\n        i, len, part, id, value, err;\n\n    for (i = 0, len = pattern.length; i < len; i += 1) {\n        part = pattern[i];\n\n        // Exist early for string parts.\n        if (typeof part === 'string') {\n            result += part;\n            continue;\n        }\n\n        id = part.id;\n\n        // Enforce that all required values are provided by the caller.\n        if (!(values && src$utils$$.hop.call(values, id))) {\n          err = new Error('A value must be provided for: ' + id);\n          err.variableId = id;\n          throw err;\n        }\n\n        value = values[id];\n\n        // Recursively format plural and select parts' option — which can be a\n        // nested pattern structure. The choosing of the option to use is\n        // abstracted-by and delegated-to the part helper object.\n        if (part.options) {\n            result += this._format(part.getOption(value), values);\n        } else {\n            result += part.format(value);\n        }\n    }\n\n    return result;\n};\n\nMessageFormat.prototype._mergeFormats = function (defaults, formats) {\n    var mergedFormats = {},\n        type, mergedType;\n\n    for (type in defaults) {\n        if (!src$utils$$.hop.call(defaults, type)) { continue; }\n\n        mergedFormats[type] = mergedType = src$es5$$.objCreate(defaults[type]);\n\n        if (formats && src$utils$$.hop.call(formats, type)) {\n            src$utils$$.extend(mergedType, formats[type]);\n        }\n    }\n\n    return mergedFormats;\n};\n\nMessageFormat.prototype._resolveLocale = function (locales) {\n    if (typeof locales === 'string') {\n        locales = [locales];\n    }\n\n    // Create a copy of the array so we can push on the default locale.\n    locales = (locales || []).concat(MessageFormat.defaultLocale);\n\n    var localeData = MessageFormat.__localeData__;\n    var i, len, localeParts, data;\n\n    // Using the set of locales + the default locale, we look for the first one\n    // which that has been registered. When data does not exist for a locale, we\n    // traverse its ancestors to find something that's been registered within\n    // its hierarchy of locales. Since we lack the proper `parentLocale` data\n    // here, we must take a naive approach to traversal.\n    for (i = 0, len = locales.length; i < len; i += 1) {\n        localeParts = locales[i].toLowerCase().split('-');\n\n        while (localeParts.length) {\n            data = localeData[localeParts.join('-')];\n            if (data) {\n                // Return the normalized locale string; e.g., we return \"en-US\",\n                // instead of \"en-us\".\n                return data.locale;\n            }\n\n            localeParts.pop();\n        }\n    }\n\n    var defaultLocale = locales.pop();\n    throw new Error(\n        'No locale data has been added to IntlMessageFormat for: ' +\n        locales.join(', ') + ', or the default locale: ' + defaultLocale\n    );\n};\n\n//# sourceMappingURL=core.js.map\n\n//# sourceURL=webpack://__ember_auto_import__/./node_modules/@ember-intl/intl-messageformat/lib/core.js?");
+
+/***/ }),
+
+/***/ "./node_modules/@ember-intl/intl-messageformat/lib/en.js":
+/*!***************************************************************!*\
+  !*** ./node_modules/@ember-intl/intl-messageformat/lib/en.js ***!
+  \***************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("// GENERATED FILE\n\nexports[\"default\"] = {\"locale\":\"en\",\"pluralRuleFunction\":function (n,ord){var s=String(n).split(\".\"),v0=!s[1],t0=Number(s[0])==n,n10=t0&&s[0].slice(-1),n100=t0&&s[0].slice(-2);if(ord)return n10==1&&n100!=11?\"one\":n10==2&&n100!=12?\"two\":n10==3&&n100!=13?\"few\":\"other\";return n==1&&v0?\"one\":\"other\"},\"numbers\":{\"decimal\":{\"long\":[[1000,{\"one\":[\"0 thousand\",1],\"other\":[\"0 thousand\",1]}],[10000,{\"one\":[\"00 thousand\",2],\"other\":[\"00 thousand\",2]}],[100000,{\"one\":[\"000 thousand\",3],\"other\":[\"000 thousand\",3]}],[1000000,{\"one\":[\"0 million\",1],\"other\":[\"0 million\",1]}],[10000000,{\"one\":[\"00 million\",2],\"other\":[\"00 million\",2]}],[100000000,{\"one\":[\"000 million\",3],\"other\":[\"000 million\",3]}],[1000000000,{\"one\":[\"0 billion\",1],\"other\":[\"0 billion\",1]}],[10000000000,{\"one\":[\"00 billion\",2],\"other\":[\"00 billion\",2]}],[100000000000,{\"one\":[\"000 billion\",3],\"other\":[\"000 billion\",3]}],[1000000000000,{\"one\":[\"0 trillion\",1],\"other\":[\"0 trillion\",1]}],[10000000000000,{\"one\":[\"00 trillion\",2],\"other\":[\"00 trillion\",2]}],[100000000000000,{\"one\":[\"000 trillion\",3],\"other\":[\"000 trillion\",3]}]],\"short\":[[1000,{\"one\":[\"0K\",1],\"other\":[\"0K\",1]}],[10000,{\"one\":[\"00K\",2],\"other\":[\"00K\",2]}],[100000,{\"one\":[\"000K\",3],\"other\":[\"000K\",3]}],[1000000,{\"one\":[\"0M\",1],\"other\":[\"0M\",1]}],[10000000,{\"one\":[\"00M\",2],\"other\":[\"00M\",2]}],[100000000,{\"one\":[\"000M\",3],\"other\":[\"000M\",3]}],[1000000000,{\"one\":[\"0B\",1],\"other\":[\"0B\",1]}],[10000000000,{\"one\":[\"00B\",2],\"other\":[\"00B\",2]}],[100000000000,{\"one\":[\"000B\",3],\"other\":[\"000B\",3]}],[1000000000000,{\"one\":[\"0T\",1],\"other\":[\"0T\",1]}],[10000000000000,{\"one\":[\"00T\",2],\"other\":[\"00T\",2]}],[100000000000000,{\"one\":[\"000T\",3],\"other\":[\"000T\",3]}]]}}};\n\n//# sourceMappingURL=en.js.map\n\n//# sourceURL=webpack://__ember_auto_import__/./node_modules/@ember-intl/intl-messageformat/lib/en.js?");
+
+/***/ }),
+
+/***/ "./node_modules/@ember-intl/intl-messageformat/lib/es5.js":
+/*!****************************************************************!*\
+  !*** ./node_modules/@ember-intl/intl-messageformat/lib/es5.js ***!
+  \****************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("/*\nCopyright (c) 2014, Yahoo! Inc. All rights reserved.\nCopyrights licensed under the New BSD License.\nSee the accompanying LICENSE file for terms.\n*/\n\n/* jslint esnext: true */\n\n\nvar src$utils$$ = __webpack_require__(/*! ./utils */ \"./node_modules/@ember-intl/intl-messageformat/lib/utils.js\");\n\n// Purposely using the same implementation as the Intl.js `Intl` polyfill.\n// Copyright 2013 Andy Earnshaw, MIT License\n\nvar realDefineProp = (function () {\n    try { return !!Object.defineProperty({}, 'a', {}); }\n    catch (e) { return false; }\n})();\n\nvar es3 = !realDefineProp && !Object.prototype.__defineGetter__;\n\nvar defineProperty = realDefineProp ? Object.defineProperty :\n        function (obj, name, desc) {\n\n    if ('get' in desc && obj.__defineGetter__) {\n        obj.__defineGetter__(name, desc.get);\n    } else if (!src$utils$$.hop.call(obj, name) || 'value' in desc) {\n        obj[name] = desc.value;\n    }\n};\n\nvar objCreate = Object.create || function (proto, props) {\n    var obj, k;\n\n    function F() {}\n    F.prototype = proto;\n    obj = new F();\n\n    for (k in props) {\n        if (src$utils$$.hop.call(props, k)) {\n            defineProperty(obj, k, props[k]);\n        }\n    }\n\n    return obj;\n};\n\nexports.defineProperty = defineProperty, exports.objCreate = objCreate;\n\n//# sourceMappingURL=es5.js.map\n\n//# sourceURL=webpack://__ember_auto_import__/./node_modules/@ember-intl/intl-messageformat/lib/es5.js?");
+
+/***/ }),
+
+/***/ "./node_modules/@ember-intl/intl-messageformat/lib/main.js":
+/*!*****************************************************************!*\
+  !*** ./node_modules/@ember-intl/intl-messageformat/lib/main.js ***!
+  \*****************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("/* jslint esnext: true */\n\n\nvar src$core$$ = __webpack_require__(/*! ./core */ \"./node_modules/@ember-intl/intl-messageformat/lib/core.js\"), src$en$$ = __webpack_require__(/*! ./en */ \"./node_modules/@ember-intl/intl-messageformat/lib/en.js\");\n\nsrc$core$$[\"default\"].__addLocaleData(src$en$$[\"default\"]);\nsrc$core$$[\"default\"].defaultLocale = 'en';\n\nexports[\"default\"] = src$core$$[\"default\"];\n\n//# sourceMappingURL=main.js.map\n\n//# sourceURL=webpack://__ember_auto_import__/./node_modules/@ember-intl/intl-messageformat/lib/main.js?");
+
+/***/ }),
+
+/***/ "./node_modules/@ember-intl/intl-messageformat/lib/utils.js":
+/*!******************************************************************!*\
+  !*** ./node_modules/@ember-intl/intl-messageformat/lib/utils.js ***!
+  \******************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("/*\nCopyright (c) 2014, Yahoo! Inc. All rights reserved.\nCopyrights licensed under the New BSD License.\nSee the accompanying LICENSE file for terms.\n*/\n\n/* jslint esnext: true */\n\n\nexports.extend = extend;\nvar hop = Object.prototype.hasOwnProperty;\n\nfunction extend(obj) {\n    var sources = Array.prototype.slice.call(arguments, 1),\n        i, len, source, key;\n\n    for (i = 0, len = sources.length; i < len; i += 1) {\n        source = sources[i];\n        if (!source) { continue; }\n\n        for (key in source) {\n            if (hop.call(source, key)) {\n                obj[key] = source[key];\n            }\n        }\n    }\n\n    return obj;\n}\nexports.hop = hop;\n\n//# sourceMappingURL=utils.js.map\n\n//# sourceURL=webpack://__ember_auto_import__/./node_modules/@ember-intl/intl-messageformat/lib/utils.js?");
+
+/***/ }),
+
+/***/ "./node_modules/@ember-intl/intl-relativeformat/index.js":
+/*!***************************************************************!*\
+  !*** ./node_modules/@ember-intl/intl-relativeformat/index.js ***!
+  \***************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("/* jshint node:true */\n\n\n\nvar IntlRelativeFormat = __webpack_require__(/*! ./lib/main */ \"./node_modules/@ember-intl/intl-relativeformat/lib/main.js\")['default'];\n\n// Add all locale data to `IntlRelativeFormat`. This module will be ignored when\n// bundling for the browser with Browserify/Webpack.\n__webpack_require__(/*! ./lib/locales */ 2);\n\n// Re-export `IntlRelativeFormat` as the CommonJS default exports with all the\n// locale data registered, and with English set as the default locale. Define\n// the `default` prop for use with other compiled ES6 Modules.\nexports = module.exports = IntlRelativeFormat;\nexports['default'] = exports;\n\n\n//# sourceURL=webpack://__ember_auto_import__/./node_modules/@ember-intl/intl-relativeformat/index.js?");
+
+/***/ }),
+
+/***/ "./node_modules/@ember-intl/intl-relativeformat/lib/core.js":
+/*!******************************************************************!*\
+  !*** ./node_modules/@ember-intl/intl-relativeformat/lib/core.js ***!
+  \******************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("/*\nCopyright (c) 2014, Yahoo! Inc. All rights reserved.\nCopyrights licensed under the New BSD License.\nSee the accompanying LICENSE file for terms.\n*/\n\n/* jslint esnext: true */\n\n\nvar $ember$intl$intl$messageformat$$ = __webpack_require__(/*! @ember-intl/intl-messageformat */ \"./node_modules/@ember-intl/intl-messageformat/index.js\"), src$diff$$ = __webpack_require__(/*! ./diff */ \"./node_modules/@ember-intl/intl-relativeformat/lib/diff.js\"), src$es5$$ = __webpack_require__(/*! ./es5 */ \"./node_modules/@ember-intl/intl-relativeformat/lib/es5.js\");\nexports[\"default\"] = RelativeFormat;\n\n// -----------------------------------------------------------------------------\n\nvar FIELDS = [\n    'second', 'second-short',\n    'minute', 'minute-short',\n    'hour', 'hour-short',\n    'day', 'day-short',\n    'month', 'month-short',\n    'year', 'year-short'\n];\nvar STYLES = ['best fit', 'numeric'];\n\n// -- RelativeFormat -----------------------------------------------------------\n\nfunction RelativeFormat(locales, options) {\n    options = options || {};\n\n    // Make a copy of `locales` if it's an array, so that it doesn't change\n    // since it's used lazily.\n    if (src$es5$$.isArray(locales)) {\n        locales = locales.concat();\n    }\n\n    src$es5$$.defineProperty(this, '_locale', {value: this._resolveLocale(locales)});\n    src$es5$$.defineProperty(this, '_options', {value: {\n        style: this._resolveStyle(options.style),\n        units: this._isValidUnits(options.units) && options.units\n    }});\n\n    src$es5$$.defineProperty(this, '_locales', {value: locales});\n    src$es5$$.defineProperty(this, '_fields', {value: this._findFields(this._locale)});\n    src$es5$$.defineProperty(this, '_messages', {value: src$es5$$.objCreate(null)});\n\n    // \"Bind\" `format()` method to `this` so it can be passed by reference like\n    // the other `Intl` APIs.\n    var relativeFormat = this;\n    this.format = function format(date, options) {\n        return relativeFormat._format(date, options);\n    };\n}\n\n// Define internal private properties for dealing with locale data.\nsrc$es5$$.defineProperty(RelativeFormat, '__localeData__', {value: src$es5$$.objCreate(null)});\nsrc$es5$$.defineProperty(RelativeFormat, '__addLocaleData', {value: function (data) {\n    if (!(data && data.locale)) {\n        throw new Error(\n            'Locale data provided to IntlRelativeFormat is missing a ' +\n            '`locale` property value'\n        );\n    }\n\n    RelativeFormat.__localeData__[data.locale.toLowerCase()] = data;\n\n    // Add data to IntlMessageFormat.\n    $ember$intl$intl$messageformat$$[\"default\"].__addLocaleData(data);\n}});\n\n// Define public `defaultLocale` property which can be set by the developer, or\n// it will be set when the first RelativeFormat instance is created by\n// leveraging the resolved locale from `Intl`.\nsrc$es5$$.defineProperty(RelativeFormat, 'defaultLocale', {\n    enumerable: true,\n    writable  : true,\n    value     : undefined\n});\n\n// Define public `thresholds` property which can be set by the developer, and\n// defaults to relative time thresholds from moment.js.\nsrc$es5$$.defineProperty(RelativeFormat, 'thresholds', {\n    enumerable: true,\n\n    value: {\n        second: 45, 'second-short': 45,  // seconds to minute\n        minute: 45, 'minute-short': 45, // minutes to hour\n        hour  : 22, 'hour-short': 22, // hours to day\n        day   : 26, 'day-short': 26, // days to month\n        month : 11, 'month-short': 11 // months to year\n    }\n});\n\nRelativeFormat.prototype.resolvedOptions = function () {\n    return {\n        locale: this._locale,\n        style : this._options.style,\n        units : this._options.units\n    };\n};\n\nRelativeFormat.prototype._compileMessage = function (units) {\n    // `this._locales` is the original set of locales the user specified to the\n    // constructor, while `this._locale` is the resolved root locale.\n    var locales        = this._locales;\n    var resolvedLocale = this._locale;\n\n    var field        = this._fields[units];\n    var relativeTime = field.relativeTime;\n    var future       = '';\n    var past         = '';\n    var i;\n\n    for (i in relativeTime.future) {\n        if (relativeTime.future.hasOwnProperty(i)) {\n            future += ' ' + i + ' {' +\n                relativeTime.future[i].replace('{0}', '#') + '}';\n        }\n    }\n\n    for (i in relativeTime.past) {\n        if (relativeTime.past.hasOwnProperty(i)) {\n            past += ' ' + i + ' {' +\n                relativeTime.past[i].replace('{0}', '#') + '}';\n        }\n    }\n\n    var message = '{when, select, future {{0, plural, ' + future + '}}' +\n                                 'past {{0, plural, ' + past + '}}}';\n\n    // Create the synthetic IntlMessageFormat instance using the original\n    // locales value specified by the user when constructing the the parent\n    // IntlRelativeFormat instance.\n    return new $ember$intl$intl$messageformat$$[\"default\"](message, locales);\n};\n\nRelativeFormat.prototype._getMessage = function (units) {\n    var messages = this._messages;\n\n    // Create a new synthetic message based on the locale data from CLDR.\n    if (!messages[units]) {\n        messages[units] = this._compileMessage(units);\n    }\n\n    return messages[units];\n};\n\nRelativeFormat.prototype._getRelativeUnits = function (diff, units) {\n    var field = this._fields[units];\n\n    if (field.relative) {\n        return field.relative[diff];\n    }\n};\n\nRelativeFormat.prototype._findFields = function (locale) {\n    var localeData = RelativeFormat.__localeData__;\n    var data       = localeData[locale.toLowerCase()];\n\n    // The locale data is de-duplicated, so we have to traverse the locale's\n    // hierarchy until we find `fields` to return.\n    while (data) {\n        if (data.fields) {\n            return data.fields;\n        }\n\n        data = data.parentLocale && localeData[data.parentLocale.toLowerCase()];\n    }\n\n    throw new Error(\n        'Locale data added to IntlRelativeFormat is missing `fields` for :' +\n        locale\n    );\n};\n\nRelativeFormat.prototype._format = function (date, options) {\n    var now = options && options.now !== undefined ? options.now : src$es5$$.dateNow();\n\n    if (date === undefined) {\n        date = now;\n    }\n\n    // Determine if the `date` and optional `now` values are valid, and throw a\n    // similar error to what `Intl.DateTimeFormat#format()` would throw.\n    if (!isFinite(now)) {\n        throw new RangeError(\n            'The `now` option provided to IntlRelativeFormat#format() is not ' +\n            'in valid range.'\n        );\n    }\n\n    if (!isFinite(date)) {\n        throw new RangeError(\n            'The date value provided to IntlRelativeFormat#format() is not ' +\n            'in valid range.'\n        );\n    }\n\n    var diffReport  = src$diff$$[\"default\"](now, date);\n    var units       = this._options.units || this._selectUnits(diffReport);\n    var diffInUnits = diffReport[units];\n\n    if (this._options.style !== 'numeric') {\n        var relativeUnits = this._getRelativeUnits(diffInUnits, units);\n        if (relativeUnits) {\n            return relativeUnits;\n        }\n    }\n\n    return this._getMessage(units).format({\n        '0' : Math.abs(diffInUnits),\n        when: diffInUnits < 0 ? 'past' : 'future'\n    });\n};\n\nRelativeFormat.prototype._isValidUnits = function (units) {\n    if (!units || src$es5$$.arrIndexOf.call(FIELDS, units) >= 0) {\n        return true;\n    }\n\n    if (typeof units === 'string') {\n        var suggestion = /s$/.test(units) && units.substr(0, units.length - 1);\n        if (suggestion && src$es5$$.arrIndexOf.call(FIELDS, suggestion) >= 0) {\n            throw new Error(\n                '\"' + units + '\" is not a valid IntlRelativeFormat `units` ' +\n                'value, did you mean: ' + suggestion\n            );\n        }\n    }\n\n    throw new Error(\n        '\"' + units + '\" is not a valid IntlRelativeFormat `units` value, it ' +\n        'must be one of: \"' + FIELDS.join('\", \"') + '\"'\n    );\n};\n\nRelativeFormat.prototype._resolveLocale = function (locales) {\n    if (typeof locales === 'string') {\n        locales = [locales];\n    }\n\n    // Create a copy of the array so we can push on the default locale.\n    locales = (locales || []).concat(RelativeFormat.defaultLocale);\n\n    var localeData = RelativeFormat.__localeData__;\n    var i, len, localeParts, data;\n\n    // Using the set of locales + the default locale, we look for the first one\n    // which that has been registered. When data does not exist for a locale, we\n    // traverse its ancestors to find something that's been registered within\n    // its hierarchy of locales. Since we lack the proper `parentLocale` data\n    // here, we must take a naive approach to traversal.\n    for (i = 0, len = locales.length; i < len; i += 1) {\n        localeParts = locales[i].toLowerCase().split('-');\n\n        while (localeParts.length) {\n            data = localeData[localeParts.join('-')];\n            if (data) {\n                // Return the normalized locale string; e.g., we return \"en-US\",\n                // instead of \"en-us\".\n                return data.locale;\n            }\n\n            localeParts.pop();\n        }\n    }\n\n    var defaultLocale = locales.pop();\n    throw new Error(\n        'No locale data has been added to IntlRelativeFormat for: ' +\n        locales.join(', ') + ', or the default locale: ' + defaultLocale\n    );\n};\n\nRelativeFormat.prototype._resolveStyle = function (style) {\n    // Default to \"best fit\" style.\n    if (!style) {\n        return STYLES[0];\n    }\n\n    if (src$es5$$.arrIndexOf.call(STYLES, style) >= 0) {\n        return style;\n    }\n\n    throw new Error(\n        '\"' + style + '\" is not a valid IntlRelativeFormat `style` value, it ' +\n        'must be one of: \"' + STYLES.join('\", \"') + '\"'\n    );\n};\n\nRelativeFormat.prototype._selectUnits = function (diffReport) {\n    var i, l, units;\n    var fields = FIELDS.filter(function(field) {\n        return field.indexOf('-short') < 1;\n    });\n\n    for (i = 0, l = fields.length; i < l; i += 1) {\n        units = fields[i];\n\n        if (Math.abs(diffReport[units]) < RelativeFormat.thresholds[units]) {\n            break;\n        }\n    }\n\n    return units;\n};\n\n//# sourceMappingURL=core.js.map\n\n//# sourceURL=webpack://__ember_auto_import__/./node_modules/@ember-intl/intl-relativeformat/lib/core.js?");
+
+/***/ }),
+
+/***/ "./node_modules/@ember-intl/intl-relativeformat/lib/diff.js":
+/*!******************************************************************!*\
+  !*** ./node_modules/@ember-intl/intl-relativeformat/lib/diff.js ***!
+  \******************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("/*\nCopyright (c) 2014, Yahoo! Inc. All rights reserved.\nCopyrights licensed under the New BSD License.\nSee the accompanying LICENSE file for terms.\n*/\n\n/* jslint esnext: true */\n\n\n\nvar round = Math.round;\n\nfunction daysToYears(days) {\n    // 400 years have 146097 days (taking into account leap year rules)\n    return days * 400 / 146097;\n}\n\nexports[\"default\"] = function (from, to) {\n    // Convert to ms timestamps.\n    from = +from;\n    to   = +to;\n\n    var millisecond = round(to - from),\n        second      = round(millisecond / 1000),\n        minute      = round(second / 60),\n        hour        = round(minute / 60),\n        day         = round(hour / 24),\n        week        = round(day / 7);\n\n    var rawYears = daysToYears(day),\n        month    = round(rawYears * 12),\n        year     = round(rawYears);\n\n    return {\n        millisecond    : millisecond,\n        second         : second,\n        'second-short' : second,\n        minute         : minute,\n        'minute-short' : minute,\n        hour           : hour,\n        'hour-short'   : hour,\n        day            : day,\n        'day-short'    : day,\n        week           : week,\n        'week-short'   : week,\n        month          : month,\n        'month-short'  : month,\n        year           : year,\n        'year-short'   : year\n    };\n};\n\n//# sourceMappingURL=diff.js.map\n\n//# sourceURL=webpack://__ember_auto_import__/./node_modules/@ember-intl/intl-relativeformat/lib/diff.js?");
+
+/***/ }),
+
+/***/ "./node_modules/@ember-intl/intl-relativeformat/lib/en.js":
+/*!****************************************************************!*\
+  !*** ./node_modules/@ember-intl/intl-relativeformat/lib/en.js ***!
+  \****************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("// GENERATED FILE\n\nexports[\"default\"] = {\"locale\":\"en\",\"pluralRuleFunction\":function(n,ord){var s=String(n).split(\".\"),v0=!s[1],t0=Number(s[0])==n,n10=t0&&s[0].slice(-1),n100=t0&&s[0].slice(-2);if(ord)return n10==1&&n100!=11?\"one\":n10==2&&n100!=12?\"two\":n10==3&&n100!=13?\"few\":\"other\";return n==1&&v0?\"one\":\"other\"},\"fields\":{\"year\":{\"displayName\":\"year\",\"relative\":{\"0\":\"this year\",\"1\":\"next year\",\"-1\":\"last year\"},\"relativeTime\":{\"future\":{\"one\":\"in {0} year\",\"other\":\"in {0} years\"},\"past\":{\"one\":\"{0} year ago\",\"other\":\"{0} years ago\"}}},\"year-short\":{\"displayName\":\"yr.\",\"relative\":{\"0\":\"this yr.\",\"1\":\"next yr.\",\"-1\":\"last yr.\"},\"relativeTime\":{\"future\":{\"one\":\"in {0} yr.\",\"other\":\"in {0} yr.\"},\"past\":{\"one\":\"{0} yr. ago\",\"other\":\"{0} yr. ago\"}}},\"month\":{\"displayName\":\"month\",\"relative\":{\"0\":\"this month\",\"1\":\"next month\",\"-1\":\"last month\"},\"relativeTime\":{\"future\":{\"one\":\"in {0} month\",\"other\":\"in {0} months\"},\"past\":{\"one\":\"{0} month ago\",\"other\":\"{0} months ago\"}}},\"month-short\":{\"displayName\":\"mo.\",\"relative\":{\"0\":\"this mo.\",\"1\":\"next mo.\",\"-1\":\"last mo.\"},\"relativeTime\":{\"future\":{\"one\":\"in {0} mo.\",\"other\":\"in {0} mo.\"},\"past\":{\"one\":\"{0} mo. ago\",\"other\":\"{0} mo. ago\"}}},\"day\":{\"displayName\":\"day\",\"relative\":{\"0\":\"today\",\"1\":\"tomorrow\",\"-1\":\"yesterday\"},\"relativeTime\":{\"future\":{\"one\":\"in {0} day\",\"other\":\"in {0} days\"},\"past\":{\"one\":\"{0} day ago\",\"other\":\"{0} days ago\"}}},\"day-short\":{\"displayName\":\"day\",\"relative\":{\"0\":\"today\",\"1\":\"tomorrow\",\"-1\":\"yesterday\"},\"relativeTime\":{\"future\":{\"one\":\"in {0} day\",\"other\":\"in {0} days\"},\"past\":{\"one\":\"{0} day ago\",\"other\":\"{0} days ago\"}}},\"hour\":{\"displayName\":\"hour\",\"relative\":{\"0\":\"this hour\"},\"relativeTime\":{\"future\":{\"one\":\"in {0} hour\",\"other\":\"in {0} hours\"},\"past\":{\"one\":\"{0} hour ago\",\"other\":\"{0} hours ago\"}}},\"hour-short\":{\"displayName\":\"hr.\",\"relative\":{\"0\":\"this hour\"},\"relativeTime\":{\"future\":{\"one\":\"in {0} hr.\",\"other\":\"in {0} hr.\"},\"past\":{\"one\":\"{0} hr. ago\",\"other\":\"{0} hr. ago\"}}},\"minute\":{\"displayName\":\"minute\",\"relative\":{\"0\":\"this minute\"},\"relativeTime\":{\"future\":{\"one\":\"in {0} minute\",\"other\":\"in {0} minutes\"},\"past\":{\"one\":\"{0} minute ago\",\"other\":\"{0} minutes ago\"}}},\"minute-short\":{\"displayName\":\"min.\",\"relative\":{\"0\":\"this minute\"},\"relativeTime\":{\"future\":{\"one\":\"in {0} min.\",\"other\":\"in {0} min.\"},\"past\":{\"one\":\"{0} min. ago\",\"other\":\"{0} min. ago\"}}},\"second\":{\"displayName\":\"second\",\"relative\":{\"0\":\"now\"},\"relativeTime\":{\"future\":{\"one\":\"in {0} second\",\"other\":\"in {0} seconds\"},\"past\":{\"one\":\"{0} second ago\",\"other\":\"{0} seconds ago\"}}},\"second-short\":{\"displayName\":\"sec.\",\"relative\":{\"0\":\"now\"},\"relativeTime\":{\"future\":{\"one\":\"in {0} sec.\",\"other\":\"in {0} sec.\"},\"past\":{\"one\":\"{0} sec. ago\",\"other\":\"{0} sec. ago\"}}}}};\n\n//# sourceMappingURL=en.js.map\n\n//# sourceURL=webpack://__ember_auto_import__/./node_modules/@ember-intl/intl-relativeformat/lib/en.js?");
+
+/***/ }),
+
+/***/ "./node_modules/@ember-intl/intl-relativeformat/lib/es5.js":
+/*!*****************************************************************!*\
+  !*** ./node_modules/@ember-intl/intl-relativeformat/lib/es5.js ***!
+  \*****************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("/*\nCopyright (c) 2014, Yahoo! Inc. All rights reserved.\nCopyrights licensed under the New BSD License.\nSee the accompanying LICENSE file for terms.\n*/\n\n/* jslint esnext: true */\n\n// Purposely using the same implementation as the Intl.js `Intl` polyfill.\n// Copyright 2013 Andy Earnshaw, MIT License\n\n\n\nvar hop = Object.prototype.hasOwnProperty;\nvar toString = Object.prototype.toString;\n\nvar realDefineProp = (function () {\n    try { return !!Object.defineProperty({}, 'a', {}); }\n    catch (e) { return false; }\n})();\n\nvar es3 = !realDefineProp && !Object.prototype.__defineGetter__;\n\nvar defineProperty = realDefineProp ? Object.defineProperty :\n        function (obj, name, desc) {\n\n    if ('get' in desc && obj.__defineGetter__) {\n        obj.__defineGetter__(name, desc.get);\n    } else if (!hop.call(obj, name) || 'value' in desc) {\n        obj[name] = desc.value;\n    }\n};\n\nvar objCreate = Object.create || function (proto, props) {\n    var obj, k;\n\n    function F() {}\n    F.prototype = proto;\n    obj = new F();\n\n    for (k in props) {\n        if (hop.call(props, k)) {\n            defineProperty(obj, k, props[k]);\n        }\n    }\n\n    return obj;\n};\n\nvar arrIndexOf = Array.prototype.indexOf || function (search, fromIndex) {\n    /*jshint validthis:true */\n    var arr = this;\n    if (!arr.length) {\n        return -1;\n    }\n\n    for (var i = fromIndex || 0, max = arr.length; i < max; i++) {\n        if (arr[i] === search) {\n            return i;\n        }\n    }\n\n    return -1;\n};\n\nvar isArray = Array.isArray || function (obj) {\n    return toString.call(obj) === '[object Array]';\n};\n\nvar dateNow = Date.now || function () {\n    return new Date().getTime();\n};\n\nexports.defineProperty = defineProperty, exports.objCreate = objCreate, exports.arrIndexOf = arrIndexOf, exports.isArray = isArray, exports.dateNow = dateNow;\n\n//# sourceMappingURL=es5.js.map\n\n//# sourceURL=webpack://__ember_auto_import__/./node_modules/@ember-intl/intl-relativeformat/lib/es5.js?");
+
+/***/ }),
+
+/***/ "./node_modules/@ember-intl/intl-relativeformat/lib/main.js":
+/*!******************************************************************!*\
+  !*** ./node_modules/@ember-intl/intl-relativeformat/lib/main.js ***!
+  \******************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+eval("/* jslint esnext: true */\n\n\nvar src$core$$ = __webpack_require__(/*! ./core */ \"./node_modules/@ember-intl/intl-relativeformat/lib/core.js\"), src$en$$ = __webpack_require__(/*! ./en */ \"./node_modules/@ember-intl/intl-relativeformat/lib/en.js\");\n\nsrc$core$$[\"default\"].__addLocaleData(src$en$$[\"default\"]);\nsrc$core$$[\"default\"].defaultLocale = 'en';\n\nexports[\"default\"] = src$core$$[\"default\"];\n\n//# sourceMappingURL=main.js.map\n\n//# sourceURL=webpack://__ember_auto_import__/./node_modules/@ember-intl/intl-relativeformat/lib/main.js?");
+
+/***/ }),
+
+/***/ "./node_modules/cldr-compact-number/dist/cldr-compact-number.es5.js":
+/*!**************************************************************************!*\
+  !*** ./node_modules/cldr-compact-number/dist/cldr-compact-number.es5.js ***!
+  \**************************************************************************/
+/*! exports provided: default, compactFormat */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+eval("__webpack_require__.r(__webpack_exports__);\n/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, \"compactFormat\", function() { return compactFormat; });\nfunction replaceNumber(normalized, format) {\n    // 1.734 -> 1K\n    // replace 0's with absolute number while preserving space and remaining text\n    // return format.replace(/0*(\\s*)(\\w+)/, Math.round(number) + '$1$2');\n    return format.replace(/0*/, normalized);\n}\nfunction normalizeLocale(locale) {\n    if (locale instanceof Array) {\n        return locale[0].replace(/_/, '-').toLowerCase();\n    }\n    return locale.replace(/_/, '-').toLowerCase();\n}\n/**\n * If rule only contains 0, it indicates no short number formatting applied\n * e.g. \"ja\" 1234 -> 1234 and not 1K\n */\nfunction needsFormatting(format) {\n    return format.match(/[^0]/);\n}\n/**\n * Given a format: { af: {locale: \"af\", numbers: {…}} af-na: {locale: \"af-NA\", parentLocale: \"af\"} }\n * recursively find numbers hash\n *\n * @method findLocaleData\n * @param localeData\n * @param locale\n */\nfunction findLocaleData(localeData, locale) {\n    var topLevelData = localeData[locale];\n    if (!topLevelData) {\n        return;\n    }\n    var numbersHash = topLevelData.numbers;\n    var parentLocale = topLevelData.parentLocale;\n    if (!numbersHash && parentLocale) {\n        numbersHash = findLocaleData(localeData, parentLocale);\n    }\n    return numbersHash;\n}\n\n/**\n * Meant to either localize a number with toLocaleString or return an Integer\n * localization accepts 3 arguments\n *  - significantDigits\n *  - minimumFractionDigits\n *  - maximumFractionDigits\n */\nfunction normalizeNumber(decimal, arbitraryPrecision, sign, locale, _a) {\n    var _b = _a.significantDigits, significantDigits = _b === void 0 ? 0 : _b, _c = _a.minimumFractionDigits, minimumFractionDigits = _c === void 0 ? 0 : _c, _d = _a.maximumFractionDigits, maximumFractionDigits = _d === void 0 ? 2 : _d;\n    if (significantDigits) {\n        return toLocaleFixed(toFixed(decimal, significantDigits), locale, {\n            maximumFractionDigits: maximumFractionDigits,\n            minimumFractionDigits: minimumFractionDigits\n        });\n    }\n    return withRounding(decimal, arbitraryPrecision) * sign;\n}\nfunction extractIntPart(decimal, range, numberOfDigits) {\n    // 1734 -> 1.734\n    // 17345 -> 17.345\n    // 999949 -> 999.9K with one significant digit or 999,9 mil in Spanish\n    // this gives us the \"int\" (LHS) part of the number with the remains on the RHS\n    return (decimal / range) * Math.pow(10, numberOfDigits - 1);\n}\nfunction toFixed(decimal, significantDigits) {\n    // solves issues with toFixed returning a string\n    // e.g. 999.94 -> 999.9\n    // e.g. 999.95 -> 1000 instead of (999.95).toFixed(1) -> '1000.1'\n    var powOf10 = Math.pow(10, significantDigits);\n    return Math.round(decimal * powOf10) / powOf10;\n}\nfunction withRounding(decimal, arbitraryPrecision) {\n    if (decimal <= 1) {\n        // We do not want to round up to nearest 10 (Math.pow(10, 1)) when < 1.\n        // Just round decimal\n        return Math.round(decimal);\n    }\n    // rounding on floating point numbers\n    // e.g. 99.5 -> 100\n    var powOf10 = Math.pow(10, arbitraryPrecision);\n    return Math.round(decimal / powOf10) * powOf10;\n}\nfunction toLocaleFixed(value, locale, digitsConfig) {\n    if (value && typeof value === 'number') {\n        return value.toLocaleString(locale, digitsConfig);\n    }\n}\n\nfunction compactFormat(value, locale, localeData, options) {\n    if (options === void 0) { options = {}; }\n    var num = Number(value);\n    if (!value || typeof num !== 'number') {\n        return value;\n    }\n    // figure out which numbers hash based on the locale\n    locale = normalizeLocale(locale); // en_GB -> en-GB\n    var data = findLocaleData(localeData, locale);\n    if (!data) {\n        return value;\n    }\n    // take the absolute value and stash sign to apply at end\n    var sign = 1;\n    if (num < 0) {\n        sign = -1;\n        num = Math.abs(num);\n    }\n    // find specific rules: short or long\n    var _a = options.financialFormat, financialFormat = _a === void 0 ? false : _a, _b = options.long, long = _b === void 0 ? false : _b, _c = options.significantDigits, significantDigits = _c === void 0 ? 0 : _c, _d = options.threshold, threshold = _d === void 0 ? 0.05 : _d;\n    var rules = long ? data.decimal.long : data.decimal.short;\n    if (!rules || num < 1000) {\n        return value;\n    }\n    // 1. Take number and determine range it is in\n    // 2. Extract specific rule from hash - [\"0K\", 1] meaning which value from the rule and number of zeros\n    var matchingRule;\n    var arbitraryPrecision = 0;\n    for (var i = 0; i <= rules.length; i++) {\n        if (num <= rules[i][0]) {\n            var testRangeHigh = rules[i][0];\n            // always use previous rule until within 5% threshold of upper limit\n            if (!financialFormat && 1 - num / testRangeHigh > threshold) {\n                // e.g use 950K instead of 1M\n                // e.g use 101K instead of 0.1M\n                matchingRule = rules[i - 1];\n            }\n            else {\n                matchingRule = rules[i];\n                if (!significantDigits || !financialFormat) {\n                    // if we want to round up, we need to prevent numbers like 99,499 from rounding down to 99K\n                    // /-private/math-utils will use this variable to round a number like 91 to 100 since we are within the threshold\n                    arbitraryPrecision = 1;\n                }\n            }\n            break;\n        }\n    }\n    // 3. Normalise number by converting to decimal and cropping to number of digits\n    //  1000 -> 1.000 -> 1K\n    //  1600 -> 1.600 -> 2K\n    // 4. Format according to formatter e.g. \"0K\"\n    var range = matchingRule[0], opts = matchingRule[1];\n    // cldr data is either `one` or `other`.  Defaulting to `one` for now\n    var _e = opts.one || opts.other, formatter = _e[0], numberOfDigits = _e[1];\n    if (!needsFormatting(formatter)) {\n        return value;\n    }\n    var normalized = normalizeNumber(extractIntPart(num, range, numberOfDigits), arbitraryPrecision, sign, locale, options);\n    return replaceNumber(normalized, formatter);\n}\n\n/* harmony default export */ __webpack_exports__[\"default\"] = (compactFormat);\n\n\n\n//# sourceURL=webpack://__ember_auto_import__/./node_modules/cldr-compact-number/dist/cldr-compact-number.es5.js?");
+
+/***/ }),
+
+/***/ "./node_modules/fast-memoize/src/index.js":
+/*!************************************************!*\
+  !*** ./node_modules/fast-memoize/src/index.js ***!
+  \************************************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+eval("//\n// Main\n//\n\nfunction memoize (fn, options) {\n  var cache = options && options.cache\n    ? options.cache\n    : cacheDefault\n\n  var serializer = options && options.serializer\n    ? options.serializer\n    : serializerDefault\n\n  var strategy = options && options.strategy\n    ? options.strategy\n    : strategyDefault\n\n  return strategy(fn, {\n    cache: cache,\n    serializer: serializer\n  })\n}\n\n//\n// Strategy\n//\n\nfunction isPrimitive (value) {\n  return value == null || typeof value === 'number' || typeof value === 'boolean' // || typeof value === \"string\" 'unsafe' primitive for our needs\n}\n\nfunction monadic (fn, cache, serializer, arg) {\n  var cacheKey = isPrimitive(arg) ? arg : serializer(arg)\n\n  var computedValue = cache.get(cacheKey)\n  if (typeof computedValue === 'undefined') {\n    computedValue = fn.call(this, arg)\n    cache.set(cacheKey, computedValue)\n  }\n\n  return computedValue\n}\n\nfunction variadic (fn, cache, serializer) {\n  var args = Array.prototype.slice.call(arguments, 3)\n  var cacheKey = serializer(args)\n\n  var computedValue = cache.get(cacheKey)\n  if (typeof computedValue === 'undefined') {\n    computedValue = fn.apply(this, args)\n    cache.set(cacheKey, computedValue)\n  }\n\n  return computedValue\n}\n\nfunction assemble (fn, context, strategy, cache, serialize) {\n  return strategy.bind(\n    context,\n    fn,\n    cache,\n    serialize\n  )\n}\n\nfunction strategyDefault (fn, options) {\n  var strategy = fn.length === 1 ? monadic : variadic\n\n  return assemble(\n    fn,\n    this,\n    strategy,\n    options.cache.create(),\n    options.serializer\n  )\n}\n\nfunction strategyVariadic (fn, options) {\n  var strategy = variadic\n\n  return assemble(\n    fn,\n    this,\n    strategy,\n    options.cache.create(),\n    options.serializer\n  )\n}\n\nfunction strategyMonadic (fn, options) {\n  var strategy = monadic\n\n  return assemble(\n    fn,\n    this,\n    strategy,\n    options.cache.create(),\n    options.serializer\n  )\n}\n\n//\n// Serializer\n//\n\nfunction serializerDefault () {\n  return JSON.stringify(arguments)\n}\n\n//\n// Cache\n//\n\nfunction ObjectWithoutPrototypeCache () {\n  this.cache = Object.create(null)\n}\n\nObjectWithoutPrototypeCache.prototype.has = function (key) {\n  return (key in this.cache)\n}\n\nObjectWithoutPrototypeCache.prototype.get = function (key) {\n  return this.cache[key]\n}\n\nObjectWithoutPrototypeCache.prototype.set = function (key, value) {\n  this.cache[key] = value\n}\n\nvar cacheDefault = {\n  create: function create () {\n    return new ObjectWithoutPrototypeCache()\n  }\n}\n\n//\n// API\n//\n\nmodule.exports = memoize\nmodule.exports.strategies = {\n  variadic: strategyVariadic,\n  monadic: strategyMonadic\n}\n\n\n//# sourceURL=webpack://__ember_auto_import__/./node_modules/fast-memoize/src/index.js?");
+
+/***/ })
+
+}]);//# sourceMappingURL=vendor.map

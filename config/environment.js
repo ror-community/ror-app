@@ -2,7 +2,7 @@
 
 module.exports = function(environment) {
   let ENV = {
-    modulePrefix: 'ember-quickstart',
+    modulePrefix: 'ror-app',
     environment,
     rootURL: '/',
     locationType: 'auto',
@@ -16,6 +16,8 @@ module.exports = function(environment) {
         Date: false
       }
     },
+
+    API_URL: process.env.API_URL || "https://api.ror.org",
 
     APP: {
       // Here you can pass flags/options to your application instance

@@ -1,0 +1,44 @@
+<div class="sidebar" data-color="black">
+  <div class="sidebar-wrapper">
+    <div class="logo">
+      <a href="http://www.ror-community" class="simple-text">
+        ROR
+      </a>
+    </div>
+
+    {{#bs-nav as |nav|}}
+      {{#nav.item}}
+        {{#nav.link-to "index"}}
+        <i class="fa fa-home fa-fw"></i>
+        <p>Home</p>
+        {{/nav.link-to}}
+      {{/nav.item}}
+      {{#nav.item}}
+        {{#nav.link-to "organizations"}}
+          <i class="fa fa-institution fa-fw"></i>
+          <p>Organizations</p>
+        {{/nav.link-to}}
+      {{/nav.item}}
+      {{nav.item class="separator"}}
+      {{#nav.item}}
+        <a class="nav-link" target="_blank" rel="noopener" href="https://www.ror.community/about/">
+          <i class="fa fa-info fa-fw"></i>
+          <p>About</p>
+        </a>
+      {{/nav.item}}
+      {{#nav.item}}
+        <a class="nav-link" target="_blank" rel="noopener" href="https://www.ror.community/scope/">
+          <i class="fa fa-file-text-o fa-fw"></i>
+          <p>Scope</p>
+        </a>
+      {{/nav.item}}
+      {{#nav.item}}
+        <a class="nav-link" target="_blank" rel="noopener" href="https://www.ror.community/blog/">
+          <i class="fa fa-newspaper-o fa-fw"></i>
+          <p>Blog</p>
+        </a>
+      {{/nav.item}}
+    {{/bs-nav}}
+
+  </div>
+</div>

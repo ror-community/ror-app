@@ -1,0 +1,7 @@
+{{#bs-navbar class="navbar-expand-lg justify-content-start" collapsed=collapsed onCollapse=(action (mut collapsed) true) onExpand=(action (mut collapsed) false) as |navbar|}}
+  <span class="navbar-brand mb-0 h1">{{title}}</span>
+  <form class="form-inline">
+    <input class="form-control ml-5" type="search" placeholder="Search" aria-label="Search">
+    <button class="btn btn-default btn-sm" type="submit">Search</button>
+  </form>
+{{/bs-navbar}}
