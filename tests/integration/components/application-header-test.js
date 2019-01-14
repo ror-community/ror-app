@@ -12,6 +12,6 @@ module('Integration | Component | application-header', function(hooks) {
 
     await render(hbs`{{application-header}}`);
 
-    assert.equal(this.element.textContent.trim(), 'Search');
+    assert.equal(this.element.textContent.trim(), '');
   });
 });
