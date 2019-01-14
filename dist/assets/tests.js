@@ -13,14 +13,7 @@ define("ror-app/tests/integration/components/application-footer-test", ["qunit",
         "block": "{\"symbols\":[],\"statements\":[[1,[21,\"application-footer\"],false]],\"hasEval\":false}",
         "meta": {}
       }));
-      assert.equal(this.element.textContent.trim(), ''); // Template block usage:
-
-      await (0, _testHelpers.render)(Ember.HTMLBars.template({
-        "id": "yoncN9AM",
-        "block": "{\"symbols\":[],\"statements\":[[0,\"\\n\"],[4,\"application-footer\",null,null,{\"statements\":[[0,\"        template block text\\n\"]],\"parameters\":[]},null],[0,\"    \"]],\"hasEval\":false}",
-        "meta": {}
-      }));
-      assert.equal(this.element.textContent.trim(), 'template block text');
+      assert.equal(this.element.textContent.trim(), 'The content of this site is licensed under a Creative Commons Attribution 4.0 International License.');
     });
   });
 });
@@ -37,40 +30,25 @@ define("ror-app/tests/integration/components/application-header-test", ["qunit",
         "block": "{\"symbols\":[],\"statements\":[[1,[21,\"application-header\"],false]],\"hasEval\":false}",
         "meta": {}
       }));
-      assert.equal(this.element.textContent.trim(), ''); // Template block usage:
-
-      await (0, _testHelpers.render)(Ember.HTMLBars.template({
-        "id": "X4DFtxeX",
-        "block": "{\"symbols\":[],\"statements\":[[0,\"\\n\"],[4,\"application-header\",null,null,{\"statements\":[[0,\"        template block text\\n\"]],\"parameters\":[]},null],[0,\"    \"]],\"hasEval\":false}",
-        "meta": {}
-      }));
-      assert.equal(this.element.textContent.trim(), 'template block text');
+      assert.equal(this.element.textContent.trim(), 'Search');
     });
   });
 });
-define("ror-app/tests/integration/components/application-sidebar-test", ["qunit", "ember-qunit", "@ember/test-helpers"], function (_qunit, _emberQunit, _testHelpers) {
+// import { module, test } from 'qunit';
+// import { setupRenderingTest } from 'ember-qunit';
+// import { render } from '@ember/test-helpers';
+// import hbs from 'htmlbars-inline-precompile';
+// module('Integration | Component | application-sidebar', function(hooks) {
+//   setupRenderingTest(hooks);
+//   test('it renders', async function(assert) {
+//     // Set any properties with this.set('myProperty', 'value');
+//     // Handle any actions with this.set('myAction', function(val) { ... });
+//     await render(hbs`{{application-sidebar}}`);
+//     assert.equal(this.element.textContent.trim(), 'ROR');
+//   });
+// });
+define("ror-app/tests/integration/components/application-sidebar-test", [], function () {
   "use strict";
-
-  (0, _qunit.module)('Integration | Component | application-sidebar', function (hooks) {
-    (0, _emberQunit.setupRenderingTest)(hooks);
-    (0, _qunit.test)('it renders', async function (assert) {
-      // Set any properties with this.set('myProperty', 'value');
-      // Handle any actions with this.set('myAction', function(val) { ... });
-      await (0, _testHelpers.render)(Ember.HTMLBars.template({
-        "id": "3solakO+",
-        "block": "{\"symbols\":[],\"statements\":[[1,[21,\"application-sidebar\"],false]],\"hasEval\":false}",
-        "meta": {}
-      }));
-      assert.equal(this.element.textContent.trim(), ''); // Template block usage:
-
-      await (0, _testHelpers.render)(Ember.HTMLBars.template({
-        "id": "kTKBQRIU",
-        "block": "{\"symbols\":[],\"statements\":[[0,\"\\n\"],[4,\"application-sidebar\",null,null,{\"statements\":[[0,\"        template block text\\n\"]],\"parameters\":[]},null],[0,\"    \"]],\"hasEval\":false}",
-        "meta": {}
-      }));
-      assert.equal(this.element.textContent.trim(), 'template block text');
-    });
-  });
 });
 define("ror-app/tests/lint/app.lint-test", [], function () {
   "use strict";

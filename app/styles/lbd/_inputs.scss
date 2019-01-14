@@ -3,10 +3,10 @@
 }
 .form-control:-moz-placeholder{
    @include placeholder($medium-gray,1);
-}  
+}
 .form-control::-webkit-input-placeholder{
-   @include placeholder($medium-gray,1); 
-} 
+   @include placeholder($medium-gray,1);
+}
 .form-control:-ms-input-placeholder{
    @include placeholder($medium-gray,1);
 }
@@ -15,18 +15,19 @@
     background-color: $white-bg;
     border: 1px solid $light-gray;
     border-radius: $border-radius-base;
+    font-size: .875rem;
     color: #565656;
     @include input-size($padding-base-vertical, $padding-base-horizontal - 4, $height-base);
     @include box-shadow(none);
-    
+
     &:focus{
            background-color: $white-bg;
            border: 1px solid $medium-dark-gray;
            @include box-shadow(none);
-           outline: 0 !important;    
-           color: #333333;   
+           outline: 0 !important;
+           color: #333333;
     }
-    
+
     .has-success &,
     .has-error &,
     .has-success &:focus,
@@ -34,12 +35,10 @@
         border-color: $light-gray;
         @include box-shadow(none);
     }
-    
-    .has-success &{
-        color: $success-color;
-    }
+
     .has-success &:focus{
         border-color: $success-color;
+        color: $success-color;
     }
     .has-error &{
         color: $danger-color;
@@ -47,7 +46,7 @@
     .has-error &:focus{
         border-color: $danger-color;
     }
-    
+
     & + .form-control-feedback{
         border-radius: $border-radius-large;
         font-size: $font-size-base;
@@ -57,7 +56,7 @@
         top: 50%;
         vertical-align: middle;
     }
-    
+
     .open &{
         border-radius: $border-radius-base $border-radius-base 0 0;
         border-bottom-color: transparent;
@@ -85,7 +84,7 @@
     background-color: $white-color;
     border: 1px solid $light-gray;
     border-radius: $border-radius-base;
-    
+
     .has-success &,
     .has-error &{
         background-color: $white-color;
@@ -106,15 +105,15 @@
     }
 }
 
-.input-group .form-control:first-child, 
-.input-group-addon:first-child,  
-.input-group-btn:first-child > .dropdown-toggle, 
+.input-group .form-control:first-child,
+.input-group-addon:first-child,
+.input-group-btn:first-child > .dropdown-toggle,
 .input-group-btn:last-child > .btn:not(:last-child):not(.dropdown-toggle) {
     border-right: 0 none;
 }
-.input-group .form-control:last-child, 
-.input-group-addon:last-child,  
-.input-group-btn:last-child > .dropdown-toggle, 
+.input-group .form-control:last-child,
+.input-group-addon:last-child,
+.input-group-btn:last-child > .dropdown-toggle,
 .input-group-btn:first-child > .btn:not(:first-child) {
     border-left: 0 none;
 }
@@ -138,4 +137,35 @@
 
 .input-group-focus .input-group-addon{
     border-color: $dark-gray;
+}
+
+.star{
+    color: #FB404B;
+    padding-left: 3px;
+}
+
+.card .card-body {
+    .control-label{
+        text-align: right;
+        padding-top: 18px;
+    }
+    .form-control-static,
+    .col-sm-10 .form-check:first-of-type,
+    .col-sm-4 .form-check:first-of-type{
+        padding-top: 8px;
+    }
+}
+
+.form-group.has-error{
+    .error{
+        color: $danger-color;
+        text-transform: none;
+        margin-bottom: 0;
+    }
+}
+
+.form-group.has-success{
+    .error{
+        display: none !important;
+    }
 }
