@@ -11,12 +11,12 @@ cache:
 before_install:
   - set -e
   - if [ "$TRAVIS_BRANCH" == "master" ]; then
-      AWS_BUCKET="app.ror.org";
+      AWS_BUCKET="search.ror.org";
       CLOUDFRONT_DISTRIBUTION_ID=$CLOUDFRONT_DISTRIBUTION_ID;
       cp .env.production .env;
       AUTO_DEPLOY=true;
     else
-      AWS_BUCKET="app.ror.org";
+      AWS_BUCKET="search.ror.org";
       CLOUDFRONT_DISTRIBUTION_ID=$CLOUDFRONT_DISTRIBUTION_ID;
       cp .env.production .env;
     fi
