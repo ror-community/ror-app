@@ -30,7 +30,7 @@ define("ror-app/tests/integration/components/application-header-test", ["qunit",
         "block": "{\"symbols\":[],\"statements\":[[1,[21,\"application-header\"],false]],\"hasEval\":false}",
         "meta": {}
       }));
-      assert.equal(this.element.textContent.trim(), 'Search');
+      assert.equal(this.element.textContent.trim(), '');
     });
   });
 });
@@ -54,6 +54,10 @@ define("ror-app/tests/lint/app.lint-test", [], function () {
   "use strict";
 
   QUnit.module('ESLint | app');
+  QUnit.test('adapters/application.js', function (assert) {
+    assert.expect(1);
+    assert.ok(true, 'adapters/application.js should pass ESLint\n\n');
+  });
   QUnit.test('app.js', function (assert) {
     assert.expect(1);
     assert.ok(true, 'app.js should pass ESLint\n\n');
@@ -70,9 +74,21 @@ define("ror-app/tests/lint/app.lint-test", [], function () {
     assert.expect(1);
     assert.ok(true, 'components/application-sidebar.js should pass ESLint\n\n');
   });
+  QUnit.test('controllers/organizations.js/index.js', function (assert) {
+    assert.expect(1);
+    assert.ok(true, 'controllers/organizations.js/index.js should pass ESLint\n\n');
+  });
+  QUnit.test('controllers/organizations.js/show.js', function (assert) {
+    assert.expect(1);
+    assert.ok(true, 'controllers/organizations.js/show.js should pass ESLint\n\n');
+  });
   QUnit.test('formats.js', function (assert) {
     assert.expect(1);
     assert.ok(true, 'formats.js should pass ESLint\n\n');
+  });
+  QUnit.test('models/organization.js', function (assert) {
+    assert.expect(1);
+    assert.ok(true, 'models/organization.js should pass ESLint\n\n');
   });
   QUnit.test('resolver.js', function (assert) {
     assert.expect(1);
@@ -89,6 +105,18 @@ define("ror-app/tests/lint/app.lint-test", [], function () {
   QUnit.test('routes/organizations.js', function (assert) {
     assert.expect(1);
     assert.ok(true, 'routes/organizations.js should pass ESLint\n\n');
+  });
+  QUnit.test('routes/organizations/index.js', function (assert) {
+    assert.expect(1);
+    assert.ok(true, 'routes/organizations/index.js should pass ESLint\n\n');
+  });
+  QUnit.test('routes/organizations/show.js', function (assert) {
+    assert.expect(1);
+    assert.ok(true, 'routes/organizations/show.js should pass ESLint\n\n');
+  });
+  QUnit.test('serializers/application.js', function (assert) {
+    assert.expect(1);
+    assert.ok(true, 'serializers/application.js should pass ESLint\n\n');
   });
 });
 define("ror-app/tests/lint/templates.template.lint-test", [], function () {
@@ -119,6 +147,10 @@ define("ror-app/tests/lint/templates.template.lint-test", [], function () {
     assert.expect(1);
     assert.ok(true, 'ror-app/templates/organizations.hbs should pass TemplateLint.\n\n');
   });
+  QUnit.test('ror-app/templates/organizations/index.hbs', function (assert) {
+    assert.expect(1);
+    assert.ok(true, 'ror-app/templates/organizations/index.hbs should pass TemplateLint.\n\n');
+  });
 });
 define("ror-app/tests/lint/tests.lint-test", [], function () {
   "use strict";
@@ -140,9 +172,17 @@ define("ror-app/tests/lint/tests.lint-test", [], function () {
     assert.expect(1);
     assert.ok(true, 'test-helper.js should pass ESLint\n\n');
   });
+  QUnit.test('unit/models/organization-test.js', function (assert) {
+    assert.expect(1);
+    assert.ok(true, 'unit/models/organization-test.js should pass ESLint\n\n');
+  });
   QUnit.test('unit/routes/organizations-test.js', function (assert) {
     assert.expect(1);
     assert.ok(true, 'unit/routes/organizations-test.js should pass ESLint\n\n');
+  });
+  QUnit.test('unit/serializers/application-test.js', function (assert) {
+    assert.expect(1);
+    assert.ok(true, 'unit/serializers/application-test.js should pass ESLint\n\n');
   });
 });
 define("ror-app/tests/test-helper", ["ror-app/app", "ror-app/config/environment", "@ember/test-helpers", "ember-qunit"], function (_app, _environment, _testHelpers, _emberQunit) {
@@ -150,6 +190,19 @@ define("ror-app/tests/test-helper", ["ror-app/app", "ror-app/config/environment"
 
   (0, _testHelpers.setApplication)(_app.default.create(_environment.default.APP));
   (0, _emberQunit.start)();
+});
+define("ror-app/tests/unit/models/organization-test", ["qunit", "ember-qunit"], function (_qunit, _emberQunit) {
+  "use strict";
+
+  (0, _qunit.module)('Unit | Model | organization', function (hooks) {
+    (0, _emberQunit.setupTest)(hooks); // Replace this with your real tests.
+
+    (0, _qunit.test)('it exists', function (assert) {
+      let store = this.owner.lookup('service:store');
+      let model = store.createRecord('organization', {});
+      assert.ok(model);
+    });
+  });
 });
 define("ror-app/tests/unit/routes/organizations-test", ["qunit", "ember-qunit"], function (_qunit, _emberQunit) {
   "use strict";
@@ -159,6 +212,25 @@ define("ror-app/tests/unit/routes/organizations-test", ["qunit", "ember-qunit"],
     (0, _qunit.test)('it exists', function (assert) {
       let route = this.owner.lookup('route:organizations');
       assert.ok(route);
+    });
+  });
+});
+define("ror-app/tests/unit/serializers/application-test", ["qunit", "ember-qunit"], function (_qunit, _emberQunit) {
+  "use strict";
+
+  (0, _qunit.module)('Unit | Serializer | application', function (hooks) {
+    (0, _emberQunit.setupTest)(hooks); // Replace this with your real tests.
+
+    (0, _qunit.test)('it exists', function (assert) {
+      let store = this.owner.lookup('service:store');
+      let serializer = store.serializerFor('organization');
+      assert.ok(serializer);
+    });
+    (0, _qunit.test)('it serializes records', function (assert) {
+      let store = this.owner.lookup('service:store');
+      let record = store.createRecord('organization', {});
+      let serializedRecord = record.serialize();
+      assert.ok(serializedRecord);
     });
   });
 });

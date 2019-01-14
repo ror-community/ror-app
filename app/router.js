@@ -7,7 +7,9 @@ const Router = EmberRouter.extend({
 });
 
 Router.map(function() {
-  this.route('organizations');
+  this.route('organizations', function() {
+    this.route('show', { path: '/:organization_id' });
+  });
 });
 
 export default Router;
