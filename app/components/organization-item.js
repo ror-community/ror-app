@@ -7,6 +7,9 @@ export default Component.extend({
   didInsertElement() {
     this.set('aliases', this.model.get('aliases').join(', '));
     this.set('acronyms', this.model.get('acronyms').join(', '));
+    this.set('labels', this.model.get('labels').map(label => { 
+      return label.label;
+    }));
 
     this.set('grid', this.model.get('external_ids.GRID').preferred);
     if (this.model.get('external_ids.ISNI')) {

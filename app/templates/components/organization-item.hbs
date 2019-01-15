@@ -3,9 +3,9 @@
     <div class="card">
       <div class="card-header">
         <h4 class="card-title">{{model.name}}</h4>
-        {{#if (or aliases acronyms)}}
+        {{#if (or aliases acronyms labels)}}
           <p class="card-category">
-            {{aliases}}{{if (and aliases acronyms) ", " ""}}{{acronyms}}
+            {{aliases}}{{if (and aliases acronyms) ", " ""}}{{acronyms}}{{if (and (or aliases acronyms) labels) ", " ""}}{{labels}}
           </p>
         {{/if}}
       </div>
