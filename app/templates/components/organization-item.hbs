@@ -20,13 +20,13 @@
         <h6>Other Identifiers</h6>
         <p>GRID <a target="_blank" rel="noopener" href="https://grid.ac/institutes/{{grid}}">{{grid}}</a><br>
         {{#if isni}}
-          ISNI {{isni}}<br>
+          ISNI <a target="_blank" rel="noopener" href="http://isni.org/isni/{{isni}}">{{isni}}</a><br>
         {{/if}}
         {{#if fundref}}
-          Crossref Funder ID {{fundref}}<br>
+          Crossref Funder ID <a target="_blank" rel="noopener" href="https://api.crossref.org/funders/{{fundref}}">{{fundref}}</a><br>
         {{/if}}
         {{#if wikidata}}
-          Wikidata {{wikidata}}<br>
+          Wikidata <a target="_blank" rel="noopener" href="https://www.wikidata.org/wiki/{{wikidata}}">{{wikidata}}</a><br>
         {{/if}}
         </p>
 
