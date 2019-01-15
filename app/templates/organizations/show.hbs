@@ -1,0 +1,11 @@
+<div class="content">
+  <div class="container-fluid">
+    {{#if model}}
+      {{#each model as |organization|}}
+        {{organization-item model=organization}}
+      {{/each}}
+    {{else}}
+
+    {{/if}}
+  </div>
+</div>

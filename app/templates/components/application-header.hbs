@@ -9,8 +9,8 @@
   
     <div class="collapse navbar-collapse justify-content-end">
       <ul class="nav navbar-nav mr-auto">
-        <form class="navbar-form navbar-left navbar-search-form" role="search">
-          {{input type="text" value=query placeholder="Search..." class="form-control ml-5"}}
+        <form {{action "doSearch" query on="submit"}} class="navbar-form navbar-left navbar-search-form" role="search">
+          {{input name="query" value=query class="form-control ml-5" placeholder='Search...' escape-press=(action 'clear') enter=(action 'doSearch')}}
         </form>
       </ul>
     </div>

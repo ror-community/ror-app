@@ -1,0 +1,39 @@
+<div class="row">  
+  <div class="col-lg-9 col-sm-12">
+    <div class="card">
+      <div class="card-header">
+        <h4 class="card-title">{{model.name}}</h4>
+        {{#if (or aliases acronyms)}}
+          <p class="card-category">
+            {{aliases}}{{if (and aliases acronyms) ", " ""}}{{acronyms}}
+          </p>
+        {{/if}}
+      </div>
+      <div class="card-body">
+        {{#if model.links}}
+          <h6>URL</h6>
+          {{#each model.links as |link|}}
+            <p><a target="_blank" rel="noopener" href={{link}}>{{link}}</a></p>
+          {{/each}}
+        {{/if}}
+
+        <h6>Other Identifiers</h6>
+        <p>GRID <a target="_blank" rel="noopener" href="https://grid.ac/institutes/{{model.local}}">{{model.local}}</a></p>
+
+        {{#if model.types}}
+          <h6>Organization Type</h6>
+          {{#each model.types as |type|}}
+            <p>{{type}}</p>
+          {{/each}}
+        {{/if}}
+        
+        <h6>Country</h6>
+        {{model.country.country_name}}
+      </div>
+      <div class="card-footer">
+        <hr>
+          <a target="_blank" rel="noopener" href={{model.id}}><i class="fa fa-external-link"></i> {{model.id}}</a>
+      </div>
+    </div>      
+  </div>
+</div>
