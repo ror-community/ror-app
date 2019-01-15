@@ -18,11 +18,15 @@
         {{/if}}
 
         <h6>Other Identifiers</h6>
-        <p>GRID <a target="_blank" rel="noopener" href="https://grid.ac/institutes/{{model.local}}">{{model.local}}</a><br>
-        {{#if model.external_ids}}
-          {{#each-in external_ids as |identifier identifier_values|}}
-            {{identifier}} {{identifier_values}}<br>
-          {{/each-in}}
+        <p>GRID <a target="_blank" rel="noopener" href="https://grid.ac/institutes/{{grid}}">{{grid}}</a><br>
+        {{#if isni}}
+          ISNI {{isni}}<br>
+        {{/if}}
+        {{#if fundref}}
+          Crossref Funder ID {{fundref}}<br>
+        {{/if}}
+        {{#if wikidata}}
+          Wikidata {{wikidata}}<br>
         {{/if}}
         </p>
 
