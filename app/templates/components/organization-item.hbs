@@ -18,7 +18,13 @@
         {{/if}}
 
         <h6>Other Identifiers</h6>
-        <p>GRID <a target="_blank" rel="noopener" href="https://grid.ac/institutes/{{model.local}}">{{model.local}}</a></p>
+        <p>GRID <a target="_blank" rel="noopener" href="https://grid.ac/institutes/{{model.local}}">{{model.local}}</a><br>
+        {{#if model.external_ids}}
+          {{#each-in external_ids as |identifier identifier_values|}}
+            {{identifier}} {{identifier_values}}<br>
+          {{/each-in}}
+        {{/if}}
+        </p>
 
         {{#if model.types}}
           <h6>Organization Type</h6>
@@ -29,10 +35,10 @@
         
         <h6>Country</h6>
         {{model.country.country_name}}
-      </div>
-      <div class="card-footer">
+
         <hr>
-          <a target="_blank" rel="noopener" href={{model.id}}><i class="fa fa-external-link"></i> {{model.id}}</a>
+
+        {{#link-to "organizations.show" model.id}}<i class="fa fa-external-link"></i> https://{{model.id}}{{/link-to}}
       </div>
     </div>      
   </div>

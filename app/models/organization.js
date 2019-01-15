@@ -7,6 +7,7 @@ export default DS.Model.extend({
   links: DS.attr(),
   aliases: DS.attr(),
   acronyms: DS.attr(),
+  external_ids: DS.attr(),
   wikipediaUrl: DS.attr('string'),
   labels: DS.attr(),
   country: DS.attr()

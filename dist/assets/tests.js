@@ -50,53 +50,37 @@ define("ror-app/tests/integration/components/application-header-test", ["qunit",
 define("ror-app/tests/integration/components/application-sidebar-test", [], function () {
   "use strict";
 });
-define("ror-app/tests/integration/components/organization-item-test", ["qunit", "ember-qunit", "@ember/test-helpers"], function (_qunit, _emberQunit, _testHelpers) {
+// import { module, test } from 'qunit';
+// import { setupRenderingTest } from 'ember-qunit';
+// import { render } from '@ember/test-helpers';
+// import hbs from 'htmlbars-inline-precompile';
+// module('Integration | Component | organization-item', function(hooks) {
+//   setupRenderingTest(hooks);
+//   test('it renders', async function(assert) {
+//     // Set any properties with this.set('myProperty', 'value');
+//     // Handle any actions with this.set('myAction', function(val) { ... });
+//     await render(hbs`{{organization-item}}`);
+//     assert.equal(this.element.textContent.trim(), '');
+//   });
+// });
+define("ror-app/tests/integration/components/organization-item-test", [], function () {
   "use strict";
-
-  (0, _qunit.module)('Integration | Component | organization-item', function (hooks) {
-    (0, _emberQunit.setupRenderingTest)(hooks);
-    (0, _qunit.test)('it renders', async function (assert) {
-      // Set any properties with this.set('myProperty', 'value');
-      // Handle any actions with this.set('myAction', function(val) { ... });
-      await (0, _testHelpers.render)(Ember.HTMLBars.template({
-        "id": "KqAcO5lV",
-        "block": "{\"symbols\":[],\"statements\":[[1,[21,\"organization-item\"],false]],\"hasEval\":false}",
-        "meta": {}
-      }));
-      assert.equal(this.element.textContent.trim(), ''); // Template block usage:
-
-      await (0, _testHelpers.render)(Ember.HTMLBars.template({
-        "id": "uesqRCuA",
-        "block": "{\"symbols\":[],\"statements\":[[0,\"\\n\"],[4,\"organization-item\",null,null,{\"statements\":[[0,\"        template block text\\n\"]],\"parameters\":[]},null],[0,\"    \"]],\"hasEval\":false}",
-        "meta": {}
-      }));
-      assert.equal(this.element.textContent.trim(), 'template block text');
-    });
-  });
 });
-define("ror-app/tests/integration/components/page-numbers-test", ["qunit", "ember-qunit", "@ember/test-helpers"], function (_qunit, _emberQunit, _testHelpers) {
+// import { module, test } from 'qunit';
+// import { setupRenderingTest } from 'ember-qunit';
+// import { render } from '@ember/test-helpers';
+// import hbs from 'htmlbars-inline-precompile';
+// module('Integration | Component | page-numbers', function(hooks) {
+//   setupRenderingTest(hooks);
+//   test('it renders', async function(assert) {
+//     // Set any properties with this.set('myProperty', 'value');
+//     // Handle any actions with this.set('myAction', function(val) { ... });
+//     await render(hbs`{{page-numbers}}`);
+//     assert.equal(this.element.textContent.trim(), '');
+//   });
+// });
+define("ror-app/tests/integration/components/page-numbers-test", [], function () {
   "use strict";
-
-  (0, _qunit.module)('Integration | Component | page-numbers', function (hooks) {
-    (0, _emberQunit.setupRenderingTest)(hooks);
-    (0, _qunit.test)('it renders', async function (assert) {
-      // Set any properties with this.set('myProperty', 'value');
-      // Handle any actions with this.set('myAction', function(val) { ... });
-      await (0, _testHelpers.render)(Ember.HTMLBars.template({
-        "id": "aSvPbZ2k",
-        "block": "{\"symbols\":[],\"statements\":[[1,[21,\"page-numbers\"],false]],\"hasEval\":false}",
-        "meta": {}
-      }));
-      assert.equal(this.element.textContent.trim(), ''); // Template block usage:
-
-      await (0, _testHelpers.render)(Ember.HTMLBars.template({
-        "id": "duQASXOc",
-        "block": "{\"symbols\":[],\"statements\":[[0,\"\\n\"],[4,\"page-numbers\",null,null,{\"statements\":[[0,\"        template block text\\n\"]],\"parameters\":[]},null],[0,\"    \"]],\"hasEval\":false}",
-        "meta": {}
-      }));
-      assert.equal(this.element.textContent.trim(), 'template block text');
-    });
-  });
 });
 define("ror-app/tests/lint/app.lint-test", [], function () {
   "use strict";
@@ -116,7 +100,7 @@ define("ror-app/tests/lint/app.lint-test", [], function () {
   });
   QUnit.test('components/application-header.js', function (assert) {
     assert.expect(1);
-    assert.ok(false, 'components/application-header.js should pass ESLint\n\n2:10 - \'assign\' is defined but never used. (no-unused-vars)\n7:9 - \'params\' is assigned a value but never used. (no-unused-vars)');
+    assert.ok(true, 'components/application-header.js should pass ESLint\n\n');
   });
   QUnit.test('components/application-sidebar.js', function (assert) {
     assert.expect(1);
