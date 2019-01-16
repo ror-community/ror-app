@@ -1,5 +1,5 @@
 import { underscore } from '@ember/string';
-import { merge } from '@ember/polyfills';
+import { assign } from '@ember/polyfills';
 import DS from 'ember-data';
 
 export default DS.JSONSerializer.extend({
@@ -13,7 +13,7 @@ export default DS.JSONSerializer.extend({
       return item;
     });
     let data = this._super(store, primaryModelClass, payload, id, requestType);
-    return merge(data, meta);
+    return assign(data, meta);
   },
   normalizeSingleResponse(store, primaryModelClass, payload, id, requestType) {
     // strip "https://" from id
