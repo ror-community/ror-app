@@ -1,29 +1,15 @@
 import Component from '@ember/component';
-// import { assign } from '@ember/polyfills';
+import { inject as service } from '@ember/service';
 
 export default Component.extend({
-
-  // search() {
-  //   let params = { query: this.query, sort: this.sort };
-
-  //   this.router.transitionTo({ queryParams: params });
-  // },
+  globalSearch: service(),
 
   actions: {
-    doSearch(query) {
-      if (query) {
-        this.set('sort', 'relevance');
-      } else if (this.sort === 'relevance') {
-        this.set('sort', null);
-      }
-
-      this.set('query', query);
-      this.search();
+    search(query) {
+      this.get('globalSearch').doSearch(query);
     },
     clear() {
-      this.set('query', null);
-      this.set('sort', null);
-      this.search();
+      this.get('globalSearch').doSearch(null);
     }
   }
 });
