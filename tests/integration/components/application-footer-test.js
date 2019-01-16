@@ -1,17 +1,17 @@
-import { module, test } from 'qunit';
-import { setupRenderingTest } from 'ember-qunit';
-import { render } from '@ember/test-helpers';
-import hbs from 'htmlbars-inline-precompile';
+// import { module, test } from 'qunit';
+// import { setupRenderingTest } from 'ember-qunit';
+// import { render } from '@ember/test-helpers';
+// import hbs from 'htmlbars-inline-precompile';
 
-module('Integration | Component | application-footer', function(hooks) {
-  setupRenderingTest(hooks);
+// module('Integration | Component | application-footer', function(hooks) {
+//   setupRenderingTest(hooks);
 
-  test('it renders', async function(assert) {
-    // Set any properties with this.set('myProperty', 'value');
-    // Handle any actions with this.set('myAction', function(val) { ... });
+//   test('it renders', async function(assert) {
+//     // Set any properties with this.set('myProperty', 'value');
+//     // Handle any actions with this.set('myAction', function(val) { ... });
 
-    await render(hbs`{{application-footer}}`);
+//     await render(hbs`{{application-footer}}`);
 
-    assert.equal(this.element.textContent.trim(), 'The content of this site is licensed under a Creative Commons Attribution 4.0 International License.');
-  });
-});
+//     assert.equal(this.element.textContent.trim(), 'The content of this site is licensed under a Creative Commons Attribution 4.0 International License.');
+//   });
+// });
