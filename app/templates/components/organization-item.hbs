@@ -18,29 +18,19 @@
                   <a target="_blank" rel="noopener" class="card-link" href={{link}}>{{link}}</a><br>
                 {{/each}}
               {{/if}}
-
-              {{#if model.types}}
-                <h6 class="mt-3 mb-0">Organization Type</h6>
-                {{#each model.types as |type|}}
-                  {{type}}<br>
-                {{/each}}
-              {{/if}}
-              
-              <h6 class="mt-3 mb-0">Country</h6>
-              {{model.country.country_name}}<br>
             </div>
 
             <div class="col-md-6">
               <h6 class="mt-3 mb-0">Other Identifiers</h6>
-              GRID <a target="_blank" rel="noopener" class="card-link" shref="https://grid.ac/institutes/{{grid}}">{{grid}}</a><br>
+              <span class="text-primary">GRID</span> <a target="_blank" rel="noopener" class="card-link" shref="https://grid.ac/institutes/{{grid}}">{{grid}}</a><br>
               {{#if isni}}
-                ISNI <a target="_blank" rel="noopener" class="card-link" href="http://isni.org/isni/{{isni}}">{{isni}}</a><br>
+                <span class="text-primary">ISNI</span> <a target="_blank" rel="noopener" class="card-link" href="http://isni.org/isni/{{isni}}">{{isni}}</a><br>
               {{/if}}
               {{#if fundref}}
-                Crossref Funder ID <a target="_blank" class="card-link" rel="noopener" href="https://api.crossref.org/funders/{{fundref}}">{{fundref}}</a><br>
+                <span class="text-primary">Crossref Funder ID</span> <a target="_blank" class="card-link" rel="noopener" href="https://api.crossref.org/funders/{{fundref}}">{{fundref}}</a><br>
               {{/if}}
               {{#if wikidata}}
-                Wikidata <a target="_blank" rel="noopener" class="card-link" href="https://www.wikidata.org/wiki/{{wikidata}}">{{wikidata}}</a><br>
+                <span class="text-primary">Wikidata</span> <a target="_blank" rel="noopener" class="card-link" href="https://www.wikidata.org/wiki/{{wikidata}}">{{wikidata}}</a><br>
               {{/if}}
             </div>
           </div>
@@ -48,6 +38,10 @@
 
         <hr>
 
+        <span class="badge badge-primary float-right ml-2">{{model.country.country_name}}</span>
+        {{#each model.types as |type|}}
+          <span class="badge badge-default float-right">{{type}}</span>
+        {{/each}}
         {{#link-to "organizations.show" model.id class="card-link"}}<i class="fa fa-external-link"></i> https://ror.org/{{model.id}}{{/link-to}}
       </div>
     </div>      
