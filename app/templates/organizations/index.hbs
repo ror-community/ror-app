@@ -10,11 +10,7 @@
       {{/each}}
       
       {{#if (gt model.meta.totalPages 1)}}
-        <div class="row">  
-          <div class="col-lg-8 col-sm-12">
-            {{page-numbers model=model link="organizations"}}
-          </div>
-        </div>
+        {{page-numbers model=model link="organizations"}}
       {{/if}}
     {{else}}
       {{#bs-alert dismissible=false type="warning"}}

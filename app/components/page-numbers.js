@@ -2,9 +2,9 @@ import Component from '@ember/component';
 import { computed } from '@ember/object';
 
 export default Component.extend({
-  tagName: 'nav',
+  tagName: 'row',
 
-  currentPage: computed.alias("model.queryParams.page"),
+  currentPage: computed.alias("model.query.page"),
   totalPages: computed.alias("model.meta.totalPages"),
 
   pageItems: computed("currentPage","totalPages", function() {
