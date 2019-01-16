@@ -4,10 +4,13 @@
       {{#each model as |organization|}}
         {{organization-item model=organization}}
       {{/each}}
-      <div class="text-center">
-        {{#if (gt model.meta.totalPages 1)}}
-          {{page-numbers model=model link="organizations"}}
-        {{/if}}
+      
+      <div class="row">  
+        <div class="col-lg-9 col-sm-12">
+          {{#if (gt model.meta.totalPages 1)}}
+            {{page-numbers model=model link="organizations"}}
+          {{/if}}
+        </div>
       </div>
     {{else}}
       {{#bs-alert dismissible=false type="warning"}}

@@ -1,17 +1,24 @@
 <nav class="navbar navbar-expand-lg">
   <div class="container">
-    <span class="navbar-brand mb-0 h1">{{title}}</span>
-    <button class="navbar-toggler navbar-toggler-right" type="button" data-toggle="collapse"  aria-controls="navigation-index" aria-expanded="false" aria-label="Toggle navigation">
-      <span class="navbar-toggler-bar burger-lines"></span>
-      <span class="navbar-toggler-bar burger-lines"></span>
-      <span class="navbar-toggler-bar burger-lines"></span>
-    </button>
+    <div class="navbar-translate">
+      <span class="navbar-brand mb-0 h1">{{title}}</span>
+      <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#example-navbar-transparent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-bar bar1"></span>
+        <span class="navbar-toggler-bar bar2"></span>
+        <span class="navbar-toggler-bar bar3"></span>
+      </button>
+    </div>
   
-    <div class="collapse navbar-collapse justify-content-end">
+    <div class="collapse navbar-collapse">
       <ul class="nav navbar-nav mr-auto">
-        <form {{action "doSearch" query on="submit"}} class="navbar-form navbar-left navbar-search-form" role="search">
-          {{input name="query" value=query class="form-control ml-5" placeholder='Search...' escape-press=(action 'clear') enter=(action 'doSearch')}}
+        <form {{action "doSearch" query on="submit"}} class="form-inline ml-auto" role="search">
+          {{input name="query" value=query class="form-control" placeholder='Search...' escape-press=(action 'clear') enter=(action 'doSearch')}}
         </form>
+        <li class="nav-item">
+          <a class="nav-link" href="#">
+            <i class="fa fa-twitter"></i>
+          </a>
+        </li>
       </ul>
     </div>
   </div>
