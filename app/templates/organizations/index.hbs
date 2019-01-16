@@ -1,6 +1,10 @@
 <div class="content">
   <div class="container-fluid">
     {{#if model}}
+      {{#if (gt model.meta.total 1)}}
+        <h4 class="ml-3">{{format-number model.meta.total}} Organizations</h4>
+      {{/if}}
+
       {{#each model as |organization|}}
         {{organization-item model=organization}}
       {{/each}}
