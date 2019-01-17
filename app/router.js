@@ -7,8 +7,10 @@ const Router = EmberRouter.extend({
 });
 
 Router.map(function() {
-  this.route('organizations', function() {
+  this.route('organizations', { path: '/' }, function() {
+    this.route('index', { path: '/search' });
     this.route('show', { path: '/:organization_id' });
+    this.route('about', { path: '/' });
   });
 });
 
