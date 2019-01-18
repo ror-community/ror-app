@@ -7,7 +7,7 @@
           {{#each model.types as |type|}}
             <span class="badge badge-type float-right">{{type}}</span>
           {{/each}}</small>
-          {{#link-to "organizations.show" model.id class="card-link"}}https://ror.org/{{model.id}}{{/link-to}}
+          <img class="ror-id mb-1" src="/assets/ror-logo-small.png" alt="ROR ID"> {{#link-to "organizations.show" model.id class="card-link logo-link"}}https://ror.org/{{model.id}}{{/link-to}}
         </h5>
         <hr>
 

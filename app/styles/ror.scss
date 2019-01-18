@@ -12,23 +12,28 @@
 
   & a:not(.btn):not(.nav-link):not([data-toggle='collapse']):not(.footer-link){
       text-decoration: none;
-      color: $brand-info;
+      color: $primary-color;
 
       &:hover,
       &:focus{
-          color: darken($brand-info, 20%);
+          color: darken($primary-color, 20%);;
           border-bottom: 0;
       }
   }
 }
 
 // colors for filters
-$type-color: #108080 !default;
-$country-color: #808004 !default;
+$type-color: #ad9a27 !default;
+$country-color: #789aa1 !default;
 
 .badge-type{
   @include badge-color($type-color);
 }
 .badge-country{
   @include badge-color($country-color);
+}
+
+img.ror-id {
+  width: 24px;
+  height: 24px;
 }
