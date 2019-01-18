@@ -4,6 +4,10 @@
   padding: 0 1em;
 }
 
+.info-search {
+  min-height: calc(100vh - 200px);
+}
+
 // override, color links
 .card {
   a[data-toggle='collapse']{
