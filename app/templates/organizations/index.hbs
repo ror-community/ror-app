@@ -10,7 +10,7 @@
       {{/each}}
       
       {{#if (gt model.meta.totalPages 1)}}
-        {{page-numbers model=model link="organizations"}}
+        {{page-numbers model=model link="organizations.index"}}
       {{/if}}
     {{else}}
       {{#bs-alert dismissible=false type="warning"}}
