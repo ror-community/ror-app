@@ -1,4 +1,34 @@
+// limit max-width on large screens
 .container-fluid {
   max-width: 1420px;
   padding: 0 1em;
+}
+
+// override, color links
+.card {
+  a[data-toggle='collapse']{
+    text-decoration: none;
+  }
+
+  & a:not(.btn):not(.nav-link):not([data-toggle='collapse']):not(.footer-link){
+      text-decoration: none;
+      color: $brand-info;
+
+      &:hover,
+      &:focus{
+          color: darken($brand-info, 20%);
+          border-bottom: 0;
+      }
+  }
+}
+
+// colors for filters
+$type-color: #108080 !default;
+$country-color: #808004 !default;
+
+.badge-type{
+  @include badge-color($type-color);
+}
+.badge-country{
+  @include badge-color($country-color);
 }
