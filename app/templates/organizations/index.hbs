@@ -13,9 +13,13 @@
         {{page-numbers model=model link="organizations.index"}}
       {{/if}}
     {{else}}
-      {{#bs-alert dismissible=false type="warning"}}
-        No Organizations found.
-      {{/bs-alert}}
+      <div class="row">  
+        <div class="col-lg-8 col-sm-12">
+          {{#bs-alert dismissible=false type="warning"}}
+            No Organizations found.
+          {{/bs-alert}}
+        </div>
+      </div>
     {{/if}}
   </div>
 </div>
