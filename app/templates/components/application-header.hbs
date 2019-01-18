@@ -1,7 +1,9 @@
-<nav class="navbar navbar-expand-lg">
+<nav class="navbar navbar-expand-lg bg-white">
   <div class="container-fluid">
     <div class="navbar-translate">
-      <span class="navbar-brand mb-0 h1">ROR Search</span>
+      <a class="navbar-brand" href="/">
+        Research Organization Registry
+      </a>
       <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#example-navbar-transparent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-bar bar1"></span>
         <span class="navbar-toggler-bar bar2"></span>
@@ -14,8 +16,25 @@
         <form {{action "search" query on="submit"}} class="form-inline ml-auto" role="search">
           {{input name="query" value=query class="form-control col-sm-8" placeholder='Search...' escape-press=(action 'clear') enter=(action 'search')}}
         </form>
+      </ul>
+      <ul class="nav navbar-nav ml-auto">
         <li class="nav-item">
-          <a class="nav-link" href="#">
+          <a class="nav-link" target="_blank" rel="noopener" href="https://ror.org/about">
+            <p>About</p>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" target="_blank" rel="noopener" href="https://ror.org/scope">
+            <p>Scope</p>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" target="_blank" rel="noopener" href="https://ror.org/blog">
+            <p>Blog</p>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" target="_blank" rel="noopener" href="https://twitter.com/ResearchOrgs">
             <i class="fa fa-twitter"></i>
           </a>
         </li>
