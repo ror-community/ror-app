@@ -1,9 +1,5 @@
 @import "ember-bootstrap/bootstrap";
 
- // customizations
- @import 'ror';
- @import 'site';
-
 /*!
 
  =========================================================
@@ -90,3 +86,7 @@
  
  @import 'now-ui-kit/responsive';
  
+  // customizations
+  @import 'ror';
+  @import 'site';
+  
