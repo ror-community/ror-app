@@ -41,25 +41,3 @@ img.ror-id {
   width: 24px;
   height: 24px;
 }
-
-/* contact form specific (though most of this comes straight from mailchimp) */
-
-.contact-shortcode {
-  max-width: 600px;
-}
-
-/*!
-* Mailchimp stylings
-*/
-#mc_embed_signup form {padding: 0;}
-#mc_embed_signup .button {background-color: #ff6900;}
-#mc_embed_signup input {border: 0px; border-radius: 0px; -webkit-border-radius: 0px; -moz-border-radius: 0px;}
-#mc_embed_signup h2 {margin:0; font-size: 1.2em;text-transform:none; font-weight: 600;}
-#mc_embed_signup .mc-field-group{width:80%;padding-top:.5em;}
-#mc_embed_signup #mce-success-response,
-#mc_embed_signup #mce-error-response {color:#505759;}
-
-.required {
-  color: #999999;
-  text-transform: none;
-}
