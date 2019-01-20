@@ -51,9 +51,13 @@
     }
   }
 
-  ul li, ol li {
+  ul li {
     line-height: 1.61em;
     font-weight: 300;
     font-size: 1.2em;
+  }
+
+  ul ul li {
+    font-size: 1em;
   }
 }
