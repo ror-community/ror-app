@@ -60,4 +60,19 @@
   ul ul li {
     font-size: 1em;
   }
+
+  &[data-background-color="dark"]{
+    background-color: #3f4547;
+  }
+}
+
+.section-banner {
+  z-index: 1;
+  margin-top: -20px;
+  padding: 0;
+  
+  img {
+    width: 100%;
+    max-height: 400px;
+  }
 }
