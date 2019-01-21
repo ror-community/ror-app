@@ -61,8 +61,8 @@
     font-size: 1em;
   }
 
-  &[data-background-color="dark"]{
-    background-color: #3f4547;
+  &[data-background-color="green"]{
+    background-color: $primary-color;
   }
 }
 
