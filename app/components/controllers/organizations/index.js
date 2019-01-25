@@ -1,9 +1,10 @@
 import Controller from '@ember/controller';
 export default Controller.extend({
-  queryParams: ['query', 'sort', 'page'],
+  queryParams: ['query', 'sort', 'page', 'qp'],
   query: null,
   sort: null,
   page: 1,
+  qp: 'multiMatch',
 
   actions: {
     doSearch(query) {
