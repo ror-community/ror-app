@@ -4,7 +4,6 @@ export default Controller.extend({
   query: null,
   sort: null,
   page: 1,
-  qp: 'multiMatch',
 
   actions: {
     doSearch(query) {
