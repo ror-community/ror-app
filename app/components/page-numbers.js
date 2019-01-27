@@ -8,7 +8,7 @@ export default Component.extend({
   totalPages: computed.alias("model.meta.totalPages"),
 
   pageItems: computed("currentPage","totalPages", function() {
-    const page = Number(this.get("currentPage"));
+    const page = Number(this.get("currentPage") || 1);
     const totalPages = Number(this.get("totalPages"));
 
     return Array.from(Array(totalPages).keys()).reduce(function (sum, i) {
