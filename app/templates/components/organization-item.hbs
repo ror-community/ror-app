@@ -3,10 +3,6 @@
     <div class="card">
       <div class="card-body">
         <h5 class="card-title">
-          <small><span class="badge badge-country float-right ml-2">{{model.country.country_name}}</span>
-          {{#each model.types as |type|}}
-            <span class="badge badge-type float-right">{{type}}</span>
-          {{/each}}</small>
           <img class="ror-id mb-1" src="/assets/ror-logo-small.png" alt="ROR ID"> {{#link-to "organizations.show" model.id class="card-link logo-link"}}https://ror.org/{{model.id}}{{/link-to}}
         </h5>
         <hr>
@@ -43,6 +39,12 @@
               {{/if}}
             </div>
           </div>
+        </div>
+        <div class="footer text-left">
+          <span class="badge badge-country">{{model.country.country_name}}</span>
+          {{#each model.types as |type|}}
+            <span class="badge badge-type">{{type}}</span>
+          {{/each}}
         </div>
       </div>
     </div>      
