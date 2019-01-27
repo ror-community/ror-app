@@ -15,6 +15,11 @@ before_install:
       CLOUDFRONT_DISTRIBUTION_ID=$CLOUDFRONT_DISTRIBUTION_ID;
       cp .env.production .env;
       AUTO_DEPLOY=true;
+    elif [ "$TRAVIS_BRANCH" == "dev" ]; then
+      AWS_BUCKET="search.dev.ror.org";
+      CLOUDFRONT_DISTRIBUTION_ID=$CLOUDFRONT_DISTRIBUTION_DEV_ID;
+      cp .env.dev .env;
+      AUTO_DEPLOY=true;
     else
       AWS_BUCKET="search.ror.org";
       CLOUDFRONT_DISTRIBUTION_ID=$CLOUDFRONT_DISTRIBUTION_ID;
