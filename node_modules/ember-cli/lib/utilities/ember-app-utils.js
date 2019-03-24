@@ -95,7 +95,7 @@ function contentFor(config, match, type, options) {
       content.push(calculateBaseTag(config.baseURL, config.locationType));
 
       if (options.storeConfigInMeta) {
-        content.push(`<meta name="${config.modulePrefix}/config/environment" content="${escape(JSON.stringify(config))}" />`);
+        content.push(`<meta name="${config.modulePrefix}/config/environment" content="${encodeURIComponent(JSON.stringify(config))}" />`);
       }
 
       break;
@@ -170,7 +170,7 @@ function configReplacePatterns(options) {
       return convertObjectToString(config.EmberENV);
     },
   }, {
-    match: /{{content-for ['"](.+)["']}}/g,
+    match: /{{content-for ['"](.+?)["']}}/g,
     replacement(config, match, type) {
       return contentFor(config, match, type, options);
     },
