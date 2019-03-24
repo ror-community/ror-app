@@ -45,7 +45,7 @@ after_success:
       GIT_TAG=$(git describe --tags $(git rev-list --tags --max-count=1));
       sentry-cli releases new ror-app:${GIT_TAG} --finalize --project ror-app;
 
-      if [ "${TRAVIS_TAG?}" ]; then
+      if [ "$TRAVIS_BRANCH" == "master" ]; then
         sentry-cli releases deploys ror-app:${GIT_TAG} new -e production;
       else
         sentry-cli releases deploys ror-app:${GIT_TAG} new -e dev;
