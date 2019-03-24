@@ -48,7 +48,7 @@ after_success:
       if [ "${TRAVIS_TAG?}" ]; then
         sentry-cli releases deploys ror-app:${GIT_TAG} new -e production;
       else
-        sentry-cli releases deploys ror-app:${GIT_TAG} new -e stage;
+        sentry-cli releases deploys ror-app:${GIT_TAG} new -e dev;
       fi
 
       sentry-cli releases set-commits --auto ror-app:${GIT_TAG};
