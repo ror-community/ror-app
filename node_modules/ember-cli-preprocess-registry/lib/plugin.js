@@ -20,9 +20,8 @@ Plugin.prototype.toTree = function() {
 };
 
 Plugin.prototype.getExt = function(inputTreeRoot, inputPath, filename) {
-  if(Array.isArray(this.ext)) {
-    var detect = require('ember-cli-lodash-subset').find;
-    return detect(this.ext, function(ext) {
+  if (Array.isArray(this.ext)) {
+    return this.ext.find(function(ext) {
       var filenameAndExt = filename + '.' + ext;
       return fs.existsSync(path.join(inputTreeRoot, inputPath, filenameAndExt));
     });

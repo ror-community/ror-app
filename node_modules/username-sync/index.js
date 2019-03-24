@@ -19,17 +19,39 @@ module.exports.env = function() {
 };
 
 module.exports.os = function() {
-  if (typeof os.userInfo === 'function') {
-    return os.userInfo().username;
+  try {
+    if (typeof os.userInfo === 'function') {
+      return os.userInfo().username;
+    }
+  } catch(e) {
+    handleUserInfoError(e);
+    return;
   }
 };
 
 module.exports.execSync = function() {
-  var username = require('child_process').execSync('whoami').toString().trim();
+  try {
+    var username = require('child_process').execSync('whoami').toString().trim();
 
-  if (process.platform === 'win32') {
-    username = username.replace(/^.*\\/, ''); // remove DOMAIN stuff
+    if (username) {
+      if (process.platform === 'win32') {
+        return username = username.replace(/^.*\\/, ''); // remove DOMAIN stuff
+      }
+
+      return username;
+    }
+
+    return require('child_process').execSync('id', ['-un']).toString().trim();
+  } catch(e) {
+    handleUserInfoError(e);
+    return;
   }
+};
 
-  return username;
+function handleUserInfoError(e) {
+  if (e !== null && typeof e === 'object' && e.code === 'ENOENT') {
+    // if this is run inside a container such as docker, it will fail to get userinfo()
+  } else {
+   throw (e);
+  }
 };

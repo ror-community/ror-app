@@ -32,11 +32,27 @@ before_install:
 install:
   - yarn install --non-interactive
   - sudo pip install awscli
+  - curl -sL https://sentry.io/get-cli/ | bash
+  - sentry-cli --version
 
 script:
   - yarn test
-
   - ember build --environment=production
+
+after_success:
+  # Send release information to Sentry
+  - if [ "$AUTO_DEPLOY" == "true" ]; then
+      GIT_TAG=$(git describe --tags $(git rev-list --tags --max-count=1));
+      sentry-cli releases new ror-app:${GIT_TAG} --finalize --project ror-app;
+
+      if [ "${TRAVIS_TAG?}" ]; then
+        sentry-cli releases deploys ror-app:${GIT_TAG} new -e production;
+      else
+        sentry-cli releases deploys ror-app:${GIT_TAG} new -e stage;
+      fi
+
+      sentry-cli releases set-commits --auto ror-app:${GIT_TAG};
+    fi
 
 deploy:
   provider: s3

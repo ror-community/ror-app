@@ -1,6 +1,8 @@
 'use strict';
 
 module.exports = function(environment) {
+  const pkg = require('../package.json');
+  
   let ENV = {
     modulePrefix: 'ror-app',
     environment,
@@ -18,6 +20,9 @@ module.exports = function(environment) {
     },
 
     API_URL: process.env.API_URL || "https://api.ror.org",
+    SENTRY_DSN: process.env.SENTRY_DSN || null,
+    VERSION: pkg.version,
+    APP_NAME: pkg.name,
 
     APP: {
       // Here you can pass flags/options to your application instance

@@ -1,4 +1,5 @@
 var ensurePosix = require('ensure-posix-path');
+var hash = require('object-hash');
 
 /**
  * Configures the module resolver. Empty options will reset to default settings
@@ -63,6 +64,16 @@ function resolveModules(options) {
 
     return parentBase.join('/');
   }
+
+  // broccoli-babel-transpiler caching
+
+  moduleResolve.cacheKey = function() {
+    return hash(options);
+  };
+
+  moduleResolve.baseDir = function() {
+    return __dirname;
+  };
 
   // parallel API - enable parallel babel transpilation for the moduleResolve function
   moduleResolve._parallelBabel = {
