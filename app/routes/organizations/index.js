@@ -3,10 +3,6 @@ import { assign } from '@ember/polyfills';
 
 export default Route.extend({
   model(params) {
-    params = assign(params, { 
-      qp: 'multiMatch'
-    });
-
     return this.store.query('organization', params);
   },
 

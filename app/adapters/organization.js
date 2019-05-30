@@ -6,5 +6,13 @@ export default DS.JSONAPIAdapter.extend({
 
   urlForFindRecord(id, modelName) {
     return `${ENV.API_URL}/${modelName}s/ror.org/${id}`;
+  },
+
+  init() {
+    this._super(...arguments);
+
+    this.set('headers', {
+      'ACCEPT': 'application/json'
+    });
   }
 });
