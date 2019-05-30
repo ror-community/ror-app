@@ -1,5 +1,4 @@
 import Route from '@ember/routing/route';
-import { assign } from '@ember/polyfills';
 
 export default Route.extend({
   model(params) {
