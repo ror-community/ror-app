@@ -1,8 +1,6 @@
 import Controller from '@ember/controller';
 export default Controller.extend({
-  queryParams: ['sort', 'page', {
-    query: 'query.ui'
-  }],
+  queryParams: ['sort', 'page', 'query'],
   query: null,
   sort: null,
   page: 1,
