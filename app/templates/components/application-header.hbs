@@ -17,17 +17,32 @@ onCollapse=(action (mut collapsed) true) onExpand=(action (mut collapsed) false)
       {{#navbar.nav class="ml-auto" as |nav|}}
 
       {{#nav.item}}
-      <a class="nav-link" href="/about" {{action navbar.collapse}}>
+      <a class="nav-link" href="/about/" {{action navbar.collapse}}>
         <p>About</p>
       </a>
       {{/nav.item}}
       {{#nav.item}}
-      <a class="nav-link" href="/scope" {{action navbar.collapse}}>
+      <a class="nav-link" href="/scope/" {{action navbar.collapse}}>
         <p>Scope</p>
       </a>
       {{/nav.item}}
       {{#nav.item}}
-      <a class="nav-link" href="/blog" {{action navbar.collapse}}>
+      <a class="nav-link" href="/facts/" {{action navbar.collapse}}>
+        <p>Facts</p>
+      </a>
+      {{/nav.item}}
+      {{#nav.item}}
+      <a class="nav-link" href="/community/" {{action navbar.collapse}}>
+        <p>Community</p>
+      </a>
+      {{/nav.item}}
+      {{#nav.item}}
+      <a class="nav-link" href="/resources/" {{action navbar.collapse}}>
+        <p>Resources</p>
+      </a>
+      {{/nav.item}}
+      {{#nav.item}}
+      <a class="nav-link" href="/blog/" {{action navbar.collapse}}>
         <p>Blog</p>
       </a>
       {{/nav.item}}
