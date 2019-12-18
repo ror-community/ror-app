@@ -1,6 +1,6 @@
 {
   "name": "ror-app",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "description": "Frontend for the Research Organization Registry (ROR).",
   "repository": {
@@ -63,6 +63,7 @@
     "node": "6.* || 8.* || >= 10.*"
   },
   "dependencies": {
-    "@sentry/browser": "^4.6.5"
+    "@sentry/browser": "^5.10.2",
+    "@sentry/integrations": "^5.10.2"
   }
 }
