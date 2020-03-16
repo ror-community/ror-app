@@ -5,7 +5,6 @@ A short introduction of this app could easily go here.
 
 ## Prerequisites
 
-
 You will need the following things properly installed on your computer.
 
 * [Git](https://git-scm.com/)
@@ -47,7 +46,11 @@ Make use of the many generators for code, try `ember help generate` for more det
 
 ### Deploying
 
-Specify what it takes to deploy your app.
+Deployment is handled by Travis automatically after any commit to the repo. 
+
+### Relation to the primary ROR site
+
+Styling for the app is handled externally, in the primary site at https://ror.org. The `<head>` tag in `app/index.html` contains the link to the relevant CSS. Note that the dev branch is pointed at https://*dev*.ror.org instead. 
 
 ## Further Reading / Useful Links
 
