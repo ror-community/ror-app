@@ -1,4 +1,4 @@
-{{#bs-navbar backgroundColor="white" class="navbar-expand-lg" collapsed=collapsed
+{{#bs-navbar backgroundColor="white" class="navbar-expand-lg" 
 onCollapse=(action (mut collapsed) true) onExpand=(action (mut collapsed) false) as |navbar|}}
   <div class="container-fluid">
     <a class="navbar-brand" href="/">
@@ -13,7 +13,7 @@ onCollapse=(action (mut collapsed) true) onExpand=(action (mut collapsed) false)
     
     {{navbar.toggle}}
 
-    {{#navbar.content collapsed=collapsed}}
+    {{#navbar.content}}
       {{#navbar.nav class="ml-auto" as |nav|}}
 
       {{#nav.item}}
