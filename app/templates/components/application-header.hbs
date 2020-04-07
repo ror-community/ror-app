@@ -13,7 +13,7 @@ onCollapse=(action (mut collapsed) true) onExpand=(action (mut collapsed) false)
     
     {{navbar.toggle}}
 
-    {{#navbar.content}}
+    {{#navbar.content collapsed=collapsed}}
       {{#navbar.nav class="ml-auto" as |nav|}}
 
       {{#nav.item}}
