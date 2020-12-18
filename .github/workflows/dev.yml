@@ -31,7 +31,7 @@ jobs:
           cp .env.dev .env;
           yarn install --non-interactive
           yarn test
-          ember build --environment=production
+          yarn build
 
       - name: Deploy 
         uses: reggionick/s3-deploy@v3
