@@ -1,6 +1,6 @@
 # ror-app
 
-![Deploy Dev](https://github.com/ror-community/ror-app/workflows/Deploy%20Dev/badge.svg)
+![Deploy Master](https://github.com/ror-community/ror-app/workflows/Deploy%20Master/badge.svg)
 
 This README outlines the details of collaborating on this Ember application.
 A short introduction of this app could easily go here.
