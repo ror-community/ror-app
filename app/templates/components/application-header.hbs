@@ -1,16 +1,16 @@
-{{#bs-navbar backgroundColor="white" class="navbar-expand-lg" 
+{{#bs-navbar backgroundColor="white" class="navbar-expand-lg"
 onCollapse=(action (mut collapsed) true) onExpand=(action (mut collapsed) false) as |navbar|}}
   <div class="container-fluid">
     <a class="navbar-brand" href="/">
       <img style="width:150px !important;" class="w-50 pl-0 pr-0 d-none d-sm-inline" src="/assets/ror-logo.svg" alt="Research Organization Registry logo">
       <h4 class="d-block d-sm-none mt-3">ROR</h4>
     </a>
-    
+
     <form {{action "search" query on="submit"}} class="form-inline mw-25" role="search">
       {{input name="query" value=query class="form-control" placeholder='Search Registry...' escape-press=(action
         'clear') enter=(action 'search')}}
     </form>
-    
+
     {{navbar.toggle}}
 
     {{#navbar.content}}
@@ -37,7 +37,7 @@ onCollapse=(action (mut collapsed) true) onExpand=(action (mut collapsed) false)
       </a>
       {{/nav.item}}
       {{#nav.item}}
-      <a class="nav-link" href="/resources/">
+      <a class="nav-link" href="https://ror.readme.io" target="_support">
         <p>Resources</p>
       </a>
       {{/nav.item}}
