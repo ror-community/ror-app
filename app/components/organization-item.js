@@ -1,6 +1,7 @@
 import Component from '@ember/component';
 
 export default Component.extend({
+  grid: null,
   isni: null,
   wikidata: null,
 
@@ -12,7 +13,7 @@ export default Component.extend({
     }));
 
     if (this.model.get('external_ids.GRID').preferred) {
-      grid = this.model.get('external_ids.GRID').preferred;
+      let grid = this.model.get('external_ids.GRID').preferred;
       this.set('grid', grid);
     }
     if (this.model.get('external_ids.ISNI')) {
