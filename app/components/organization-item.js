@@ -12,9 +12,11 @@ export default Component.extend({
       return label.label;
     }));
 
-    if (this.model.get('external_ids.GRID').preferred) {
-      let grid = this.model.get('external_ids.GRID').preferred;
-      this.set('grid', grid);
+    if (this.model.get('external_ids.GRID')) {
+      if (this.model.get('external_ids.GRID').preferred){
+        let grid = this.model.get('external_ids.GRID').preferred;
+        this.set('grid', grid);
+      }
     }
     if (this.model.get('external_ids.ISNI')) {
       let isni = this.model.get('external_ids.ISNI').all.get('firstObject').replace(/-|\s/g,"");
