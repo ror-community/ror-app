@@ -17,6 +17,9 @@ jobs:
         with:
           submodules: true
           fetch-depth: 0
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '14'
 
       - name: Extract branch name
         shell: bash
@@ -33,7 +36,7 @@ jobs:
           yarn test
           yarn build
 
-      - name: Deploy 
+      - name: Deploy
         uses: reggionick/s3-deploy@v3
         with:
           folder: dist
