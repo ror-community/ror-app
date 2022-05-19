@@ -5,7 +5,9 @@ export default Route.extend({
     /*Escape Elasticsearch reserved chars
     https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html#_reserved_characters*/
     // eslint-disable-next-line
-    params.query = params.query.replace(/([\+\-\=\&\|\>\<\!\(\)\{\}\\\[\]\^\"\~\*\?\:\/])/g, "\\$1");
+    if(params.query){
+      params.query = params.query.replace(/([\+\-\=\&\|\>\<\!\(\)\{\}\\\[\]\^\"\~\*\?\:\/])/g, "\\$1");
+    }
     return this.store.query('organization', params).then(function(model) {
       return model;
     }).catch(function (reason) {
