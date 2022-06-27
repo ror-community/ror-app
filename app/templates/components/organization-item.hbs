@@ -26,6 +26,7 @@
             </div>
 
             <div class="col-md-6">
+            {{#if (or grid isni fundref wikidata)}}
               <h6 class="mt-3 mb-0">Other Identifiers</h6>
               {{#if grid}}
                <span class="text-default">GRID</span> <a target="_blank" rel="noopener" class="card-link" href="https://grid.ac/institutes/{{grid}}">{{grid}}</a><br>
@@ -39,6 +40,7 @@
               {{#if wikidata}}
                 <span class="text-default">Wikidata</span> <a target="_blank" rel="noopener" class="card-link" href="https://www.wikidata.org/wiki/{{wikidata}}">{{wikidata}}</a><br>
               {{/if}}
+            {{/if}}
             </div>
           </div>
         </div>
