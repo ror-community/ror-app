@@ -18,16 +18,31 @@ export default Component.extend({
       }
     }
     if (this.model.get('external_ids.ISNI')) {
-      let isni = this.model.get('external_ids.ISNI').all.get('firstObject').replace(/-|\s/g,"");
-      this.set('isni', isni);
+      if (this.model.get('external_ids.ISNI').preferred){
+        let isni = this.model.get('external_ids.ISNI').preferred.replace(/-|\s/g,"");
+        this.set('isni', isni);
+    } else {
+        let isni = this.model.get('external_ids.ISNI').all.get('firstObject').replace(/-|\s/g,"");
+        this.set('isni', isni);
+      }
     }
     if (this.model.get('external_ids.FundRef')) {
-      let fundref = this.model.get('external_ids.FundRef').all.get('firstObject');
-      this.set('fundref', fundref);
+      if (this.model.get('external_ids.FundRef').preferred){
+        let fundref = this.model.get('external_ids.FundRef').preferred;
+        this.set('fundref', fundref);
+      } else {
+        let fundref = this.model.get('external_ids.FundRef').all.get('firstObject');
+        this.set('fundref', fundref);
+      }
     }
     if (this.model.get('external_ids.Wikidata')) {
-      let wikidata = this.model.get('external_ids.Wikidata').all.get('firstObject');
-      this.set('wikidata', wikidata);
+      if (this.model.get('external_ids.Wikidata').preferred){
+        let wikidata = this.model.get('external_ids.Wikidata').preferred;
+        this.set('wikidata', wikidata);
+      } else {
+        let wikidata = this.model.get('external_ids.Wikidata').all.get('firstObject');
+        this.set('wikidata', wikidata);
+      }
     }
   }
 });
