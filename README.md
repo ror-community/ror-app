@@ -4,7 +4,7 @@
 
 Frontend application the provides the search UI on top of the [ROR API](https://github.com/ror-community/ror-api) used in https://ror.org/search .
 
-# Dev setup
+# Local setup
 
 ## Prerequisites
 
@@ -19,7 +19,7 @@ You will need the following item properly installed on your computer.
 
 - `git clone <repository-url>` this repository
 - `cd ror-app`
-- `npm install`
+- `yarn install`
 
 ## Running / Development
 
@@ -46,6 +46,12 @@ Make use of the many generators for code, try `ember help generate` for more det
 
 - `ember build` (development)
 - `ember build --environment production` (production)
+
+# Development
+
+- All development should be done locally in feature branches.
+- When you have changes ready to push to dev, open a pull request against the dev branch.
+- Do not push changes directly to dev or master.
 
 # Deployment
 
