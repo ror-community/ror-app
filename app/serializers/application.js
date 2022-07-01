@@ -7,7 +7,7 @@ export default DS.JSONSerializer.extend({
     let total = payload.number_of_results;
     let totalPages = Math.min(Math.ceil(total / 20), 500);
     let meta = { meta: { total: total, totalPages: totalPages } }
-    payload = payload.items.map(item => { 
+    payload = payload.items.map(item => {
       // strip "https://" from id
       item.id = item.id.substr(16);
       return item;
@@ -25,7 +25,7 @@ export default DS.JSONSerializer.extend({
 
   //   return this._super(store, primaryModelClass, payload);
   // },
-  keyForAttribute(attr) {
+    keyForAttribute(attr) {
     return underscore(attr);
   }
 });

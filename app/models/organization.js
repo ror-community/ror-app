@@ -2,7 +2,7 @@ import DS from 'ember-data';
 
 export default DS.Model.extend({
   meta: DS.attr(),
-  
+
   name: DS.attr('string'),
   local: DS.attr('string'),
   types: DS.attr(),
@@ -12,5 +12,8 @@ export default DS.Model.extend({
   external_ids: DS.attr(),
   wikipediaUrl: DS.attr('string'),
   labels: DS.attr(),
-  country: DS.attr()
+  country: DS.attr(),
+  addresses: DS.attr(),
+  relationships: DS.attr(),
 });
+
