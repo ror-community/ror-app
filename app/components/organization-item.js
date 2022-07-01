@@ -3,15 +3,33 @@ import { computed } from '@ember/object';
 import { inject as service } from '@ember/service';
 
 export default Component.extend({
-
+  fundref: null,
+  grid: null,
   isni: null,
   wikidata: null,
+  relationships: {},
+  relationshipsCount: null,
   router: service(),
+
   isSearch: computed('router.currentURL', function() {
     return this.router.currentURL.includes("search")
   }),
 
+  // Convert label array into a dictionary with relationship type as key
+  // for variable fields in template
+  convertRelationships(relationships){
+    let formattedRelationships = {Parent:[], Child:[], Related:[]};
+    for (let i = 0; i < relationships.length; i++){
+      formattedRelationships[relationships[i]["type"]].push({"label": relationships[i]["label"], "id": relationships[i]["id"]});
+    }
+    return formattedRelationships
+  },
+
   didInsertElement() {
+    if(this.model.get('relationships')) {
+      this.set('relationshipsCount', this.model.get('relationships').length)
+      this.set('relationships', this.convertRelationships(this.model.get('relationships')))
+    }
     this.set('aliases', this.model.get('aliases').join(', '));
     this.set('acronyms', this.model.get('acronyms').join(', '));
     this.set('labels', this.model.get('labels').map(label => {

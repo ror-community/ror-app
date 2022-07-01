@@ -14,4 +14,6 @@ export default DS.Model.extend({
   labels: DS.attr(),
   country: DS.attr(),
   addresses: DS.attr(),
+  relationships: DS.attr(),
 });
+
