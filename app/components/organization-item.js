@@ -1,13 +1,20 @@
 import Component from '@ember/component';
+import { computed } from '@ember/object';
+import { inject as service } from '@ember/service';
 
 export default Component.extend({
+
   isni: null,
   wikidata: null,
+  router: service(),
+  isSearch: computed('router.currentURL', function() {
+    return this.router.currentURL.includes("search")
+  }),
 
   didInsertElement() {
     this.set('aliases', this.model.get('aliases').join(', '));
     this.set('acronyms', this.model.get('acronyms').join(', '));
-    this.set('labels', this.model.get('labels').map(label => { 
+    this.set('labels', this.model.get('labels').map(label => {
       return label.label;
     }));
 
