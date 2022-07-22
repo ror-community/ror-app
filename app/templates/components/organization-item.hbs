@@ -2,6 +2,18 @@
   <div class="col-lg-8 col-sm-12">
     <div class="card">
       <div class="card-body">
+        {{#if notFound}}
+        <h5 class="card-title">
+          Oops, something went wrong retrieving this ROR ID
+          <hr>
+        </h5>
+        <div class="row">
+          <div class="col-md-12 mb-3 mt-3">
+            <em>{{notFoundMsg}}</em>
+          </div>
+        </div>
+        {{/if}}
+        {{#if (not notFound)}}
         <h5 class="card-title">
           <img class="ror-id mb-1" src="/assets/ror-logo-small.png" alt="ROR ID"> {{#link-to "organizations.show" model.id class="card-link logo-link"}}https://ror.org/{{model.id}}{{/link-to}}
         </h5>
@@ -89,6 +101,7 @@
             <p class="small mt-3 mb-0"><i>Is there an issue with the data on this record? <a target="_blank" rel="noopener" href="https://docs.google.com/forms/d/e/1FAIpQLSdJYaMTCwS7muuTa-B_CnAtCSkKzt19lkirAKG4u7umH9Nosg/viewform">Submit a curation request</a></i></p>
           {{/if}}
         </div>
+        {{/if}}
       </div>
     </div>
   </div>
