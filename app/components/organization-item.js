@@ -28,7 +28,7 @@ export default Component.extend({
 
   didInsertElement() {
     if(this.model.response_status) {
-      if(this.model.response_status[0].includes("does not exist") || this.model.response_status[0].includes("removed")){
+      if(this.model.response_status[0].includes("does not exist") || this.model.response_status[0].includes("removed") || this.model.response_status[0].includes("not a valid")){
           this.set('notFound', true)
           this.set('notFoundMsg', this.model.response_status[0])
         }
