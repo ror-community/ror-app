@@ -1,0 +1,61 @@
+name: Deploy Staging
+on:
+  push:
+    branches:
+      - "staging"
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      S3_BUCKET: ${{ secrets.S3_BUCKET_SEARCH_STAGING }}
+      CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID_STAGING }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+          fetch-depth: 0
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+
+      - name: Extract branch name
+        shell: bash
+        run: |
+          echo "::set-output name=BRANCH::$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//_/g')"
+          echo "::set-output name=GIT_SHA::$(git rev-parse HEAD)"
+          echo "::set-output name=GIT_SHA_SHORT::$(git rev-parse --short HEAD)"
+        id: extract_variables
+
+      - name: Build
+        run: |
+          cp .env.dev .env;
+          yarn install --non-interactive
+          yarn test
+          yarn build
+
+      - name: Deploy
+        uses: reggionick/s3-deploy@v3
+        with:
+          folder: dist
+          bucket: ${{ secrets.S3_BUCKET_SEARCH_STAGING }}
+          bucket-region: ${{ secrets.S3_BUCKET_REGION }}
+          dist-id: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID_STAGING }}
+          invalidation: /*
+          delete-removed: true
+
+      - name: Notify Slack
+        if: always()
+        uses: edge/simple-slack-notify@master
+        with:
+          channel: '#website-updates'
+          color: 'good'
+          text: 'Finished copying new content to server <https://staging.ror.org/search|staging.ror.org/search>...'
+          failure_text: '${env.GITHUB_WORKFLOW} (${env.GITHUB_RUN_NUMBER}) build failed'
+          fields: |
+            [{ "title": "Committed by", "value": "<https://github.com/ror-community/ror-app/commits?author=${{ github.actor }}|${{ github.actor }}>", "short": true },
+             { "title": "Commit SHA", "value": "<https://github.com/ror-community/ror-app/commit/${{ steps.extract_variables.outputs.GIT_SHA }}|${{ steps.extract_variables.outputs.GIT_SHA_SHORT }}>", "short": true },
+             { "title": "Repository", "value": "<https://github.com/${{ github.repository }}|${{ github.repository }}>", "short": true },
+             { "title": "Branch", "value": "<https://github.com/ror-community/ror-app/tree/${{ steps.extract_variables.outputs.BRANCH }}|${{ steps.extract_variables.outputs.BRANCH }}>", "short": true }]
