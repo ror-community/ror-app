@@ -1,8 +1,7 @@
-name: Deploy Master
+name: Release
 on:
-  push:
-    branches:
-      - "master"
+  release:
+    types: [published]
 jobs:
   run:
     runs-on: ubuntu-latest

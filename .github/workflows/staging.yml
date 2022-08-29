@@ -3,6 +3,9 @@ on:
   push:
     branches:
       - "staging"
+    paths-ignore:
+      - '**/README.md'
+      - '**/workflows/**'
 jobs:
   run:
     runs-on: ubuntu-latest
