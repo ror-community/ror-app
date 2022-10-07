@@ -52,10 +52,10 @@ export default Component.extend({
       }
       if (this.model.get('external_ids.ISNI')) {
         if (this.model.get('external_ids.ISNI').preferred){
-          let isni = this.model.get('external_ids.ISNI').preferred.replace(/-|\s/g,"");
+          let isni = this.model.get('external_ids.ISNI').preferred;
           this.set('isni', isni);
       } else {
-          let isni = this.model.get('external_ids.ISNI').all.get('firstObject').replace(/-|\s/g,"");
+          let isni = this.model.get('external_ids.ISNI').all.get('firstObject');
           this.set('isni', isni);
         }
       }
