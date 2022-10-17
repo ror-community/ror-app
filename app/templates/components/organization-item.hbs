@@ -18,6 +18,28 @@
           <img class="ror-id mb-1" src="/assets/ror-logo-small.png" alt="ROR ID"> {{#link-to "organizations.show" model.id class="card-link logo-link"}}https://ror.org/{{model.id}}{{/link-to}}
         </h5>
         <hr>
+        {{#if inactiveStatus}}
+          <div class="callout">
+            <span class="text-default"><em><b>This record has
+              {{#if (eq model.status "withdrawn")}}been {{/if}}{{#if (eq model.status "inactive")}}become {{/if}}
+              {{model.status}}
+              {{#if (eq model.status "withdrawn")}}from {{/if}}{{#if (eq model.status "inactive")}}in{{/if}}
+              ROR and is no longer actively maintained.
+            </b></em></span>
+            {{#each-in relationships as |relationshipType relationshipInstances|}}
+              {{#if (eq relationshipType "Successor")}}
+                {{#if relationshipInstances}}
+                  <span class="text-default"><em>This organization is succeeded by
+                    {{#each relationshipInstances as |relationshipInstance|}}
+                      <a target="_blank" rel="noopener" class="card-link mt-1" href={{relationshipInstance.id}}>{{relationshipInstance.label}}</a>{{#if @index}}, {{/if}}.
+                    {{/each}}
+                  </em></span>
+                {{/if}}
+              {{/if}}
+            {{/each-in}}
+            <br><a target="_blank" rel="noopener" class="card-link mt-1" href="#"><em>Learn more about {{model.status}} records</em></a>
+          </div>
+        {{/if}}
         <h4 class="card-title text-default">{{model.name}}</h4>
         <div class="row">
           <div class="col-md-12">
