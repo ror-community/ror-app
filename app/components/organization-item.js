@@ -52,11 +52,15 @@ export default Component.extend({
       }
       if (this.model.get('external_ids.ISNI')) {
         if (this.model.get('external_ids.ISNI').preferred){
-          let isni = this.model.get('external_ids.ISNI').preferred;
-          this.set('isni', isni);
+          let display_isni = this.model.get('external_ids.ISNI').preferred;
+          let link_isni = this.model.get('external_ids.ISNI').preferred.replace(/-|\s/g,"");
+          this.set('display_isni', display_isni);
+          this.set('link_isni', link_isni);
       } else {
-          let isni = this.model.get('external_ids.ISNI').all.get('firstObject');
-          this.set('isni', isni);
+          let display_isni = this.model.get('external_ids.ISNI').all.get('firstObject');
+          let link_isni = this.model.get('external_ids.ISNI').all.get('firstObject').replace(/-|\s/g,"");
+          this.set('display_isni', display_isni);
+          this.set('link_isni', link_isni);
         }
       }
       if (this.model.get('external_ids.FundRef')) {
