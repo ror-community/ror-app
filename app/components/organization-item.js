@@ -3,6 +3,7 @@ import { computed } from '@ember/object';
 import { inject as service } from '@ember/service';
 
 export default Component.extend({
+  INACTIVE_STATUSES: ['inactive', 'withdrawn'],
   fundref: null,
   grid: null,
   isni: null,
@@ -15,11 +16,12 @@ export default Component.extend({
   isSearch: computed('router.currentURL', function() {
     return this.router.currentURL.includes("search")
   }),
+  inactiveStatus: false,
 
   // Convert label array into a dictionary with relationship type as key
   // for variable fields in template
   convertRelationships(relationships){
-    let formattedRelationships = {Parent:[], Child:[], Related:[]};
+    let formattedRelationships = {Parent:[], Child:[], Related:[], Successor:[], Predecessor:[]};
     for (let i = 0; i < relationships.length; i++){
       formattedRelationships[relationships[i]["type"]].push({"label": relationships[i]["label"], "id": relationships[i]["id"]});
     }
@@ -32,6 +34,9 @@ export default Component.extend({
           this.set('notFound', true)
           this.set('notFoundMsg', this.model.response_status[0])
         }
+    }
+    if(this.INACTIVE_STATUSES.indexOf(this.model.get('status')) > -1) {
+      this.set('inactiveStatus', true)
     }
     if(this.notFound === false){
       if(this.model.get('relationships')) {
