@@ -27,6 +27,14 @@ $desktop-width: 1024px;
   }
 }
 
+.fa-question-circle {
+  font-size: 1.1rem;
+  &:hover{
+    color: #53BAA1;
+  }
+
+}
+
 .badge {
     padding: 8px 12px;
     font-size: .8em;
@@ -47,6 +55,10 @@ $desktop-width: 1024px;
     @media screen and (max-width:$phone-width) {
         display: none;
     }
+}
+
+.popover {
+  font-size: .8rem;
 }
 
 .filters-list {
