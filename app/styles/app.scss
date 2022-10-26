@@ -48,3 +48,63 @@ $desktop-width: 1024px;
         display: none;
     }
 }
+
+.filters-list {
+  position: relative;
+  display: block;
+  padding-left: 1.25rem;
+}
+
+.filters-list input[type=checkbox] {
+  box-sizing: border-box;
+  padding: 0;
+}
+
+.filters-list-input {
+  position: absolute;
+  margin-top: 0.4rem;
+  margin-left: -1.25rem;
+}
+
+.filters-list-label {
+  display: inline-block;
+  margin: 0;
+}
+
+#filters{
+  line-height: 1.5rem;
+  h2 {
+    font-size: 1.5rem;
+    margin: 0;
+    line-height: normal;
+  }
+  h3 {
+    font-size: 1rem;
+    margin: 0;
+    line-height: normal;
+  }
+  p {
+    margin-bottom: 0;
+  }
+  hr {
+    margin: .5rem 0;
+  }
+  .filter-group{
+    margin-bottom: 1rem;
+  }
+
+  a {
+    line-height: normal;
+    font-size: 1rem;
+    font-style: italic;
+  }
+  i {
+    margin-right: .3rem;
+  }
+  .btn-round {
+    padding: 6px 9px;
+    float: left;
+    margin-right: .3rem;
+  }
+
+}
