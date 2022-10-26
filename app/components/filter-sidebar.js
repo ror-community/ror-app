@@ -11,7 +11,6 @@ export default Component.extend({
     actions: {
         applyFilter() {
             this.filterValue = ''
-            console.log("apply filter")
             if (this.activeStatus == true){
                 this.filterValue += "status:active,"
             }
@@ -24,13 +23,10 @@ export default Component.extend({
             this.filterValue = this.filterValue.slice(0, -1)
             this.set('model.query.filter', this.filterValue)
             //this.get('globalSearch').doSearch(this.query, this.allStatus)
-            console.log("model is")
-            console.log(this.model)
             this.get('router').transitionTo('organizations.index', { queryParams: { query: this.model.query.query, page: this.model.query.page, all_status: this.model.query.allStatus, filter: this.model.query.filter}});
         },
         clearFilter() {
             this.filterValue = ''
-            console.log("clear filters")
             this.set('activeStatus', true);
             this.set('inactiveStatus', false);
             this.set('withdrawnStatus', false);
