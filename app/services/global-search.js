@@ -10,8 +10,9 @@ export default Service.extend({
   },
 
   doSearch(query) {
-    console.log("do search")
-    console.log(this.model)
+    if (query.trim() === ''){
+      query = undefined
+    }
     //let params = assign(this.model.get('query'), { query: this.query, sort: this.sort });
 
     // this.router.transitionTo({ queryParams: params });
