@@ -1,0 +1,22 @@
+<div id="filters" class="small">
+    <div class="filter-group">
+        <h3>Record status <i class="fa fa-question-circle" aria-hidden="true"><BsPopover @triggerEvents="hover" class="popover">Each ROR record has a status of active, inactive or withdrawn. <b>Inactive</b> indicates that an organization has split, merged or otherwise ceased to operate. <b>Withdrawn</b> indicates that an organization was added to ROR in error.</BsPopover></i></h3>
+        <hr>
+        <div class="filters-list">
+            {{input class="filters-list-input" type="checkbox" id="active-status" name="activeStatus" checked=activeStatus}}
+            <label class="filters-list-label" for="active-status">Active</label>
+        </div>
+        <div class="filters-list">
+            {{input class="filters-list-input" type="checkbox" id="inactive-status" name="inactiveStatus" checked=inactiveStatus}}
+            <label class="filters-list-label" for="inactive-status">Inactive</label>
+        </div>
+        <div class="filters-list">
+            {{input class="filters-list-input" type="checkbox" id="withdrawn-status" name="withdrawnStatus" checked=withdrawnStatus}}
+            <label class="filters-list-label" for="withdrawn-status">Withdrawn</label>
+        </div>
+    </div>
+    <div>
+        <button class="btn btn-sma btn-round btn-primary" type="submit" id="filter-button" {{action "applyFilter"}}><i class="fa fa-check-circle" aria-hidden="true"></i>Apply</button>
+        <button class="btn btn-sma btn-round btn-secondary" type="submit" id="clear-button" {{action "clearFilter"}}><i class="fa fa-times-circle" aria-hidden="true"></i>Clear</button>
+    </div>
+</div>
