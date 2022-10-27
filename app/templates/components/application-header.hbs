@@ -3,13 +3,13 @@ onCollapse=(action (mut collapsed) true) onExpand=(action (mut collapsed) false)
   <div class="container-fluid">
     <a class="navbar-brand d-block" href="/">
       <img class="pl-0 pr-0" src="/assets/ror-logo.svg" alt="Research Organization Registry logo">
-      <h4 class="d-block d-sm-none mt-3">ROR</h4>
     </a>
-
-    <form {{action "search" query on="submit"}} class="form-inline mw-25" role="search">
-      {{input name="query" value=query class="form-control" placeholder='Search Registry...' escape-press=(action
-        'clear') enter=(action 'search')}}
-    </form>
+    <div id="search">
+      <form {{action "search" query on="submit"}} class="form-inline mw-25" role="search">
+        {{input name="query" value=query id="query" class="form-control" placeholder='Search Registry...' escape-press=(action
+          'clear') enter=(action 'search')}}
+      </form>
+    </div>
 
     {{navbar.toggle}}
 
@@ -21,31 +21,31 @@ onCollapse=(action (mut collapsed) true) onExpand=(action (mut collapsed) false)
             <p>About</p>
           </a>
         {{/nav.item}}
-        
+
         {{#nav.item}}
         <a class="nav-link" href="/registry/">
           <p>Registry</p>
         </a>
         {{/nav.item}}
-        
+
         {{#nav.item}}
         <a class="nav-link" href="/community/">
           <p>Community</p>
         </a>
         {{/nav.item}}
-        
+
         {{#nav.item}}
         <a class="nav-link" href="/blog/">
           <p>Blog</p>
         </a>
         {{/nav.item}}
-        
+
         {{#nav.item}}
         <a class="nav-link external" href="https://ror.readme.io">
           <p>Support <i class="fa fa-external-link"></i></p>
         </a>
         {{/nav.item}}
-      
+
       {{/navbar.nav}}
     {{/navbar.content}}
   </div>
