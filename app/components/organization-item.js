@@ -35,10 +35,10 @@ export default Component.extend({
           this.set('notFoundMsg', this.model.response_status[0])
         }
     }
-    if(this.INACTIVE_STATUSES.indexOf(this.model.get('status')) > -1) {
-      this.set('inactiveStatus', true)
-    }
     if(this.notFound === false){
+      if(this.INACTIVE_STATUSES.indexOf(this.model.get('status')) > -1) {
+        this.set('inactiveStatus', true)
+      }
       if(this.model.get('relationships')) {
         this.set('relationshipsCount', this.model.get('relationships').length)
         this.set('relationships', this.convertRelationships(this.model.get('relationships')))
