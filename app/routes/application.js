@@ -6,5 +6,13 @@ export default Route.extend({
 
   beforeModel() {
     return this.intl.setLocale(['en-us']);
+  },
+  model() {
+    let user = {
+      key: 'aa0ceb',
+      anonymous: true
+    };
+
+    return this.launchDarkly.initialize(user);
   }
 });

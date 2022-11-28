@@ -2,7 +2,7 @@
 
 module.exports = function(environment) {
   const pkg = require('../package.json');
-  
+
   let ENV = {
     modulePrefix: 'ror-app',
     environment,
@@ -18,9 +18,15 @@ module.exports = function(environment) {
         Date: false
       }
     },
+    launchDarkly: {
+      clientSideId: process.env.LAUNCH_DARKLY_CLIENT_SIDE_ID || null,
+      local: false,
+      streaming: false
+
+    },
 
     API_URL: process.env.API_URL || "https://api.ror.org",
-    SENTRY_DSN: process.env.SENTRY_DSN || null,
+    // SENTRY_DSN: process.env.SENTRY_DSN || null,
     VERSION: pkg.version,
     APP_NAME: pkg.name,
 
