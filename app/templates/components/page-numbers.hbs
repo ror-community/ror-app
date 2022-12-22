@@ -2,18 +2,18 @@
   <ul class="pagination justify-content-center">
     {{#if previousPage}}
       <li class="page-item">
-        {{#link-to 
-          link 
+        {{#link-to
+          link
           (query-params
           page=previousPage)
           class="page-link"
           aria-label="Previous"
-        }}<span aria-hidden="true"><i class="fa fa-angle-double-left" aria-hidden="true"></i></span>
+        }}<span aria-hidden="true"><i class="fa-solid fa-angle-double-left" aria-hidden="true"></i></span>
         {{/link-to}}
       </li>
     {{else}}
       <li class="page-item disabled">
-        <a class="page-link"><span aria-hidden="true"><i class="fa fa-angle-double-left" aria-hidden="true"></i></span></a>
+        <a class="page-link"><span aria-hidden="true"><i class="fa-solid fa-angle-double-left" aria-hidden="true"></i></span></a>
       </li>
     {{/if}}
 
@@ -28,8 +28,8 @@
         </li>
       {{else}}
         <li class="page-item">
-          {{#link-to 
-            link 
+          {{#link-to
+            link
             (query-params
             page=item.page)
             class="page-link"
@@ -41,18 +41,18 @@
 
     {{#if nextPage}}
       <li class="page-item">
-        {{#link-to 
-          link 
+        {{#link-to
+          link
           (query-params
           page=nextPage)
           class="page-link"
           aria-label="Next"
-        }}<span aria-hidden="true"><i class="fa fa-angle-double-right" aria-hidden="true"></i></span>
+        }}<span aria-hidden="true"><i class="fa-solid fa-angle-double-right" aria-hidden="true"></i></span>
         {{/link-to}}
       </li>
     {{else}}
       <li class="page-item">
-        <a class="page-link"><span aria-hidden="true"><i class="fa fa-angle-double-right" aria-hidden="true"></i></span></a>
+        <a class="page-link"><span aria-hidden="true"><i class="fa-solid fa-angle-double-right" aria-hidden="true"></i></span></a>
       </li>
     {{/if}}
   </ul>
