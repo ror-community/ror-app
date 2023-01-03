@@ -24,7 +24,7 @@ export default Route.extend({
         ror_id = params.query.replace(/ror\.org\//g, '')
       }
       if(ror_id){
-        this.transitionTo('/' + ror_id);
+        window.location.href = ror_id
         return;
       } else {
         // eslint-disable-next-line
@@ -53,4 +53,5 @@ export default Route.extend({
       refreshModel: true
     }
   }
+
 });
