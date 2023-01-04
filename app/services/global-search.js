@@ -10,9 +10,12 @@ export default Service.extend({
   },
 
   doSearch(query) {
+    if (query.trim() === ''){
+      query = undefined
+    }
     //let params = assign(this.model.get('query'), { query: this.query, sort: this.sort });
 
     // this.router.transitionTo({ queryParams: params });
-    this.get('router').transitionTo('organizations.index', { queryParams: { query: query, page: 1 } });
+    this.get('router').transitionTo('organizations.index', { queryParams: { query: query, page: 1}});
   }
 });

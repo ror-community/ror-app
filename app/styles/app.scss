@@ -1,92 +1,126 @@
-@import "ember-bootstrap/bootstrap";
+$green: #53baa1;
+$dark-grey: #505759;
+$light-grey: #efefef;
+$orange: #da3200;
+$mustard: #e89005;
+$beige: #d3bdb0;
+$black: #293030;
 
-/*!
 
- =========================================================
- * Now UI Kit Pro - v1.2.2
- =========================================================
 
- * Product Page: https://www.creative-tim.com/product/now-ui-kit-pro
- * Copyright 2018 Creative Tim (http://www.creative-tim.com)
+$phone-width: 420px;
+$tablet-width: 768px;
+$desktop-width: 1024px;
 
- * Designed by www.invisionapp.com Coded by www.creative-tim.com
+// override, color links
+.card {
+  h1, h2 {
+    font-size: 2rem;
+    margin-top: 0;
+    @media screen and (max-width:$phone-width) {
+        font-size: 1.6rem;
+    }
+  }
+  h3 {
+    font-size: 1.3rem;
+    text-transform: uppercase;
+  }
+}
 
- =========================================================
+.ror-search-home {
+  font-size: 1rem;
+}
 
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+.fa-question-circle {
+  font-size: 1.1rem;
+  &:hover{
+    color: #53BAA1;
+  }
 
- */
+}
 
- @import 'now-ui-kit/variables';
- @import 'now-ui-kit/mixins';
- 
- // Plugins CSS
- @import 'now-ui-kit/plugins/plugin-bootstrap-switch';
- @import 'now-ui-kit/plugins/plugin-nouislider';
- @import 'now-ui-kit/plugins/plugin-bootstrap-select';
- @import 'now-ui-kit/plugins/plugin-tagsinput';
- @import 'now-ui-kit/plugins/plugin-fileupload';
- @import 'now-ui-kit/plugins/plugin-datetimepicker';
- 
- // Core CSS
- @import 'now-ui-kit/nucleo-outline';
- 
- @import 'now-ui-kit/alerts';
- @import 'now-ui-kit/checkboxes-radio';
- @import 'now-ui-kit/badges';
- @import 'now-ui-kit/pagination';
- @import 'now-ui-kit/typography';
- @import 'now-ui-kit/misc';
- 
- @import 'now-ui-kit/buttons';
- @import 'now-ui-kit/social-buttons';
- @import 'now-ui-kit/inputs';
- @import 'now-ui-kit/progress';
- @import 'now-ui-kit/pills';
- @import 'now-ui-kit/pills-extend';
- 
- // components
- @import 'now-ui-kit/tabs';
- @import 'now-ui-kit/navbar';
- @import 'now-ui-kit/navbar-extend';
- @import 'now-ui-kit/dropdown';
- @import 'now-ui-kit/dropdown-extend';
- @import 'now-ui-kit/images';
- @import 'now-ui-kit/popups';
- @import 'now-ui-kit/tables';
- @import 'now-ui-kit/info-areas';
- @import 'now-ui-kit/media';
- @import 'now-ui-kit/modals';
- @import 'now-ui-kit/modals-extend';
- @import 'now-ui-kit/carousel';
- @import 'now-ui-kit/footers';
- 
- // cards
- @import 'now-ui-kit/cards';
- @import 'now-ui-kit/cards/card-extend';
- @import 'now-ui-kit/cards/card-background';
- @import 'now-ui-kit/cards/card-blog';
- @import 'now-ui-kit/cards/card-contact';
- @import 'now-ui-kit/cards/card-fashion';
- @import 'now-ui-kit/cards/card-form-horizontal';
- @import 'now-ui-kit/cards/card-no-shadow';
- @import 'now-ui-kit/cards/card-plain';
- @import 'now-ui-kit/cards/card-pricing';
- @import 'now-ui-kit/cards/card-profile';
- @import 'now-ui-kit/cards/card-product';
- @import 'now-ui-kit/cards/card-raised';
- @import 'now-ui-kit/cards/card-signup';
- @import 'now-ui-kit/cards/card-testimonials';
- 
- 
- // example pages and sections
- @import 'now-ui-kit/example-pages';
- @import 'now-ui-kit/sections';
- @import 'now-ui-kit/sections-extend';
- 
- @import 'now-ui-kit/responsive';
- 
-  // customizations
-  @import 'ror';
-  @import 'site';
-  
+.badge {
+    padding: 8px 12px;
+    font-size: .8em;
+    float: right;
+    @media screen and (max-width:$phone-width) {
+        float: left;
+        margin-top: .5rem
+    }
+}
+
+.badge-status{
+    border-color: $orange;
+    background-color: $orange;
+    color: #FFF;
+}
+
+.ror-id {
+    @media screen and (max-width:$phone-width) {
+        display: none;
+    }
+}
+
+.popover {
+  font-size: .8rem;
+}
+
+.filters-list {
+  position: relative;
+  display: block;
+  padding-left: 1.25rem;
+}
+
+.filters-list input[type=checkbox] {
+  box-sizing: border-box;
+  padding: 0;
+}
+
+.filters-list-input {
+  position: absolute;
+  margin-top: 0.4rem;
+  margin-left: -1.25rem;
+}
+
+.filters-list-label {
+  display: inline-block;
+  margin: 0;
+}
+
+#filters{
+  line-height: 1.5rem;
+  h2 {
+    font-size: 1.5rem;
+    margin: 0;
+    line-height: normal;
+  }
+  h3 {
+    font-size: 1rem;
+    margin: 0;
+    line-height: normal;
+  }
+  p {
+    margin-bottom: 0;
+  }
+  hr {
+    margin: .5rem 0;
+  }
+  .filter-group{
+    margin-bottom: 1rem;
+  }
+
+  a {
+    line-height: normal;
+    font-size: 1rem;
+    font-style: italic;
+  }
+  i {
+    margin-right: .3rem;
+  }
+  .btn-round {
+    padding: 6px 9px;
+    float: left;
+    margin-right: .3rem;
+  }
+
+}
