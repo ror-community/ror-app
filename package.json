@@ -50,7 +50,7 @@
     "ember-maybe-import-regenerator": "^1.0.0",
     "ember-moment": "^10.0.0",
     "ember-qunit": "^3.4.1",
-    "ember-resolver": "^5.0.1",
+    "ember-resolver": "^9.0.1",
     "ember-source": "~3.7.0",
     "ember-truth-helpers": "^2.1.0",
     "ember-welcome-page": "^3.2.0",
