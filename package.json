@@ -22,7 +22,7 @@
   },
   "devDependencies": {
     "@ember/jquery": "^0.5.2",
-    "@ember/optional-features": "^0.6.3",
+    "@ember/optional-features": "^2.0.0",
     "bootstrap": "^4.2.1",
     "broccoli-asset-rev": "^3.0.0",
     "ember-ajax": "^5.1.2",
@@ -37,7 +37,7 @@
     "ember-cli-flash": "^1.7.1",
     "ember-cli-htmlbars": "^6.1.1",
     "ember-cli-htmlbars-inline-precompile": "^1.0.3",
-    "ember-cli-inject-live-reload": "^1.8.2",
+    "ember-cli-inject-live-reload": "^2.1.0",
     "ember-cli-sass": "^8.0.1",
     "ember-cli-sri": "^2.1.1",
     "ember-cli-string-helpers": "^2.0.0",
@@ -50,7 +50,7 @@
     "ember-maybe-import-regenerator": "^1.0.0",
     "ember-moment": "^10.0.0",
     "ember-qunit": "^3.4.1",
-    "ember-resolver": "^5.0.1",
+    "ember-resolver": "^9.0.1",
     "ember-source": "~3.7.0",
     "ember-truth-helpers": "^2.1.0",
     "ember-welcome-page": "^3.2.0",
@@ -64,7 +64,7 @@
     "node": "6.* || 8.* || >= 10.*"
   },
   "dependencies": {
-    "@sentry/browser": "^5.10.2",
+    "@sentry/browser": "^7.29.0",
     "@sentry/integrations": "^5.10.2"
   },
   "ember-addon": {
