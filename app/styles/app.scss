@@ -124,3 +124,9 @@ $desktop-width: 1024px;
   }
 
 }
+
+// top nav styles
+
+.navbar-nav .nav-item:not(:last-child) {
+    margin-right: 15px;
+}
