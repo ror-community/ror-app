@@ -12,6 +12,7 @@ Router.map(function() {
     this.route('show', { path: '/:organization_id' });
     this.route('about', { path: '/' });
   });
+  this.route('error', { path: '/*path' });
 });
 
 export default Router;
