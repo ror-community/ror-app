@@ -64,7 +64,7 @@
     "node": "6.* || 8.* || >= 10.*"
   },
   "dependencies": {
-    "@sentry/browser": "^7.29.0",
+    "@sentry/browser": "^7.45.0",
     "@sentry/integrations": "^5.10.2"
   },
   "ember-addon": {
