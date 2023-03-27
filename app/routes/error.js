@@ -1,5 +1,4 @@
 import Route from '@ember/routing/route';
-import ENV from 'ror-app/config/environment';
 
 export default Route.extend({
     /*redirect: function() {
