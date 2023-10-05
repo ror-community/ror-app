@@ -36,9 +36,7 @@ export default Component.extend({
     }
     this.set('aliases', this.model.get('aliases').join(', '));
     this.set('acronyms', this.model.get('acronyms').join(', '));
-    this.set('labels', this.model.get('labels').map(label => {
-      return label.label;
-    }));
+    this.set('labels', this.model.get('labels').map(label => label.label).join(', '));
 
     if (this.model.get('external_ids.GRID')) {
       if (this.model.get('external_ids.GRID').preferred){
