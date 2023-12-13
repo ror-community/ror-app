@@ -8,6 +8,11 @@ module.exports = function(defaults) {
       'bootstrapVersion': 4,
       'importBootstrapFont': false,
       'importBootstrapCSS': false
+    },
+    babel: {
+      plugins: [
+        require.resolve('ember-launch-darkly/babel-plugin')
+      ]
     }
   });
 
