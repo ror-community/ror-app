@@ -2,5 +2,5 @@ import DS from 'ember-data';
 import ENV from 'ror-app/config/environment';
 
 export default DS.JSONAPIAdapter.extend({
-  host: ENV.API_URL
+  host: window.ld.variation("v2") ? ENV.API_URL_V2 : ENV.API_URL_V1,
 });
