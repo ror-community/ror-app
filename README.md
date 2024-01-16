@@ -14,6 +14,7 @@ You will need the following item properly installed on your computer.
 - [Node.js](https://nodejs.org/) (with npm)
 - [Ember CLI](https://ember-cli.com/)
 - [Google Chrome](https://google.com/chrome/)
+- [ror-site](https://github.com/ror-community/ror-site) information site
 
 ## Installation
 
@@ -22,6 +23,11 @@ You will need the following item properly installed on your computer.
 - `yarn install`
 
 ## Running / Development
+
+- Start ror-site per instructions in https://github.com/ror-community/ror-site . ror-app shares core CSS with ror-site
+- Create a file ```.env``` and add the following environment variables to it. Optionally, you can include LAUNCH_DARKLY_CLIENT_SIDE_ID if you are using Launch Darkly feature flags.
+        API_URL=https://api.ror.org (optionally, use localhost:9292 to develop against ror-api running locally in Docker)
+        BASE_URL=http://localhost:1313
 
 - `ember serve`
 - Visit your app at [http://localhost:4200](http://localhost:4200).
@@ -62,7 +68,9 @@ Deployment is handled by [Github actions](https://github.com/ror-community/ror-a
 
 ## Note
 
-Styling for the app is handled externally, in the primary site at https://ror.org. The `<head>` tag in `app/index.html` contains the link to the relevant CSS. Note that the dev branch is pointed at https://_dev_.ror.org instead.
+Core CSS hugo-ror.css is shared between ror-app and [ror-site](https://github.com/ror-community/ror-site) and is hosted on ror-site, https://ror.org. SCSS file is located at https://github.com/ror-community/ror-site/blob/master/themes/hugo-ror/assets/sass/partials/_hugo-ror.scss.
+
+The BaseUrl environment variable is used to point to hugo-ror.css for the corresponding environment (dev, staging, prod) in the [head of index.html](https://github.com/ror-community/ror-app/blob/master/app/index.html#L21). See above for local dev instructions.
 
 # Further Reading / Useful Links
 
