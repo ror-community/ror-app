@@ -3,7 +3,8 @@ import DS from 'ember-data';
 export default DS.Model.extend({
   meta: DS.attr(),
 
-  name: DS.attr(),
+  name: DS.attr('string'), //TODO: Remove this when v1 has been retired
+  names: DS.attr(),
   local: DS.attr('string'),
   types: DS.attr(),
   links: DS.attr(),

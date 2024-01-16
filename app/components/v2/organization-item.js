@@ -36,10 +36,6 @@ export default Component.extend({
       this.set('relationshipsCount', this.model.get('relationships').length)
       this.set('relationships', this.convertRelationships(this.model.get('relationships')))
     }
-    this.set('aliases', this.model.get('aliases').join(', '));
-    this.set('acronyms', this.model.get('acronyms').join(', '));
-    this.set('labels', this.model.get('labels').map(label => label.label).join(', '));
-
     if (this.model.get('external_ids.GRID')) {
       if (this.model.get('external_ids.GRID').preferred){
         let grid = this.model.get('external_ids.GRID').preferred;
@@ -77,9 +73,10 @@ export default Component.extend({
         this.set('wikidata', wikidata);
       }
     }
-    this.set('name', 'This works');
-    // if (this.model.get('names')){
-    //     this.set('name', 'This works');
-    // }
+    if (this.model.get('names')){
+      let names = this.model.get('names');
+      let name = names.find(record => record.types.includes("ror_display"));
+      this.set('name', name.value);
+    }
   }
 });
