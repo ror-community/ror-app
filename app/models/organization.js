@@ -16,6 +16,8 @@ export default DS.Model.extend({
   country: DS.attr(),
   addresses: DS.attr(),
   relationships: DS.attr(),
-  status: DS.attr('string')
+  status: DS.attr('string'),
+  admin: DS.attr(),
+  locations: DS.attr()
 });
 

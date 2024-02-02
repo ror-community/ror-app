@@ -11,12 +11,15 @@ export default Component.extend({
   wikidata: null,
   relationships: {},
   relationshipsCount: null,
-  name: null,
   router: service(),
   isSearch: computed('router.currentURL', function() {
     return this.router.currentURL.includes("search")
   }),
   inactiveStatus: false,
+  name: null,
+  lastModifiedDate: null,
+  otherNames: null,
+
 
   // Convert label array into a dictionary with relationship type as key
   // for variable fields in template
@@ -28,6 +31,38 @@ export default Component.extend({
     return formattedRelationships
   },
 
+  convertOtherNames(names){
+    const groupedNames = names.reduce((result, name) => {
+        if (name.types.includes("ror_display")) {
+            return result;
+        }
+
+        const type = name.types.includes("label") ? "label" : name.types[0];
+        result[type] = result[type] || [];
+        result[type].push(name);
+
+        return result;
+    }, {});
+
+    if (groupedNames.label) {
+        groupedNames.label.forEach((label) => {
+            if (label.lang) {
+                label.value = `${label.value} (${label.lang})`;
+            }
+        });
+    }
+
+    const values = Object.values(groupedNames).flat().map(item => item.value).join(', ');
+
+    return {values: values, groupedNames: groupedNames};
+  },
+
+  getName(names) {
+    let name = names.find(record => record.types.includes("ror_display"));
+
+    return name ? name.value : null;
+  },
+
   didInsertElement() {
     if(this.INACTIVE_STATUSES.indexOf(this.model.get('status')) > -1) {
       this.set('inactiveStatus', true)
@@ -36,47 +71,57 @@ export default Component.extend({
       this.set('relationshipsCount', this.model.get('relationships').length)
       this.set('relationships', this.convertRelationships(this.model.get('relationships')))
     }
-    if (this.model.get('external_ids.GRID')) {
-      if (this.model.get('external_ids.GRID').preferred){
-        let grid = this.model.get('external_ids.GRID').preferred;
-        this.set('grid', grid);
-      }
-    }
-    if (this.model.get('external_ids.ISNI')) {
-      if (this.model.get('external_ids.ISNI').preferred){
-        let display_isni = this.model.get('external_ids.ISNI').preferred;
-        let link_isni = this.model.get('external_ids.ISNI').preferred.replace(/-|\s/g,"");
-        this.set('display_isni', display_isni);
-        this.set('link_isni', link_isni);
-    } else {
-        let display_isni = this.model.get('external_ids.ISNI').all.get('firstObject');
-        let link_isni = this.model.get('external_ids.ISNI').all.get('firstObject').replace(/-|\s/g,"");
-        this.set('display_isni', display_isni);
-        this.set('link_isni', link_isni);
-      }
-    }
-    if (this.model.get('external_ids.FundRef')) {
-      if (this.model.get('external_ids.FundRef').preferred){
-        let fundref = this.model.get('external_ids.FundRef').preferred;
-        this.set('fundref', fundref);
-      } else {
-        let fundref = this.model.get('external_ids.FundRef').all.get('firstObject');
-        this.set('fundref', fundref);
-      }
-    }
-    if (this.model.get('external_ids.Wikidata')) {
-      if (this.model.get('external_ids.Wikidata').preferred){
-        let wikidata = this.model.get('external_ids.Wikidata').preferred;
-        this.set('wikidata', wikidata);
-      } else {
-        let wikidata = this.model.get('external_ids.Wikidata').all.get('firstObject');
-        this.set('wikidata', wikidata);
-      }
+    if (this.model.get('external_ids')){
+      this.model.get('external_ids').forEach(externalId => {
+        switch (externalId.type) {
+          case 'grid':
+            if (externalId.preferred) {
+              this.set('grid', externalId.preferred);
+            }
+            break;
+  
+          case 'isni':
+            if (externalId.preferred) {
+              let displayIsni = externalId.preferred;
+              let linkIsni = externalId.preferred.replace(/-|\s/g, "");
+              this.set('display_isni', displayIsni);
+              this.set('link_isni', linkIsni);
+            } else {
+              let displayIsni = externalId.all[0];
+              let linkIsni = externalId.all[0].replace(/-|\s/g, "");
+              this.set('display_isni', displayIsni);
+              this.set('link_isni', linkIsni);
+            }
+            break;
+  
+          case 'fundref':
+            if (externalId.preferred) {
+              this.set('fundref', externalId.preferred);
+            } else {
+              this.set('fundref', externalId.all[0]);
+            }
+            break;
+  
+          case 'wikidata':
+            if (externalId.preferred) {
+              this.set('wikidata', externalId.preferred);
+            } else {
+              this.set('wikidata', externalId.all[0]);
+            }
+            break;
+  
+          default:
+            break;
+        }
+      });
     }
     if (this.model.get('names')){
       let names = this.model.get('names');
-      let name = names.find(record => record.types.includes("ror_display"));
-      this.set('name', name.value);
+      this.set('name', this.getName(names));
+      this.set('otherNames', this.convertOtherNames(names));
+    }
+    if (this.model.get('admin.last_modified')) {
+      this.set('lastModifiedDate', this.model.get('admin.last_modified').date)
     }
   }
 });

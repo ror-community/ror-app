@@ -5,7 +5,7 @@
         {{#link-to "organizations.index"}}<i class="fa fa-caret-left" aria-hidden="true"></i> ROR search home page{{/link-to}}
     </div>
     {{#if (variation "v2")}}
-      {{v2/organization-item model=model}}
+      {{v2/organization-item model=model view="detailed"}}
     {{else}}
       {{v1/organization-item model=model}}
     {{/if}}
