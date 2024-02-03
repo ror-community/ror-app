@@ -41,9 +41,11 @@ module.exports = function(environment) {
     // ENV.APP.LOG_TRANSITIONS = true;
     // ENV.APP.LOG_TRANSITIONS_INTERNAL = true;
     // ENV.APP.LOG_VIEW_LOOKUPS = true;
-    ENV.launchDarkly.localFeatureFlags = {
-      'v2': false
-    };
+    //ENV.launchDarkly.localFeatureFlags = {
+    //  'v2_ui': true
+   // };
+    ENV.launchDarkly.local = false;
+    ENV.launchDarkly.streaming = false;
   }
 
   if (environment === 'test') {
