@@ -1,5 +1,6 @@
 import DS from 'ember-data';
 import ENV from 'ror-app/config/environment';
+import { inject as service } from '@ember/service';
 
 export default DS.JSONAPIAdapter.extend({
     //Tried injecting serivce but does not work :(
