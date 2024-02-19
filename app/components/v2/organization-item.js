@@ -27,30 +27,30 @@ export default Component.extend({
   convertRelationships(relationships){
     let formattedRelationships = {Parent:[], Child:[], Related:[], Successor:[], Predecessor:[]};
     for (let i = 0; i < relationships.length; i++){
-        formattedRelationships[capitalize(relationships[i]["type"])].push({"label": relationships[i]["label"], "id": relationships[i]["id"]});
+      formattedRelationships[capitalize(relationships[i]["type"])].push({"label": relationships[i]["label"], "id": relationships[i]["id"]});
     }
     return formattedRelationships
   },
 
   convertOtherNames(names){
     const groupedNames = names.reduce((result, name) => {
-        if (name.types.includes("ror_display")) {
-            return result;
-        }
+      if (name.types.includes("ror_display")) {
+          return result;
+      }
 
-        const type = name.types.includes("label") ? "label" : name.types[0];
-        result[type] = result[type] || [];
-        result[type].push(name);
+      const type = name.types.includes("label") ? "label" : name.types[0];
+      result[type] = result[type] || [];
+      result[type].push(name);
 
-        return result;
+      return result;
     }, {});
 
     if (groupedNames.label) {
-        groupedNames.label.forEach((label) => {
-            if (label.lang) {
-                label.value = `${label.value} (${label.lang})`;
-            }
-        });
+      groupedNames.label.forEach((label) => {
+        if (label.lang && !label.value.includes(`(${label.lang})`)) {
+          label.value = `${label.value} (${label.lang})`;
+        }
+      });
     }
 
     const values = Object.values(groupedNames).flat().map(item => item.value).join(', ');
