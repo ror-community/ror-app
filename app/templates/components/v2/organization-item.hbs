@@ -48,10 +48,10 @@
             </div>
             {{#if isSearch}}
               <div class="col-md-12">
-                {{#if other_names.values}}
+                {{#if otherNames.values}}
                   <h3 class="mt-3 mb-0 mr-2 d-inline-block">Other names: </h3>
                   <span class="text-default">
-                    {{other_names.values}}
+                    {{otherNames.values}}
                   </span>
                 {{/if}}
               </div>
@@ -61,10 +61,10 @@
               {{#each model.types as |type|}}
                 <span class="text-default">{{capitalize type}}</span><br />
               {{/each}}
-              <br />
               {{#if (not isSearch)}}
                 {{#if otherNames.groupedNames}}
-                {{#each-in otherNames.groupedNames as |nameType nameInstances|}}
+                  <h3 class="mt-3 mb-0 mr-2 d-inline-block">Other names</h3><br />
+                  {{#each-in otherNames.groupedNames as |nameType nameInstances|}}
                     {{#if nameType}}
                       {{#if nameInstances}}
                         <span class="text-default mt-3 mb-3 font-weight-bold">{{capitalize (pluralize nameType)}}</span><br>
@@ -74,7 +74,7 @@
                       {{/if}}
                     {{/if}}
                   {{/each-in}}
-              {{/if}}
+                {{/if}}
               {{/if}}
             </div>
             <div class="col-md-6">
