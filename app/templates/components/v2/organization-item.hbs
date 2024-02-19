@@ -90,7 +90,7 @@
                 <h3 class="mt-3 mb-0">Website</h3>
                 {{#each model.links as |link|}}
                   {{#if (eq link.type 'website')}}
-                    <a target="_blank" rel="noopener" class="card-link" href={{link}}>{{link.value}}</a><br>
+                    <a target="_blank" rel="noopener" class="card-link" href={{link.value}}>{{link.value}}</a><br>
                   {{/if}}
                 {{/each}}
               {{/if}}
