@@ -19,6 +19,7 @@ export default Component.extend({
   name: null,
   lastModifiedDate: null,
   otherNames: null,
+  organizationTypes: null,
 
 
   // Convert label array into a dictionary with relationship type as key
@@ -122,6 +123,9 @@ export default Component.extend({
     }
     if (this.model.get('admin.last_modified')) {
       this.set('lastModifiedDate', this.model.get('admin.last_modified').date)
+    }
+    if (this.model.get('types')) {
+      this.set('organizationTypes', this.model.get('types').map(type => type.charAt(0).toUpperCase() + type.slice(1)).join(', '))
     }
   }
 });
