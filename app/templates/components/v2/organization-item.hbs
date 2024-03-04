@@ -122,7 +122,7 @@
                   {{#each-in relationships as |relationshipType relationshipInstances|}}
                     {{#if relationshipType}}
                       {{#if relationshipInstances}}
-                        <span class="text-default mt-3 mb-3 font-weight-bold">{{relationshipType}} Organization(s)</span><br>
+                        <span class="text-default mt-3 mb-3 font-weight-bold">{{relationshipType}} Organizations</span><br>
                           {{#each relationshipInstances as |relationshipInstance|}}
                             <a target="_blank" rel="noopener" class="card-link mt-1" href={{relationshipInstance.id}}>{{relationshipInstance.label}}</a><br>
                           {{/each}}
