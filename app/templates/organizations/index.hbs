@@ -11,11 +11,7 @@
         </div>
         <div class="col-md-10 col-sm-12">
         {{#each model as |organization|}}
-          {{#if (variation "v2_ui")}}
-            {{v2/organization-item model=organization view="list"}}
-          {{else}}
-           {{v1/organization-item model=organization}}
-          {{/if}} 
+          {{organization-item model=organization}}
         {{/each}}
         </div>
         {{#if (gt model.meta.totalPages 1)}}
