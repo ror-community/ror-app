@@ -55,7 +55,7 @@ export default Component.extend({
 
     const values = Object.values(groupedNames).flat().map(item => item.value).join(', ');
 
-    return {values: values, groupedNames: groupedNames};
+    return {values: values, groupedNames: groupedNames, groupedNamesCount: Object.keys(groupedNames).length};
   },
 
   getName(names) {

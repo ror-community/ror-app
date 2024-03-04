@@ -60,7 +60,7 @@
               <h3 class="mt-3 mb-0">Organization types</h3>
               <span class="text-default">{{capitalize organizationTypes}}</span><br />
               {{#if (not isSearch)}}
-                {{#if otherNames.groupedNames}}
+                {{#if otherNames.groupedNamesCount}}
                   <h3 class="mt-3 mb-0 mr-2 d-inline-block">Other names</h3><br />
                   {{#each-in otherNames.groupedNames as |nameType nameInstances|}}
                     {{#if nameType}}
