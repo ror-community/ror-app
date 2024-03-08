@@ -19,7 +19,8 @@ module.exports = function(environment) {
       }
     },
 
-    API_URL: process.env.API_URL || "https://api.ror.org",
+    API_URL_V1: process.env.API_URL_V1 || "https://api.ror.org/v1",
+    API_URL_V2: process.env.API_URL_V2 || "https://api.ror.org/v2",
     BASE_URL: process.env.BASE_URL || null,
     SENTRY_DSN: process.env.SENTRY_DSN || null,
     VERSION: pkg.version,
@@ -28,6 +29,9 @@ module.exports = function(environment) {
     APP: {
       // Here you can pass flags/options to your application instance
       // when it is created
+    },
+    launchDarkly: {
+      clientSideId: process.env.LAUNCH_DARKLY_CLIENT_SIDE_ID
     }
   };
 
@@ -37,6 +41,11 @@ module.exports = function(environment) {
     // ENV.APP.LOG_TRANSITIONS = true;
     // ENV.APP.LOG_TRANSITIONS_INTERNAL = true;
     // ENV.APP.LOG_VIEW_LOOKUPS = true;
+    // ENV.launchDarkly.localFeatureFlags = {
+    //   'v2_ui': true
+    // };
+    ENV.launchDarkly.local = false;
+    ENV.launchDarkly.streaming = false;
   }
 
   if (environment === 'test') {
