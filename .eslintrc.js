@@ -29,12 +29,6 @@ module.exports = {
       },
       env: {
         browser: false,
-<<<<<<< HEAD
-        node: true
-      }
-    }
-  ]
-=======
         node: true,
       },
       plugins: ['node'],
@@ -51,5 +45,4 @@ module.exports = {
       extends: ['plugin:qunit/recommended'],
     },
   ],
->>>>>>> 9c76a415 (v4.9.2...v3.28.6)
 };

@@ -61,7 +61,6 @@ Make use of the many generators for code, try `ember help generate` for more det
 
 # Deployment
 
-<<<<<<< HEAD
 Deployment is handled by [Github actions](https://github.com/ror-community/ror-app/actions)
 
 - **Deploy Dev** action deploys to dev.ror.org on push/merge to dev branch
@@ -80,10 +79,3 @@ The BaseUrl environment variable is used to point to hugo-ror.css for the corres
 - Development Browser Extensions
   - [ember inspector for chrome](https://chrome.google.com/webstore/detail/ember-inspector/bmdblncegkenkacieihfhpjfppoconhi)
   - [ember inspector for firefox](https://addons.mozilla.org/en-US/firefox/addon/ember-inspector/)
-=======
-* [ember.js](https://emberjs.com/)
-* [ember-cli](https://ember-cli.com/)
-* Development Browser Extensions
-  * [ember inspector for chrome](https://chrome.google.com/webstore/detail/ember-inspector/bmdblncegkenkacieihfhpjfppoconhi)
-  * [ember inspector for firefox](https://addons.mozilla.org/en-US/firefox/addon/ember-inspector/)
->>>>>>> 9c76a415 (v4.9.2...v3.28.6)
