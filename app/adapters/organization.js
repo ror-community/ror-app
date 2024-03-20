@@ -1,7 +1,7 @@
-import DS from 'ember-data';
+import JSONAPIAdapter from '@ember-data/adapter/json-api';
 import ENV from 'ror-app/config/environment';
 
-export default DS.JSONAPIAdapter.extend({
+export default JSONAPIAdapter.extend({
   host: ENV.API_URL,
 
   urlForFindRecord(id, modelName) {

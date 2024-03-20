@@ -2,8 +2,8 @@
 
   <div class="container-fluid">
     <div class="ml-4 ror-search-home">
-        {{#link-to "organizations.index"}}<i class="fa fa-caret-left" aria-hidden="true"></i> ROR search home page{{/link-to}}
+        <LinkTo @route="organizations.index"><i class="fa fa-caret-left" aria-hidden="true"></i> ROR search home page</LinkTo>
     </div>
-    {{organization-item model=model}}
+    <OrganizationItem @model={{model}} />
   </div>
 </div>

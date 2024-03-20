@@ -7,27 +7,26 @@
       {{/if}}
       <div class="row">
         <div class="col-md-2 col-sm-12">
-          {{filter-sidebar model=model}}
+          <FilterSidebar @model={{model}} />
         </div>
         <div class="col-md-10 col-sm-12">
         {{#each model as |organization|}}
-          {{organization-item model=organization}}
+          <OrganizationItem @model={{organization}} />
         {{/each}}
         </div>
         {{#if (gt model.meta.totalPages 1)}}
-          {{page-numbers model=model link="organizations.index"}}
+          <PageNumbers @model={{model}} @link="organizations.index" />
         {{/if}}
       </div>
     {{else}}
       <div class="row">
         <div class="col-md-2">
-          {{filter-sidebar model=model}}
+          <FilterSidebar @model={{model}} />
         </div>
         <div class="col-md-10 col-sm-12">
-          {{#bs-alert dismissible=false type="warning"}}
-            No Organizations found. {{#link-to "organizations.index" (query-params
-          query=undefined page=undefined filter=undefined) }}Return to organizations list{{/link-to}}.
-          {{/bs-alert}}
+          <BsAlert @dismissible={{false}} @type="warning">
+            No Organizations found. <LinkTo @route="organizations.index" @query={{hash query=undefined page=undefined filter=undefined}}>Return to organizations list</LinkTo>.
+          </BsAlert>
         </div>
       </div>
     {{/if}}

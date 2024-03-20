@@ -6,7 +6,7 @@
         <div class="row">
           <div class="col-lg-9 col-sm-12">
             <h1>
-              <img class="ror-id mb-1" src="/assets/ror-logo-small.png" alt="ROR ID"> {{#link-to "organizations.show" model.id class="card-link logo-link"}}https://ror.org/{{model.id}}{{/link-to}}
+              <img class="ror-id mb-1" src="/assets/ror-logo-small.png" alt="ROR ID"> <LinkTo @route="organizations.show" @model={{model.id}} class="card-link logo-link">https://ror.org/{{model.id}}</LinkTo>
             </h1>
           </div>
           <div class="col-lg-3 col-sm-12">
@@ -118,7 +118,7 @@
         </div>
         <div class="footer text-left pb-0 ml-3">
           {{#if isSearch}}
-            {{#link-to "organizations.show" model.id class="btn btn-sm btn-round"}}View details{{/link-to}}
+            <LinkTo @route="organizations.show" @model={{model.id}} class="btn btn-sm btn-round">View details</LinkTo>
           {{/if}}
           {{#if (not isSearch)}}
             <p class="mt-3 mb-0"><i>Is there an issue with the data on this record? <a target="_blank" rel="noopener" href="http://curation-request.ror.org">Submit a curation request</a></i></p>
