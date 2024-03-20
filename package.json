@@ -18,7 +18,7 @@
     "lint:hbs": "ember-template-lint .",
     "lint:js": "eslint .",
     "start": "ember serve",
-    "test": "ember test"
+    "test": "npm-run-all lint test:*"
   },
   "devDependencies": {
     "@ember/jquery": "^0.5.2",
@@ -30,8 +30,8 @@
     "ember-bootstrap": "^2.4.0",
     "ember-cli": "^4.9.2",
     "ember-cli-app-version": "^3.2.0",
-    "ember-cli-babel": "^7.1.2",
-    "ember-cli-dependency-checker": "^3.0.0",
+    "ember-cli-babel": "^7.26.10",
+    "ember-cli-dependency-checker": "^3.2.0",
     "ember-cli-dotenv": "^2.2.1",
     "ember-cli-eslint": "^4.2.3",
     "ember-cli-flash": "^1.7.1",
@@ -43,25 +43,25 @@
     "ember-cli-string-helpers": "^2.0.0",
     "ember-cli-template-lint": "^1.0.0-beta.1",
     "ember-cli-uglify": "^2.1.0",
-    "ember-data": "~3.7.0",
-    "ember-export-application-global": "^2.0.0",
+    "ember-data": "~3.28.6",
+    "ember-export-application-global": "^2.0.1",
     "ember-helper-locale-number": "^1.0.0",
     "ember-load-initializers": "^2.1.2",
     "ember-maybe-import-regenerator": "^1.0.0",
     "ember-moment": "^10.0.0",
-    "ember-qunit": "^3.4.1",
+    "ember-qunit": "^5.1.5",
     "ember-resolver": "^9.0.1",
-    "ember-source": "~3.7.0",
+    "ember-source": "~3.28.8",
     "ember-truth-helpers": "^2.1.0",
-    "ember-welcome-page": "^3.2.0",
-    "eslint-plugin-ember": "^8.14.0",
+    "ember-welcome-page": "^4.1.0",
+    "eslint-plugin-ember": "^10.5.8",
     "loader.js": "^4.7.0",
+    "npm-run-all": "^4.1.5",
     "qunit-dom": "^2.0.0",
-    "sass": "^1.16.0",
-    "webpack": "5"
+    "sass": "^1.16.0"
   },
   "engines": {
-    "node": "6.* || 8.* || >= 10.*"
+    "node": "12.* || 14.* || >= 16"
   },
   "dependencies": {
     "@sentry/browser": "^7.29.0",
