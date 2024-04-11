@@ -18,7 +18,7 @@
     "lint:hbs": "ember-template-lint .",
     "lint:js": "eslint .",
     "start": "ember serve",
-    "test": "ember test  "
+    "test": "ember test"
   },
   "dependencies": {
     "@babel/helper-explode-assignable-expression": "^7.18.6",
