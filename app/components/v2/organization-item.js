@@ -54,7 +54,7 @@ export default Component.extend({
           }
         });
       }
-    }
+    };
 
     const values = Object.values(groupedNames).flat().map(item => item.value).join(', ');
 
