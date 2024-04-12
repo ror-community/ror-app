@@ -20,7 +20,6 @@ export default Component.extend({
   lastModifiedDate: null,
   otherNames: null,
   organizationTypes: null,
-  configService: service('config-service'),
 
 
   // Convert label array into a dictionary with relationship type as key
@@ -46,15 +45,13 @@ export default Component.extend({
       return result;
     }, {});
 
-    for (let key in groupedNames) {
-      if (groupedNames[key]) {
-        groupedNames[key].forEach((item) => {
-          if (item.lang && !item.value.includes(`(${item.lang})`)) {
-            item.value = `${item.value} (${item.lang})`;
-          }
-        })
-      }
-    };
+    if (groupedNames.label) {
+      groupedNames.label.forEach((label) => {
+        if (label.lang && !label.value.includes(`(${label.lang})`)) {
+          label.value = `${label.value} (${label.lang})`;
+        }
+      });
+    }
 
     const values = Object.values(groupedNames).flat().map(item => item.value).join(', ');
 
