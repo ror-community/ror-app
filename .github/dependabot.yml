@@ -5,5 +5,5 @@ updates:
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
-      interval: "daily"
-    target-branch: "dev"
+      interval: "weekly"
+    target-branch: "dependabot-updates"
