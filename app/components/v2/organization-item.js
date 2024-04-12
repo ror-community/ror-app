@@ -20,6 +20,7 @@ export default Component.extend({
   lastModifiedDate: null,
   otherNames: null,
   organizationTypes: null,
+  configService: service('config-service'),
 
 
   // Convert label array into a dictionary with relationship type as key
