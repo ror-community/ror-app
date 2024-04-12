@@ -52,7 +52,7 @@ export default Component.extend({
           if (item.lang && !item.value.includes(`(${item.lang})`)) {
             item.value = `${item.value} (${item.lang})`;
           }
-        });
+        })
       }
     };
 
