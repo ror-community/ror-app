@@ -45,12 +45,14 @@ export default Component.extend({
       return result;
     }, {});
 
-    if (groupedNames.label) {
-      groupedNames.label.forEach((label) => {
-        if (label.lang && !label.value.includes(`(${label.lang})`)) {
-          label.value = `${label.value} (${label.lang})`;
-        }
-      });
+    for (let key in groupedNames) {
+      if (groupedNames[key]) {
+        groupedNames[key].forEach((item) => {
+          if (item.lang && !item.value.includes(`(${item.lang})`)) {
+            item.value = `${item.value} (${item.lang})`;
+          }
+        });
+      }
     }
 
     const values = Object.values(groupedNames).flat().map(item => item.value).join(', ');
