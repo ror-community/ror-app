@@ -20,6 +20,7 @@ export default Component.extend({
   lastModifiedDate: null,
   otherNames: null,
   organizationTypes: null,
+  configService: service('config-service'),
 
 
   // Convert label array into a dictionary with relationship type as key
@@ -45,12 +46,14 @@ export default Component.extend({
       return result;
     }, {});
 
-    if (groupedNames.label) {
-      groupedNames.label.forEach((label) => {
-        if (label.lang && !label.value.includes(`(${label.lang})`)) {
-          label.value = `${label.value} (${label.lang})`;
-        }
-      });
+    for (let key in groupedNames) {
+      if (groupedNames[key]) {
+        groupedNames[key].forEach((item) => {
+          if (item.lang && !item.value.includes(`(${item.lang})`)) {
+            item.value = `${item.value} (${item.lang})`;
+          }
+        })
+      }
     }
 
     const values = Object.values(groupedNames).flat().map(item => item.value).join(', ');
@@ -80,7 +83,7 @@ export default Component.extend({
               this.set('grid', externalId.preferred);
             }
             break;
-  
+
           case 'isni':
             if (externalId.preferred) {
               let displayIsni = externalId.preferred;
@@ -94,7 +97,7 @@ export default Component.extend({
               this.set('link_isni', linkIsni);
             }
             break;
-  
+
           case 'fundref':
             if (externalId.preferred) {
               this.set('fundref', externalId.preferred);
@@ -102,7 +105,7 @@ export default Component.extend({
               this.set('fundref', externalId.all[0]);
             }
             break;
-  
+
           case 'wikidata':
             if (externalId.preferred) {
               this.set('wikidata', externalId.preferred);
@@ -110,7 +113,7 @@ export default Component.extend({
               this.set('wikidata', externalId.all[0]);
             }
             break;
-  
+
           default:
             break;
         }
