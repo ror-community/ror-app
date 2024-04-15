@@ -23,7 +23,7 @@
   resolved "https://registry.yarnpkg.com/@babel/compat-data/-/compat-data-7.24.4.tgz#6f102372e9094f25d908ca0d34fc74c74606059a"
   integrity sha512-vg8Gih2MLK+kOkHJp4gBEIkyaIi00jgWot2D9QOmmfLC8jINSOzmCLta6Bvz/JSBCqnegV0L80jhxkol5GWNfQ==
 
-"@babel/core@^7.1.6", "@babel/core@^7.12.0", "@babel/core@^7.13.10", "@babel/core@^7.16.10", "@babel/core@^7.16.7", "@babel/core@^7.21.0", "@babel/core@^7.24.0", "@babel/core@^7.3.4":
+"@babel/core@^7.1.6", "@babel/core@^7.12.0", "@babel/core@^7.13.10", "@babel/core@^7.16.10", "@babel/core@^7.16.7", "@babel/core@^7.21.0", "@babel/core@^7.23.7", "@babel/core@^7.24.0", "@babel/core@^7.3.4":
   version "7.24.4"
   resolved "https://registry.yarnpkg.com/@babel/core/-/core-7.24.4.tgz#1f758428e88e0d8c563874741bc4ffc4f71a4717"
   integrity sha512-MBVlMXP+kkl5394RBLSxxk/iLTeVGuXTV3cIDXavPpMMqnSnt6apKgan/U8O3USWZCWZT/TbgfEpKa4uMgN4Dg==
@@ -4631,10 +4631,10 @@ dot-prop@^5.2.0:
   dependencies:
     is-obj "^2.0.0"
 
-dotenv@^7.0.0:
-  version "7.0.0"
-  resolved "https://registry.yarnpkg.com/dotenv/-/dotenv-7.0.0.tgz#a2be3cd52736673206e8a85fb5210eea29628e7c"
-  integrity sha512-M3NhsLbV1i6HuGzBUH8vXrtxOk+tWmzWKDMbAVSUp3Zsjm7ywFeuwrUXhmhQyRK1q5B5GGy7hcXPbj3bnfZg2g==
+dotenv@>=8.0.0:
+  version "16.4.5"
+  resolved "https://registry.yarnpkg.com/dotenv/-/dotenv-16.4.5.tgz#cdd3b3b604cb327e286b4762e13502f717cb099f"
+  integrity sha512-ZmdL2rui+eB2YwhsWzjInR8LldtZHGDoQ1ugH85ppHKwpUHL7j7rN0Ti9NCnGiQbhaZ11FpR+7ao1dNsmduNUg==
 
 duplexify@^3.4.2, duplexify@^3.6.0:
   version "3.7.1"
@@ -4835,7 +4835,7 @@ ember-cli-babel-plugin-helpers@^1.0.0, ember-cli-babel-plugin-helpers@^1.1.1:
   resolved "https://registry.yarnpkg.com/ember-cli-babel-plugin-helpers/-/ember-cli-babel-plugin-helpers-1.1.1.tgz#5016b80cdef37036c4282eef2d863e1d73576879"
   integrity sha512-sKvOiPNHr5F/60NLd7SFzMpYPte/nnGkq/tMIfXejfKHIhaiIkYFqX8Z9UFTKWLLn+V7NOaby6niNPZUdvKCRw==
 
-ember-cli-babel@^7.0.0, ember-cli-babel@^7.1.2, ember-cli-babel@^7.1.3, ember-cli-babel@^7.10.0, ember-cli-babel@^7.13.0, ember-cli-babel@^7.19.0, ember-cli-babel@^7.21.0, ember-cli-babel@^7.22.1, ember-cli-babel@^7.23.0, ember-cli-babel@^7.23.1, ember-cli-babel@^7.26.10, ember-cli-babel@^7.26.11, ember-cli-babel@^7.26.5, ember-cli-babel@^7.26.6, ember-cli-babel@^7.5.0, ember-cli-babel@^7.7.3:
+ember-cli-babel@^7.0.0, ember-cli-babel@^7.1.3, ember-cli-babel@^7.10.0, ember-cli-babel@^7.13.0, ember-cli-babel@^7.19.0, ember-cli-babel@^7.21.0, ember-cli-babel@^7.22.1, ember-cli-babel@^7.23.0, ember-cli-babel@^7.23.1, ember-cli-babel@^7.26.10, ember-cli-babel@^7.26.11, ember-cli-babel@^7.26.5, ember-cli-babel@^7.26.6, ember-cli-babel@^7.5.0, ember-cli-babel@^7.7.3:
   version "7.26.11"
   resolved "https://registry.yarnpkg.com/ember-cli-babel/-/ember-cli-babel-7.26.11.tgz#50da0fe4dcd99aada499843940fec75076249a9f"
   integrity sha512-JJYeYjiz/JTn34q7F5DSOjkkZqy8qwFOOxXfE6pe9yEJqWGu4qErKxlz8I22JoVEQ/aBUO+OcKTpmctvykM9YA==
@@ -4922,14 +4922,15 @@ ember-cli-dependency-checker@^3.2.0:
     resolve "^1.22.0"
     semver "^5.7.1"
 
-ember-cli-dotenv@^2.2.1:
-  version "2.2.3"
-  resolved "https://registry.yarnpkg.com/ember-cli-dotenv/-/ember-cli-dotenv-2.2.3.tgz#3e301776fda64190906ee3b6360d3a1456bf09e4"
-  integrity sha512-E13R9kMZGdtv0KlWeL5K6YLT+9QTF4hX7bH+3dUXDhqroyj2XwnO1szy+iBe90YPQ3vr00O/Z/0Hd4VCc3FRPg==
+ember-cli-dotenv@^4.0.0:
+  version "4.0.0"
+  resolved "https://registry.yarnpkg.com/ember-cli-dotenv/-/ember-cli-dotenv-4.0.0.tgz#76e09dd4c564d6c63b650bd628f9195cc8ce0c8e"
+  integrity sha512-9Zm+Qark7yPUAuXFlMU7vUGZyQDwKaFTQCAKoGhjRQBmf33zWFjhwMXU2C+yejplu8mGfiivHn9hD0a1I+pDQA==
   dependencies:
-    dotenv "^7.0.0"
-    ember-cli-babel "^7.1.2"
-    minimist "^1.2.0"
+    "@babel/core" "^7.23.7"
+    dotenv ">=8.0.0"
+    ember-cli-babel "^8.2.0"
+    minimist "^1.2.8"
 
 ember-cli-eslint@^4.2.3:
   version "4.2.3"
@@ -8812,7 +8813,7 @@ minimist@^0.2.1:
   resolved "https://registry.yarnpkg.com/minimist/-/minimist-0.2.4.tgz#0085d5501e29033748a2f2a4da0180142697a475"
   integrity sha512-Pkrrm8NjyQ8yVt8Am9M+yUt74zE3iokhzbG1bFVNjLB92vwM71hf40RkEsryg98BujhVOncKm/C1xROxZ030LQ==
 
-minimist@^1.1.1, minimist@^1.2.0, minimist@^1.2.5, minimist@^1.2.6:
+minimist@^1.1.1, minimist@^1.2.0, minimist@^1.2.5, minimist@^1.2.6, minimist@^1.2.8:
   version "1.2.8"
   resolved "https://registry.yarnpkg.com/minimist/-/minimist-1.2.8.tgz#c1a464e7693302e082a075cee0c057741ac4772c"
   integrity sha512-2yyAR8qBkN3YuheJanUpWC5U3bb5osDywNB8RzDVlDwDHbocAJveqqj1u8+SVD7jkWT4yvsHCpWqqWqAxb0zCA==
