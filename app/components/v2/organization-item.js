@@ -83,7 +83,7 @@ export default Component.extend({
               this.set('grid', externalId.preferred);
             }
             break;
-  
+
           case 'isni':
             if (externalId.preferred) {
               let displayIsni = externalId.preferred;
@@ -97,7 +97,7 @@ export default Component.extend({
               this.set('link_isni', linkIsni);
             }
             break;
-  
+
           case 'fundref':
             if (externalId.preferred) {
               this.set('fundref', externalId.preferred);
@@ -105,7 +105,7 @@ export default Component.extend({
               this.set('fundref', externalId.all[0]);
             }
             break;
-  
+
           case 'wikidata':
             if (externalId.preferred) {
               this.set('wikidata', externalId.preferred);
@@ -113,7 +113,7 @@ export default Component.extend({
               this.set('wikidata', externalId.all[0]);
             }
             break;
-  
+
           default:
             break;
         }
