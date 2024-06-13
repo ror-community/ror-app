@@ -8,10 +8,10 @@ export default Component.extend({
 
   actions: {
     search() {
-      this.get('globalSearch').doSearch(this.query);
+      this.globalSearch.doSearch(this.query);
     },
     clear() {
-      this.get('globalSearch').doSearch(null);
+      this.globalSearch.doSearch(null);
     }
   }
 });

@@ -1,15 +1,9 @@
 <div class="col-lg-8 col-sm-12">
   <ul class="pagination justify-content-center">
-    {{#if previousPage}}
+    {{#if this.previousPage}}
       <li class="page-item">
-        {{#link-to
-          link
-          (query-params
-          page=previousPage)
-          class="page-link"
-          aria-label="Previous"
-        }}<span aria-hidden="true"><i class="fa-solid fa-angle-double-left" aria-hidden="true"></i></span>
-        {{/link-to}}
+        <LinkTo @route={{link}} @query={{hash page=this.previousPage}} class="page-link" @aria-label="Previous"><span aria-hidden="true"><i class="fa-solid fa-angle-double-left" aria-hidden="true"></i></span>
+        </LinkTo>
       </li>
     {{else}}
       <li class="page-item disabled">
@@ -17,7 +11,7 @@
       </li>
     {{/if}}
 
-    {{#each pageItems as |item|}}
+    {{#each this.pageItems as |item|}}
        {{#if item.dots}}
         <li class="page-item">
           <a class="page-link">...</a>
@@ -28,27 +22,16 @@
         </li>
       {{else}}
         <li class="page-item">
-          {{#link-to
-            link
-            (query-params
-            page=item.page)
-            class="page-link"
-          }}{{item.page}}
-          {{/link-to}}
+          <LinkTo @route={{this.link}} @query={{hash page=item.page}} class="page-link">{{item.page}}
+          </LinkTo>
         </li>
       {{/if}}
     {{/each}}
 
-    {{#if nextPage}}
+    {{#if this.nextPage}}
       <li class="page-item">
-        {{#link-to
-          link
-          (query-params
-          page=nextPage)
-          class="page-link"
-          aria-label="Next"
-        }}<span aria-hidden="true"><i class="fa-solid fa-angle-double-right" aria-hidden="true"></i></span>
-        {{/link-to}}
+        <LinkTo @route={{this.link}} @query={{hash page=this.nextPage}} class="page-link" @aria-label="Next"><span aria-hidden="true"><i class="fa-solid fa-angle-double-right" aria-hidden="true"></i></span>
+        </LinkTo>
       </li>
     {{else}}
       <li class="page-item">

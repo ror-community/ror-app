@@ -1,16 +1,16 @@
 <div class="content">
   <div class="container-fluid">
-    {{#if model}}
-      {{#if (gt model.meta.total 1)}}
-        <h4 class="ml-3">{{decimal-format model.meta.total}} Organizations</h4>
+    {{#if this.model}}
+      {{#if (gt this.model.meta.total 1)}}
+        <h4 class="ml-3">{{decimal-format this.model.meta.total}} Organizations</h4>
         <p class="small ml-3"><i>Are we missing an organization you're looking for? <a target="_blank" rel="noopener" href="http://curation-request.ror.org/">Submit a request to add it</a></i></p>
       {{/if}}
       <div class="row">
         <div class="col-md-2 col-sm-12">
-          {{filter-sidebar model=model}}
+          <FilterSidebar @model={{this.model}} />
         </div>
         <div class="col-md-10 col-sm-12">
-        {{#each model as |organization|}}
+        {{#each this.model as |organization|}}
           {{#if (variation "v2_ui")}}
             {{v2/organization-item model=organization view="list"}}
           {{else}}
@@ -18,20 +18,19 @@
           {{/if}} 
         {{/each}}
         </div>
-        {{#if (gt model.meta.totalPages 1)}}
-          {{page-numbers model=model link="organizations.index"}}
+        {{#if (gt this.model.meta.totalPages 1)}}
+          <PageNumbers @model={{this.model}} @link="organizations.index" />
         {{/if}}
       </div>
     {{else}}
       <div class="row">
         <div class="col-md-2">
-          {{filter-sidebar model=model}}
+          <FilterSidebar @model={{this.model}} />
         </div>
         <div class="col-md-10 col-sm-12">
-          {{#bs-alert dismissible=false type="warning"}}
-            No Organizations found. {{#link-to "organizations.index" (query-params
-          query=undefined page=undefined filter=undefined) }}Return to organizations list{{/link-to}}.
-          {{/bs-alert}}
+          <BsAlert @dismissible={{false}} @type="warning">
+            No Organizations found. <LinkTo @route="organizations.index" @query={{hash query=undefined page=undefined filter=undefined}}>Return to organizations list</LinkTo>.
+          </BsAlert>
         </div>
       </div>
     {{/if}}
