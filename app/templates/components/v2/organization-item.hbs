@@ -139,7 +139,7 @@
             <LinkTo @route="organizations.show" @model={{this.model.id}} class="btn btn-sm btn-round">View details</LinkTo>
           {{/if}}
           {{#if (not this.isSearch)}}
-            <p class="mt-3 mb-0"><i>Some record data is not displayed in this view. <a target="_blank" rel="noopener" href="https://api.ror.org/v2/organizations/{{this.model.id}}">See JSON view for full record data</a></i></p>
+            <p class="mt-3 mb-0"><i>Some record data is not displayed in this view. <a target="_blank" rel="noopener" href="{{configService.API_URL_V2}}/organizations/{{model.id}}">See JSON view for full record data</a></i></p>
             <p class="mt-3 mb-0">
               <i>
                 {{#if this.lastModifiedDate}}
