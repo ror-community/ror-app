@@ -5,7 +5,7 @@
     </a>
     <div id="search">
       <form {{action "search" this.query on="submit"}} class="form-inline mw-25" role="search">
-        <Input name="query" value={{this.query}} id="query" class="form-control" placeholder="Search Registry..." escape-press={{action "clear"}} enter={{action "search"}} />
+        <input name="query" value={{this.query}} id="query" class="form-control" placeholder="Search Registry..." escape-press={{action "clear"}} enter={{action "search"}} />
       </form>
     </div>
 
@@ -54,13 +54,13 @@
       <div class="callout small">
         <h2>Show records with status:</h2>
         <form {{action "applyFilter" query on="submit"}} class="form-inline mw-25" role="search">
-          <Input type="checkbox" id="active-status" name="activeStatus" />
+          <input type="checkbox" id="active-status" name="activeStatus" />
           <label for="active-status">Active</label>
-          <Input type="checkbox" id="inactive-status" name="inactiveStatus" />
+          <input type="checkbox" id="inactive-status" name="inactiveStatus" />
           <label for="inactive-status">Inactive</label>
-          <Input type="checkbox" id="withdrawn-status" name="withdrawnStatus" />
+          <input type="checkbox" id="withdrawn-status" name="withdrawnStatus" />
           <label for="withdrawn-status">Withdrawn</label>
-          <Input type="checkbox" id="all-status" name="allStatus" change={{action "applyFilter"}} />
+          <input type="checkbox" id="all-status" name="allStatus" change={{action "applyFilter"}} />
           <label for="all-status">All statuses</label>
         </form>
       </div>
