@@ -11,6 +11,7 @@
         </div>
         <div class="col-md-10 col-sm-12">
         {{#each this.model as |organization|}}
+          {{variation "v2_ui" }}
           {{#if (variation "v2_ui")}}
             {{v2/organization-item model=organization view="list"}}
           {{else}}
