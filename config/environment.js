@@ -31,7 +31,8 @@ module.exports = function(environment) {
       // when it is created
     },
     launchDarkly: {
-      clientSideId: process.env.LAUNCH_DARKLY_CLIENT_SIDE_ID
+      clientSideId: process.env.LAUNCH_DARKLY_CLIENT_SIDE_ID,
+      mode: process.env.LAUNCH_DARKLY_MODE || 'local',
     }
   };
 
@@ -41,11 +42,9 @@ module.exports = function(environment) {
     // ENV.APP.LOG_TRANSITIONS = true;
     // ENV.APP.LOG_TRANSITIONS_INTERNAL = true;
     // ENV.APP.LOG_VIEW_LOOKUPS = true;
-    // ENV.launchDarkly.localFeatureFlags = {
-    //   'v2_ui': true
-    // };
-    ENV.launchDarkly.local = false;
-    ENV.launchDarkly.streaming = false;
+    ENV.launchDarkly.localFlags = {
+      'v2_ui': true
+    };
   }
 
   if (environment === 'test') {
