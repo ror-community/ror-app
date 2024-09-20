@@ -24,8 +24,8 @@ export default class OrganizationsIndexRoute extends Route {
     if (params.query) {
       let ror_id = '';
       const re1 = new RegExp("^0[a-hj-km-np-tv-z|0-9]{6}[0-9]{2}$");
-      const re2 = new RegExp("^http(s)?:\/\/ror\.org\/0[a-hj-km-np-tv-z|0-9]{6}[0-9]{2}$");
-      const re3 = new RegExp("^ror\.org\/0[a-hj-km-np-tv-z|0-9]{6}[0-9]{2}$");
+      const re2 = new RegExp("^http(s)?:\/\/ror\.org\/0[a-hj-km-np-tv-z|0-9]{6}[0-9]{2}$"); // eslint-disable-line no-useless-escape
+      const re3 = new RegExp("^ror\.org\/0[a-hj-km-np-tv-z|0-9]{6}[0-9]{2}$"); // eslint-disable-line no-useless-escape
 
       if (re1.test(params.query)) {
         ror_id = params.query;
@@ -43,7 +43,7 @@ export default class OrganizationsIndexRoute extends Route {
         window.location.href = ror_id;
         return;
       } else {
-        params.query = params.query.replace(/([\+\-\=\&\|\>\<\!\(\)\{\}\\\[\]\^\~\*\?\:\/])/g, "\\$1");
+        params.query = params.query.replace(/([\+\-\=\&\|\>\<\!\(\)\{\}\\\[\]\^\~\*\?\:\/])/g, "\\$1"); // eslint-disable-line no-useless-escape
       }
     }
 
