@@ -1,15 +1,11 @@
 import Route from '@ember/routing/route';
+import { inject as service } from '@ember/service';
 
-export default Route.extend({
+export default class OrganizationsShowRoute extends Route {
+  @service store;
+
   model(params) {
-    //let self = this;
-    return this.store.findRecord('organization', params.organization_id).then(function(organization) {
-      return organization;
-    })
-  },
-  actions: {
-    queryParamsDidChange() {
-      this.refresh();
-    }
+    const { organization_id } = params;
+    return this.store.findRecord('organization', organization_id);
   }
-});
+}

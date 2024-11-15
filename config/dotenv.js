@@ -1,6 +1,6 @@
-module.exports = function(env) {
+module.exports = function(env) { // eslint-disable-line no-unused-vars
   return {
-    clientAllowedKeys: ['API_URL_V1', 'API_URL_V2'],
+    clientAllowedKeys: ['API_URL'],
     failOnMissingKey: false
   };
 };
