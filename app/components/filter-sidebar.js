@@ -9,6 +9,9 @@ export default Component.extend({
     filterValue: '',
 
     actions: {
+        toggleStatus(e){
+            this.set(e.target.name, e.target.checked)
+        },
         applyFilter() {
             this.filterValue = ''
             if (this.activeStatus == true){
@@ -22,8 +25,7 @@ export default Component.extend({
             }
             this.filterValue = this.filterValue.slice(0, -1)
             this.set('model.query.filter', this.filterValue)
-            //this.get('globalSearch').doSearch(this.query, this.allStatus)
-            this.get('router').transitionTo('organizations.index', { queryParams: { query: this.model.query.query, page: this.model.query.page, all_status: this.model.query.allStatus, filter: this.model.query.filter}});
+            this.router.transitionTo('organizations.index', { queryParams: { query: this.model.query.query, page: this.model.query.page, all_status: this.model.query.allStatus, filter: this.model.query.filter}});
         },
         clearFilter() {
             this.filterValue = ''
@@ -32,7 +34,7 @@ export default Component.extend({
             this.set('withdrawnStatus', false);
             this.filterValue = "status:active"
             this.set('model.query.filter', this.filterValue)
-            this.get('router').transitionTo('organizations.index', { queryParams: { query: this.model.query.query, page: this.model.query.page, all_status: this.model.query.allStatus, filter: this.model.query.filter}});
+            this.router.transitionTo('organizations.index', { queryParams: { query: this.model.query.query, page: this.model.query.page, all_status: this.model.query.allStatus, filter: this.model.query.filter}});
         }
     }
 
