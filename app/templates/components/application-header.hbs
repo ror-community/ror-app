@@ -4,7 +4,7 @@
       <img class="pl-0 pr-0" src="/assets/ror-logo.svg" alt="Research Organization Registry logo">
     </a>
     <div id="search">
-      <form {{action "search" this.query on="submit"}} class="form-inline mw-25" role="search">
+      <form {{on "submit" (fn this.actions.search this.query)}} class="form-inline mw-25" role="search">
         <input name="query" value={{this.query}} id="query" class="form-control" placeholder="Search Registry..." escape-press={{action "clear"}} enter={{action "search"}} />
       </form>
     </div>
