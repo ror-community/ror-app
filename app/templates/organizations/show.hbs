@@ -2,12 +2,8 @@
 
   <div class="container-fluid">
     <div class="ml-4 ror-search-home">
-        {{#link-to "organizations.index"}}<i class="fa fa-caret-left" aria-hidden="true"></i> ROR search home page{{/link-to}}
+        <LinkTo @route="organizations.index"><i class="fa fa-caret-left" aria-hidden="true"></i> ROR search home page</LinkTo>
     </div>
-    {{#if (variation "v2_ui")}}
-      {{v2/organization-item model=model view="detailed"}}
-    {{else}}
-      {{v1/organization-item model=model}}
-    {{/if}}
+    {{organization-item model=this.model view="detailed"}}
   </div>
 </div>

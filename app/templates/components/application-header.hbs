@@ -1,77 +1,76 @@
-{{#bs-navbar backgroundColor="white" class="navbar-expand-lg"
-onCollapse=(action (mut collapsed) true) onExpand=(action (mut collapsed) false) as |navbar|}}
+<BsNavbar @backgroundColor="white" @class="navbar-expand-lg" @onCollapse={{action (mut this.collapsed) true}} @onExpand={{action (mut this.collapsed) false}} as |navbar|>
   <div class="container-fluid">
     <a class="navbar-brand d-block" href="/">
       <img class="pl-0 pr-0" src="/assets/ror-logo.svg" alt="Research Organization Registry logo">
     </a>
     <div id="search">
-      <form {{action "search" query on="submit"}} class="form-inline mw-25" role="search">
-        {{input name="query" value=query id="query" class="form-control" placeholder='Search Registry...' escape-press=(action
-          'clear') enter=(action 'search')}}
+      <form {{on "submit" (fn this.actions.search this.query)}} class="form-inline mw-25" role="search">
+        <input name="query" value={{this.query}} id="query" class="form-control" placeholder="Search Registry..." escape-press={{action "clear"}} enter={{action "search"}} />
       </form>
     </div>
 
     {{navbar.toggle}}
 
-    {{#navbar.content}}
-      {{#navbar.nav class="ml-auto" as |nav|}}
+    <navbar.content>
+      <navbar.nav @class="ml-auto" as |nav|>
 
-        {{#nav.item}}
+        <nav.item>
           <a class="nav-link" href="/about/">
             <p>About</p>
           </a>
-        {{/nav.item}}
+        </nav.item>
 
-        {{#nav.item}}
+        <nav.item>
         <a class="nav-link" href="/registry/">
           <p>Registry</p>
         </a>
-        {{/nav.item}}
+        </nav.item>
 
-        {{#nav.item}}
+        <nav.item>
         <a class="nav-link" href="/community/">
           <p>Community</p>
         </a>
-        {{/nav.item}}
+        </nav.item>
 
-        {{#nav.item}}
+        <nav.item>
         <a class="nav-link" href="/events/">
           <p>Events</p>
         </a>
-        {{/nav.item}}
+        </nav.item>
 
-        {{#nav.item}}
+        <nav.item>
+
         <a class="nav-link" href="/blog/">
           <p>Blog</p>
         </a>
-        {{/nav.item}}
+        </nav.item>
 
-        {{#nav.item}}
+        <nav.item>
         <a class="nav-link external" href="https://ror.readme.io">
           <p>Documentation <i class="fa-solid fa-external-link"></i></p>
         </a>
-        {{/nav.item}}
+        </nav.item>
 
-      {{/navbar.nav}}
-    {{/navbar.content}}
+      </navbar.nav>
+    </navbar.content>
   </div>
-{{/bs-navbar}}
-{{#if showAdvanced}}
+</BsNavbar>
+{{#if this.showAdvanced}}
   <div class="row">
     <div class="col-md-12">
       <div class="callout small">
         <h2>Show records with status:</h2>
         <form {{action "applyFilter" query on="submit"}} class="form-inline mw-25" role="search">
-          {{input type="checkbox" id="active-status" name="activeStatus"}}
+          <input type="checkbox" id="active-status" name="activeStatus" />
           <label for="active-status">Active</label>
-          {{input type="checkbox" id="inactive-status" name="inactiveStatus"}}
+          <input type="checkbox" id="inactive-status" name="inactiveStatus" />
           <label for="inactive-status">Inactive</label>
-          {{input type="checkbox" id="withdrawn-status" name="withdrawnStatus"}}
+          <input type="checkbox" id="withdrawn-status" name="withdrawnStatus" />
           <label for="withdrawn-status">Withdrawn</label>
-          {{input type="checkbox" id="all-status" name="allStatus" change=(action 'applyFilter')}}
+          <input type="checkbox" id="all-status" name="allStatus" change={{action "applyFilter"}} />
           <label for="all-status">All statuses</label>
         </form>
       </div>
     </div>
   </div>
-  {{/if}}
+{{/if}}
