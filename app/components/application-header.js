@@ -1,17 +1,17 @@
-import Component from '@ember/component';
+import Component from '@glimmer/component';
+import { tracked } from '@glimmer/tracking';
 import { inject as service } from '@ember/service';
+import { action } from '@ember/object';
 
-export default Component.extend({
-  globalSearch: service(),
-  allStatus: false,
-  showAdvanced: false,
+export default class SearchComponent extends Component {
+  @service globalSearch;
 
-  actions: {
-    search() {
-      this.globalSearch.doSearch(this.query);
-    },
-    clear() {
-      this.globalSearch.doSearch(null);
-    }
+  @tracked query = '';
+
+  @action
+  search(event) {
+    event.preventDefault();
+    const inputValue = event.target.querySelector('[name="query"]').value;
+    this.globalSearch.doSearch(inputValue);
   }
-});
+}
