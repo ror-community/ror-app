@@ -1,11 +1,17 @@
 <BsNavbar @backgroundColor="white" @class="navbar-expand-lg" @onCollapse={{action (mut this.collapsed) true}} @onExpand={{action (mut this.collapsed) false}} as |navbar|>
   <div class="container-fluid">
     <a class="navbar-brand d-block" href="/">
-      <img class="pl-0 pr-0" src="/assets/ror-logo.svg" alt="Research Organization Registry logo">
+      <img class="pl-0 pr-0" src="/assets/ror-logo.svg" alt="Research Organization Registry">
     </a>
     <div id="search">
-      <form {{on "submit" (fn this.actions.search this.query)}} class="form-inline mw-25" role="search">
-        <input name="query" value={{this.query}} id="query" class="form-control" placeholder="Search Registry..." escape-press={{action "clear"}} enter={{action "search"}} />
+      <form {{on "submit" this.search}} class="form-inline mw-25" role="search">
+        <input
+          name="query"
+          value={{this.query}}
+          id="query"
+          class="form-control"
+          placeholder="Search Registry..."
+        />
       </form>
     </div>
 
