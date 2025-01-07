@@ -61,22 +61,3 @@
     </navbar.content>
   </div>
 </BsNavbar>
-{{#if this.showAdvanced}}
-  <div class="row">
-    <div class="col-md-12">
-      <div class="callout small">
-        <h2>Show records with status:</h2>
-        <form {{action "applyFilter" query on="submit"}} class="form-inline mw-25" role="search">
-          <input type="checkbox" id="active-status" name="activeStatus" />
-          <label for="active-status">Active</label>
-          <input type="checkbox" id="inactive-status" name="inactiveStatus" />
-          <label for="inactive-status">Inactive</label>
-          <input type="checkbox" id="withdrawn-status" name="withdrawnStatus" />
-          <label for="withdrawn-status">Withdrawn</label>
-          <input type="checkbox" id="all-status" name="allStatus" change={{action "applyFilter"}} />
-          <label for="all-status">All statuses</label>
-        </form>
-      </div>
-    </div>
-  </div>
-{{/if}}
