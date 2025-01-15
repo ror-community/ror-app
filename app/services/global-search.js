@@ -1,5 +1,4 @@
 import Service, { inject as service } from '@ember/service';
-// import { assign } from '@ember/polyfills';
 
 export default Service.extend({
   router: service(),

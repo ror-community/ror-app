@@ -37,7 +37,7 @@
                   {{/if}}
                 {{/if}}
               {{/each-in}}
-              <br><a target="_blank" rel="noopener" class="card-link mt-1" href="https://ror.readme.io/docs/ror-data-structure#status"><em>Learn more about {{model.status}} records</em></a>
+              <br><a target="_blank" rel="noopener" class="card-link mt-1" href="https://ror.readme.io/docs/ror-data-structure#status"><em>Learn more about {{this.model.status}} records</em></a>
             </div>
           {{/if}}
         {{/if}}
@@ -139,7 +139,7 @@
             <LinkTo @route="organizations.show" @model={{this.model.id}} class="btn btn-sm btn-round">View details</LinkTo>
           {{/if}}
           {{#if (not this.isSearch)}}
-            <p class="mt-3 mb-0"><i>Some record data is not displayed in this view. <a target="_blank" rel="noopener" href="{{configService.API_URL_V2}}/organizations/{{model.id}}">See JSON view for full record data</a></i></p>
+            <p class="mt-3 mb-0"><i>Some record data is not displayed in this view. <a target="_blank" rel="noopener" href="{{configService.API_URL}}/organizations/{{model.id}}">See JSON view for full record data</a></i></p>
             <p class="mt-3 mb-0">
               <i>
                 {{#if this.lastModifiedDate}}
