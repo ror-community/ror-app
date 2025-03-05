@@ -1,0 +1,102 @@
+{{! app/components/organizations/api-client-registration-form.hbs }}
+<div class="card api-client-registration-form">
+	{{#if this.showSuccessMessage}}
+    <div class="card-body">
+      <h4>Thank you for registering!</h4>
+      <p>
+        We have sent an email to <strong>{{this.email}}</strong> containing your client ID. 
+        This email was sent from support@ror.org with the subject "ROR API client ID".
+      </p>
+      <p class="mb-0">
+        If you do not receive this email within 15 minutes, check your spam/junk folder. 
+        If you still cannot find this email, please contact 
+        <a href="mailto:support@ror.org">support@ror.org</a>.
+      </p>
+    </div>
+	{{else if this.showErrorMessage}}
+		<div class="card-body">
+			<h4 class="alert-heading">Registration Error</h4>
+			<p>
+				Oh no, there was an error and we were not able to process your request for a ROR API client ID. 
+				Please contact <a href="mailto:support@ror.org">support@ror.org</a> for assistance.
+			</p>
+      <button 
+        type="button" 
+        class="btn btn-sm btn-round"
+        {{on "click" this.resetForm}}
+      >
+        Try Again
+      </button>
+		</div>
+	{{else}}
+		<BsForm @formLayout="vertical" @onSubmit={{this.onSubmit}} class="card-body" as |form|>
+			<form.element
+				@controlType="email" 
+				@label="Email address:"
+				@value={{this.email}} 
+				placeholder="Enter email"
+				@onChange={{fn (mut this.email)}}
+				@required={{true}}
+        class={{if this.emailError "is-invalid"}}
+				as |el|>
+        {{#if this.emailError}}
+          <div class="invalid-feedback d-block">
+            {{this.emailError}}
+          </div>
+        {{/if}}
+				<el.control required />
+			</form.element>
+
+			<form.element 
+				@controlType="text"
+				@label="Name:"
+				@value={{this.name}}
+				@onChange={{fn (mut this.name)}}
+			/>
+
+			<div class="form-group">
+				<PowerSelect
+				@searchEnabled={{true}}
+				@labelText="Institution"
+				@search={{this.searchOrganizations}}
+				@selected={{this.selectedInstitution}}
+				@onChange={{this.onInstitutionSelect}}
+				@placeholder="Search for your institution or enter manually"
+				@allowClear={{true}}
+				@renderInPlace={{true}}
+				as |institution|
+				>
+				{{#if institution.name}}
+					{{institution.name}}
+				{{else}}
+					{{institution}}
+				{{/if}}
+				</PowerSelect>
+			</div>
+
+			<form.element 
+				@controlType="text"
+				@label="Country:"
+				@value={{this.country}}
+				@onChange={{fn (mut this.country)}}
+			/>
+
+			<form.element 
+				@controlType="textarea"
+				@label="How do you plan to use the ROR API?"
+				@value={{this.apiUsage}}
+				@onChange={{fn (mut this.apiUsage)}}
+				@rows="3"
+			/>
+
+			<BsButton 
+			@type="primary"
+			@buttonType="submit"
+			class="btn btn-sm btn-round"
+			disabled={{this.isSubmitting}}
+			>
+			Submit
+			</BsButton>
+		</BsForm>
+	{{/if}}
+</div>
