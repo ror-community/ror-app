@@ -27,6 +27,20 @@ export default class ApiClientRegistrationFormComponent extends Component {
   
   ROR_API_URL = 'https://api.ror.org/organizations';
   countries = countries;
+
+  get isFormInvalid() {
+    return this.hasValidationErrors || !this.email || this.isSubmitting;
+  }
+
+  get hasValidationErrors() {
+    return Boolean(
+      this.emailError ||
+      this.nameError ||
+      this.institutionError ||
+      this.countryError ||
+      this.rorUseError
+    );
+  }
   
   validateEmail(email) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -68,7 +82,6 @@ export default class ApiClientRegistrationFormComponent extends Component {
   }
   
   validateRorUse(text) {
-	console.log('ror_use', text.length);
     if (text && text.length > 500) {
       return 'API usage description must be less than 500 characters';
     }
