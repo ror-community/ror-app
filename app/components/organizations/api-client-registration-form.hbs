@@ -1,18 +1,17 @@
-{{! app/components/organizations/api-client-registration-form.hbs }}
 <div class="card api-client-registration-form">
 	{{#if this.showSuccessMessage}}
-    <div class="card-body">
-      <h4>Thank you for registering!</h4>
-      <p>
-        We have sent an email to <strong>{{this.email}}</strong> containing your client ID. 
-        This email was sent from support@ror.org with the subject "ROR API client ID".
-      </p>
-      <p class="mb-0">
-        If you do not receive this email within 15 minutes, check your spam/junk folder. 
-        If you still cannot find this email, please contact 
-        <a href="mailto:support@ror.org">support@ror.org</a>.
-      </p>
-    </div>
+		<div class="card-body">
+		<h4>Thank you for registering!</h4>
+		<p>
+			We have sent an email to <strong>{{this.email}}</strong> containing your client ID. 
+			This email was sent from support@ror.org with the subject "ROR API client ID".
+		</p>
+		<p class="mb-0">
+			If you do not receive this email within 15 minutes, check your spam/junk folder. 
+			If you still cannot find this email, please contact 
+			<a href="mailto:support@ror.org">support@ror.org</a>.
+		</p>
+		</div>
 	{{else if this.showErrorMessage}}
 		<div class="card-body">
 			<h4 class="alert-heading">Registration Error</h4>
@@ -37,65 +36,111 @@
 				placeholder="Enter email"
 				@onChange={{fn (mut this.email)}}
 				@required={{true}}
-        class={{if this.emailError "is-invalid"}}
+        		class={{if this.emailError "is-invalid"}}
 				as |el|>
-        {{#if this.emailError}}
-          <div class="invalid-feedback d-block">
-            {{this.emailError}}
-          </div>
-        {{/if}}
-				<el.control required />
+				<el.control 
+					required
+					{{on "blur" (fn this.validateField "email" this.email)}}
+				/>
+				{{#if this.emailError}}
+					<div class="invalid-feedback d-block">
+						{{this.emailError}}
+					</div>
+				{{/if}}
+				
 			</form.element>
 
 			<form.element 
 				@controlType="text"
-				@label="Name:"
+				@label="Name"
 				@value={{this.name}}
 				@onChange={{fn (mut this.name)}}
-			/>
+				class={{if this.nameError "is-invalid"}}
+				as |el|>
+				<el.control 
+					{{on "blur" (fn this.validateField "name" this.name)}}
+				/>
+				{{#if this.nameError}}
+					<div class="invalid-feedback d-block">
+						{{this.nameError}}
+					</div>
+				{{/if}}
+			</form.element>
 
 			<div class="form-group">
 				<PowerSelect
-				@searchEnabled={{true}}
-				@labelText="Institution"
-				@search={{this.searchOrganizations}}
-				@selected={{this.selectedInstitution}}
-				@onChange={{this.onInstitutionSelect}}
-				@placeholder="Search for your institution or enter manually"
-				@allowClear={{true}}
-				@renderInPlace={{true}}
-				as |institution|
-				>
-				{{#if institution.name}}
-					{{institution.name}}
-				{{else}}
-					{{institution}}
-				{{/if}}
+					@searchEnabled={{true}}
+					@labelText="Institution"
+					@search={{this.searchOrganizations}}
+					@selected={{this.selectedInstitution}}
+					@onChange={{this.onInstitutionSelect}}
+					@placeholder="Search for your institution or enter manually"
+					@allowClear={{true}}
+					@renderInPlace={{true}}
+					class={{if this.institutionError "is-invalid"}}
+					as |institution|>
+						{{#if institution.name}}
+							{{institution.name}}
+						{{else}}
+							{{institution}}
+						{{/if}}
 				</PowerSelect>
+				{{#if this.institutionError}}
+					<div class="invalid-feedback d-block">
+						{{this.institutionError}}
+					</div>
+				{{/if}}
 			</div>
 
-			<form.element 
-				@controlType="text"
-				@label="Country:"
-				@value={{this.country}}
-				@onChange={{fn (mut this.country)}}
-			/>
+			<div class="form-group">
+				<label>Country</label>
+				<PowerSelect
+					@searchEnabled={{true}}
+					@search={{this.searchCountries}}
+					@selected={{this.selectedCountry}}
+					@onChange={{this.onCountrySelect}}
+					@placeholder="Select or search for a country"
+					@allowClear={{true}}
+					@renderInPlace={{true}}
+					@matchTriggerWidth={{true}} 
+					class={{if this.countryError "is-invalid"}}
+					as |country|>
+						{{country.name}} ({{country.code}})
+				</PowerSelect>
+				{{#if this.countryError}}
+					<div class="invalid-feedback d-block">
+						{{this.countryError}}
+					</div>
+				{{/if}}
+			</div>
 
 			<form.element 
 				@controlType="textarea"
 				@label="How do you plan to use the ROR API?"
-				@value={{this.apiUsage}}
-				@onChange={{fn (mut this.apiUsage)}}
+				@value={{this.ror_use}}
+				@onChange={{fn (mut this.ror_use)}}
 				@rows="3"
-			/>
+				class={{if this.rorUseError "is-invalid"}}
+				as |el|>
+				<el.control 
+					{{on "blur" (fn this.validateField "ror_use" this.ror_use)}}
+				/>
+				{{#if this.rorUseError}}
+					<div class="invalid-feedback d-block">
+						{{this.rorUseError}}
+					</div>
+				{{else}}
+					<small class="form-text text-muted">Maximum 500 characters</small>
+				{{/if}}
+			</form.element>
 
 			<BsButton 
-			@type="primary"
-			@buttonType="submit"
-			class="btn btn-sm btn-round"
-			disabled={{this.isSubmitting}}
+				@type="primary"
+				@buttonType="submit"
+				class="btn btn-sm btn-round"
+				disabled={{this.isSubmitting}}
 			>
-			Submit
+				Submit
 			</BsButton>
 		</BsForm>
 	{{/if}}
