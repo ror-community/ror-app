@@ -225,7 +225,7 @@ export default class ApiClientRegistrationFormComponent extends Component {
     };
     
     try {
-      const response = await fetch(this.configService.API_URL + '/register', {
+      const response = await fetch(this.configService.API_URL + '/register', { // TODO: Update this to the correct API endpoint
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
