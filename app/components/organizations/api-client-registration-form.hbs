@@ -31,7 +31,7 @@
 		<BsForm @formLayout="vertical" @onSubmit={{this.onSubmit}} class="card-body" as |form|>
 			<form.element
 				@controlType="email" 
-				@label="Email address:"
+				@label="Email address (required)"
 				@value={{this.email}} 
 				placeholder="Enter email"
 				@onChange={{fn (mut this.email)}}
@@ -52,7 +52,7 @@
 
 			<form.element 
 				@controlType="text"
-				@label="Name"
+				@label="Name (optional)"
 				@value={{this.name}}
 				@onChange={{fn (mut this.name)}}
 				class={{if this.nameError "is-invalid"}}
@@ -70,13 +70,14 @@
 			<div class="form-group">
 				<PowerSelect
 					@searchEnabled={{true}}
-					@labelText="Institution"
+					@labelText="Institution (optional)"
 					@search={{this.searchOrganizations}}
 					@selected={{this.selectedInstitution}}
 					@onChange={{this.onInstitutionSelect}}
 					@placeholder="Search for your institution or enter manually(Press Enter to add)"
 					@allowClear={{true}}
 					@renderInPlace={{true}}
+					@matchTriggerWidth={{true}}
 					class={{if this.institutionError "is-invalid"}}
 					as |institution|>
 						{{#if institution.name}}
@@ -93,9 +94,9 @@
 			</div>
 
 			<div class="form-group">
-				<label>Country</label>
 				<PowerSelect
 					@searchEnabled={{true}}
+					@labelText="Country (optional)"
 					@search={{this.searchCountries}}
 					@selected={{this.selectedCountry}}
 					@onChange={{this.onCountrySelect}}
@@ -116,7 +117,7 @@
 
 			<form.element 
 				@controlType="textarea"
-				@label="How do you plan to use the ROR API?"
+				@label="How do you plan to use the ROR API? (optional)"
 				@value={{this.ror_use}}
 				@onChange={{fn (mut this.ror_use)}}
 				@rows="3"
