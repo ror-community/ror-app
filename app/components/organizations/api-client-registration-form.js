@@ -106,17 +106,20 @@ export default class ApiClientRegistrationFormComponent extends Component {
         `${this.ROR_API_URL}?query=${encodeURIComponent(searchTerm)}`
       );
       const data = await response.json();
-      const results = data.items || [];
+      let results = data.items || [];
       const exactMatch = results.some(
         item => item.name.toLowerCase() === searchTerm.toLowerCase()
       );
       if (!exactMatch) {
         const sanitizedInput = this.sanitizeInput(searchTerm);
-        results.push({
-          name: sanitizedInput,
-          id: null,
-          isManualEntry: true
-        });
+        results = [
+          {
+            name: sanitizedInput,
+            id: null,
+            isManualEntry: true
+          },
+          ...results
+        ]
       }
       return results;
     } catch (error) {
@@ -144,11 +147,11 @@ export default class ApiClientRegistrationFormComponent extends Component {
   @action
   onInstitutionSelect(selection) {
     if (selection) {
-		this.selectedInstitution = {
-			name: selection.name,
-			id: selection.id,
-			isManualEntry: selection.isManualEntry || false
-		};
+      this.selectedInstitution = {
+        name: selection.name,
+        id: selection.id,
+        isManualEntry: selection.isManualEntry || false
+      };
       if (selection.isManualEntry) {
         this.institution_name = this.sanitizeInput(selection.name);
         this.institution_ror = null;
@@ -158,6 +161,7 @@ export default class ApiClientRegistrationFormComponent extends Component {
       }
       this.institutionError = this.validateInstitution(this.institution_name);
     } else {
+      this.selectedInstitution = null;
       this.institution_name = '';
       this.institution_ror = null;
       this.institutionError = null;
