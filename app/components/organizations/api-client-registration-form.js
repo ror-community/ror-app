@@ -8,13 +8,13 @@ export default class ApiClientRegistrationFormComponent extends Component {
   @service sanitizer;
   @service configService;
   
-  @tracked email = '';
-  @tracked name = '';
-  @tracked institution_name = '';
+  @tracked email = null;
+  @tracked name = null;
+  @tracked institution_name = null;
   @tracked institution_ror = null;
   @tracked selectedCountry = null;
   @tracked country_code = null;
-  @tracked ror_use = '';
+  @tracked ror_use = null;
   @tracked isSubmitting = false;
   @tracked showSuccessMessage = false;
   @tracked showErrorMessage = false;
@@ -89,11 +89,11 @@ export default class ApiClientRegistrationFormComponent extends Component {
   }
   
   sanitizeInput(text) {
-    return text ? this.sanitizer.sanitize(text).substring(0, 255) : '';
+    return text ? this.sanitizer.sanitize(text).substring(0, 255) : null;
   }
   
   sanitizeRorUse(text) {
-    return text ? this.sanitizer.sanitize(text).substring(0, 500) : '';
+    return text ? this.sanitizer.sanitize(text).substring(0, 500) : null;
   }
   
   @action
@@ -162,7 +162,7 @@ export default class ApiClientRegistrationFormComponent extends Component {
       this.institutionError = this.validateInstitution(this.institution_name);
     } else {
       this.selectedInstitution = null;
-      this.institution_name = '';
+      this.institution_name = null;
       this.institution_ror = null;
       this.institutionError = null;
     }
@@ -249,13 +249,13 @@ export default class ApiClientRegistrationFormComponent extends Component {
   
   @action
   resetForm() {
-    this.email = '';
-    this.name = '';
-    this.institution_name = '';
+    this.email = null;
+    this.name = null;
+    this.institution_name = null;
     this.institution_ror = null;
     this.selectedCountry = null;
     this.country_code = null;
-    this.ror_use = '';
+    this.ror_use = null;
     this.showSuccessMessage = false;
     this.showErrorMessage = false;
     this.emailError = null;
