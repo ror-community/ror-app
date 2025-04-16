@@ -1,0 +1,98 @@
+/* app/styles/components/organizations/api-client-registration-form.scss */
+.api-client-registration-form {
+	// Input and Textarea base styles
+	.form-control {
+	  border: 1px solid #312d2d;
+	  border-radius: 4px;
+	  padding: 8px 12px;
+	  font-size: 14px;
+	  line-height: 1.5;
+	  width: 100%;
+	  transition: all 0.2s ease-in-out;
+  
+	  &:focus {
+		border-color: #0000;
+		box-shadow: 0 0 0 2px rgba(255, 109, 133, 0.1);
+		outline: none;
+	  }
+	}
+  
+	// Textarea specific styles
+	textarea.form-control {
+	  min-height: 100px;
+	  resize: vertical;
+	}
+  
+	// Label styles
+	label.form-label {
+	  font-size: 14px;
+	  font-weight: 500;
+	  color: #333;
+	  margin-bottom: 8px;
+	}
+  
+	// Form group spacing
+	.form-group {
+	  margin-bottom: 1.25rem;
+  
+	  &:last-of-type {
+		margin-bottom: 1.5rem;
+	  }
+	}
+  
+	// Optional: Add invalid state styles
+	.is-invalid {
+	  border-color: #dc3545;
+	  
+	  &:focus {
+		border-color: #dc3545;
+		box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.25);
+	  }
+	}
+  
+	// Optional: Add validation message styles
+	.invalid-feedback {
+	  display: none;
+	  font-size: 12px;
+	  color: #dc3545;
+	  margin-top: 4px;
+	}
+  
+	.form-control.is-invalid + .invalid-feedback {
+	  display: block;
+	}
+
+	.ember-power-select-trigger {
+		border: 1px solid #312d2d;
+		border-radius: 4px;
+		padding: 8px 12px;
+		font-size: 14px;
+		line-height: 1.5;
+		min-height: 38px;
+	
+		&:focus {
+		border: 1px solid #312d2d;
+		  box-shadow: 0 0 0 2px rgba(255, 109, 133, 0.1);
+		  outline: none;
+		}
+	  }
+	
+	  .ember-power-select-dropdown {
+		border-color: #E5E5E5;
+		border-radius: 4px;
+		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+	  }
+	
+	  .ember-power-select-search-input {
+		border: 1px solid #E5E5E5;
+		border-radius: 4px;
+		padding: 8px 12px;
+		font-size: 14px;
+	
+		&:focus {
+		  border-color: #E5E5E5;
+		  outline: none;
+		}
+	  }
+	
+  }
