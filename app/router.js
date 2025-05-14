@@ -11,6 +11,7 @@ Router.map(function() {
     this.route('index', { path: '/search' });
     this.route('show', { path: '/:organization_id' });
     this.route('about', { path: '/' });
+    this.route('api-client-id', { path: '/api-client-id' });
   });
 });
 
