@@ -33,32 +33,43 @@ export default Component.extend({
     return formattedRelationships
   },
 
-  convertOtherNames(names){
-    const groupedNames = names.reduce((result, name) => {
-      if (name.types.includes("ror_display")) {
-          return result;
-      }
+  convertOtherNames(names) {
+    const nameOrder = ['label', 'alias', 'acronym'];
 
+    const initialGroupedNames = names.reduce((result, name) => {
+      if (name.types.includes("ror_display")) {
+        return result;
+      }
       const type = name.types.includes("label") ? "label" : name.types[0];
       result[type] = result[type] || [];
+      
+      if (name.lang && !name.value.includes(`(${name.lang})`)) {
+        name.value = `${name.value} (${name.lang})`;
+      }
       result[type].push(name);
-
       return result;
     }, {});
 
-    for (let key in groupedNames) {
-      if (groupedNames[key]) {
-        groupedNames[key].forEach((item) => {
-          if (item.lang && !item.value.includes(`(${item.lang})`)) {
-            item.value = `${item.value} (${item.lang})`;
-          }
-        })
+    const orderedGroupedNames = {};
+    const orderedValues = [];
+
+    nameOrder.forEach(type => {
+      if (initialGroupedNames[type]) {
+        orderedGroupedNames[type] = initialGroupedNames[type];
+
+        initialGroupedNames[type].forEach(item => {
+          orderedValues.push(item.value);
+        });
       }
-    }
+    });
 
-    const values = Object.values(groupedNames).flat().map(item => item.value).join(', ');
+    const valuesString = orderedValues.join(', ');
 
-    return {values: values, groupedNames: groupedNames, groupedNamesCount: Object.keys(groupedNames).length};
+    return {
+      values: valuesString,
+      groupedNames: orderedGroupedNames,
+      groupedNamesCount: Object.keys(orderedGroupedNames).length
+    };
   },
 
   getName(names) {
