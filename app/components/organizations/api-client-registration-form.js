@@ -25,7 +25,7 @@ export default class ApiClientRegistrationFormComponent extends Component {
   @tracked rorUseError = null;
   @tracked selectedInstitution = null;
   
-  ROR_API_URL = 'https://api.ror.org/organizations';
+  ROR_API_URL = 'https://api.ror.org/v2/organizations';
   countries = countries;
 
   get isFormInvalid() {
@@ -96,6 +96,16 @@ export default class ApiClientRegistrationFormComponent extends Component {
     return text ? this.sanitizer.sanitize(text).substring(0, 500) : null;
   }
   
+  _getDisplayOrganizationName(item) {
+    if (item.names && item.names.length > 0) {
+      const displayName = item.names.find(nameObj => 
+        nameObj.types && nameObj.types.includes('ror_display')
+      );
+      return displayName ? displayName.value : item.names[0].value;
+    }
+    return item.name || '';
+  }
+  
   @action
   async searchOrganizations(searchTerm) {
     if (!searchTerm || searchTerm.length < 2) {
@@ -106,9 +116,13 @@ export default class ApiClientRegistrationFormComponent extends Component {
         `${this.ROR_API_URL}?query=${encodeURIComponent(searchTerm)}`
       );
       const data = await response.json();
-      let results = data.items || [];
-      const exactMatch = results.some(
-        item => item.name.toLowerCase() === searchTerm.toLowerCase()
+      let results = data.items.map(item => ({
+        id: item.id,
+        name: this._getDisplayOrganizationName(item),
+        original_item: item
+      }));
+      const exactMatch = results.some(item =>
+        item.original_item.names.some(nameObj => nameObj.value.toLowerCase() === searchTerm.toLowerCase())
       );
       if (!exactMatch) {
         const sanitizedInput = this.sanitizeInput(searchTerm);
@@ -116,7 +130,8 @@ export default class ApiClientRegistrationFormComponent extends Component {
           {
             name: sanitizedInput,
             id: null,
-            isManualEntry: true
+            isManualEntry: true,
+            original_item: null
           },
           ...results
         ]
@@ -127,7 +142,8 @@ export default class ApiClientRegistrationFormComponent extends Component {
       return [{
         name: this.sanitizeInput(searchTerm),
         id: null,
-        isManualEntry: true
+        isManualEntry: true,
+        original_item: null
       }];
     }
   }
