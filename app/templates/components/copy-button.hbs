@@ -1,0 +1,14 @@
+<button
+  type="button"
+  class="copy-button {{if this.isCopied 'copy-button--success'}} {{if this.copyError 'copy-button--error'}}"
+  aria-label={{this.buttonLabel}}
+  title="Copy ROR ID"
+  {{on "click" this.copyText}}
+>
+  <i class={{this.iconClass}} aria-hidden="true"></i>
+</button>
+<span class="sr-only" role="status" aria-live="polite" aria-atomic="true">
+  {{#if this.isCopied}}
+    ROR ID copied to clipboard
+  {{/if}}
+</span>

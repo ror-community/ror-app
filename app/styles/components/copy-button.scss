@@ -1,0 +1,65 @@
+.copy-button {
+  display: inline-block;
+  margin-left: 0.5rem;
+  margin-bottom: 0.25rem;
+  padding: 0;
+  background-color: transparent;
+  border: none;
+  color: #293030;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.2s ease, opacity 0.2s ease;
+  vertical-align: middle;
+  opacity: 0.7;
+
+  &:hover {
+    color: #53baa1;
+    opacity: 1;
+  }
+
+  &:focus {
+    outline: none;
+  }
+
+  &:focus-visible {
+    outline: 2px solid #53baa1;
+    outline-offset: 2px;
+    border-radius: 2px;
+    opacity: 1;
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+
+  &.copy-button--success {
+    opacity: 1;
+  }
+
+  &.copy-button--error {
+    color: #da3200;
+    opacity: 1;
+  }
+
+  i {
+    pointer-events: none;
+  }
+
+  @media screen and (max-width: 420px) {
+    font-size: 1rem;
+    margin-left: 0.35rem;
+  }
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

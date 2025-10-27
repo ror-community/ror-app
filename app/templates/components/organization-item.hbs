@@ -7,6 +7,7 @@
             <div class="col-lg-9 col-sm-12">
               <h1>
                 <img class="ror-id mb-1" src="/assets/ror-logo-small.png" alt="ROR ID"> <LinkTo @route="organizations.show" @model={{this.model.id}} class="card-link logo-link">https://ror.org/{{this.model.id}}</LinkTo>
+                <CopyButton @textToCopy="https://ror.org/{{this.model.id}}" />
               </h1>
             </div>
             <div class="col-lg-3 col-sm-12">
