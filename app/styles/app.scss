@@ -4,12 +4,11 @@
 
 $green: #53baa1;
 $dark-grey: #505759;
+$orange: #e89005;
 $light-grey: #efefef;
-$orange: #da3200;
-$mustard: #e89005;
-$beige: #d3bdb0;
+$raspberry: #e0004d;
+$purple: #520c70;
 $black: #293030;
-
 
 
 $phone-width: 420px;
@@ -17,6 +16,11 @@ $tablet-width: 768px;
 $desktop-width: 1024px;
 
 // override, color links
+
+.description { 
+	color: $dark-grey !important;
+}
+
 .card {
   h1, h2 {
     font-size: 2rem;
@@ -127,4 +131,14 @@ $desktop-width: 1024px;
     margin-right: .3rem;
   }
 
+}
+
+#filter-button { 
+	background-color:$green;
+	color:$black !important;
+}
+
+#clear-button {
+	background-color:$dark-grey;
+	color:$light-grey !important;
 }
