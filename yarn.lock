@@ -4828,10 +4828,10 @@ domain-browser@^1.1.1:
   resolved "https://registry.yarnpkg.com/domain-browser/-/domain-browser-1.2.0.tgz#3d31f50191a6749dd1375a7f522e823d42e54eda"
   integrity sha512-jnjyiM6eRyZl2H+W8Q/zLMA481hzi0eszAaBUzIVnmYVDBbnLxVNnfu1HgEBvCbL+71FrxMl3E6lpKH7Ge3OXA==
 
-dompurify@^3.2.4:
-  version "3.2.4"
-  resolved "https://registry.yarnpkg.com/dompurify/-/dompurify-3.2.4.tgz#af5a5a11407524431456cf18836c55d13441cd8e"
-  integrity sha512-ysFSFEDVduQpyhzAob/kkuJjf5zWkZD8/A9ywSp1byueyuCfHamrCBa14/Oc2iiB0e51B+NpxSl5gmzn+Ms/mg==
+dompurify@^3.3.2:
+  version "3.3.2"
+  resolved "https://registry.yarnpkg.com/dompurify/-/dompurify-3.3.2.tgz#58c515d0f8508b8749452a028aa589ad80b36325"
+  integrity sha512-6obghkliLdmKa56xdbLOpUZ43pAR6xFy1uOrxBaIDjT+yaRuuybLjGS9eVBoSR/UPU5fq3OXClEHLJNGvbxKpQ==
   optionalDependencies:
     "@types/trusted-types" "^2.0.7"
 
