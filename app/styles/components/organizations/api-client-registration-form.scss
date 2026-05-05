@@ -9,11 +9,15 @@
 	  line-height: 1.5;
 	  width: 100%;
 	  transition: all 0.2s ease-in-out;
-  
+
 	  &:focus {
-		border-color: #0000;
+		border-color: #312d2d;
 		box-shadow: 0 0 0 2px rgba(255, 109, 133, 0.1);
-		outline: none;
+	  }
+
+	  &:focus-visible {
+		outline: 2px solid #293030;
+		outline-offset: 2px;
 	  }
 	}
   
@@ -69,11 +73,15 @@
 		font-size: 14px;
 		line-height: 1.5;
 		min-height: 38px;
-	
+
 		&:focus {
-		border: 1px solid #312d2d;
+		  border: 1px solid #312d2d;
 		  box-shadow: 0 0 0 2px rgba(255, 109, 133, 0.1);
-		  outline: none;
+		}
+
+		&:focus-visible {
+		  outline: 2px solid #293030;
+		  outline-offset: 2px;
 		}
 	  }
 	
@@ -88,10 +96,14 @@
 		border-radius: 4px;
 		padding: 8px 12px;
 		font-size: 14px;
-	
+
 		&:focus {
 		  border-color: #E5E5E5;
-		  outline: none;
+		}
+
+		&:focus-visible {
+		  outline: 2px solid #293030;
+		  outline-offset: 2px;
 		}
 	  }
 	
