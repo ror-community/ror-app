@@ -1,20 +1,20 @@
 <div class="card api-client-registration-form">
 	{{#if this.showSuccessMessage}}
-		<div class="card-body">
-		<h4>Thank you for registering!</h4>
+		<div class="card-body" role="status" aria-live="polite">
+		<h2 class="h4" tabindex="-1">Thank you for registering!</h2>
 		<p>
-			We have sent an email to <strong>{{this.email}}</strong> containing your client ID. 
+			We have sent an email to <strong>{{this.email}}</strong> containing your client ID.
 			This email was sent from <a href="mailto:api@ror.org">api@ror.org</a> with the subject "ROR API client ID".
 		</p>
 		<p class="mb-0">
-			If you do not receive this email within 15 minutes, check your spam/junk folder. 
-			If you still cannot find this email, please contact 
+			If you do not receive this email within 15 minutes, check your spam/junk folder.
+			If you still cannot find this email, please contact
 			<a href="mailto:support@ror.org">support@ror.org</a>.
 		</p>
 		</div>
 	{{else if this.showErrorMessage}}
-		<div class="card-body">
-			<h4 class="alert-heading">Registration Error</h4>
+		<div class="card-body" role="alert">
+			<h2 class="alert-heading h4" tabindex="-1">Registration Error</h2>
 			<p>
 				Oh no, there was an error and we were not able to process your request for a ROR API client ID. 
 				Please contact <a href="mailto:support@ror.org">support@ror.org</a> for assistance.
@@ -28,40 +28,61 @@
       </button>
 		</div>
 	{{else}}
+		{{#if this.hasValidationErrors}}
+			<div
+				id="form-validation-summary"
+				class="alert alert-danger m-3"
+				role="alert"
+				tabindex="-1"
+			>
+				<strong>Please correct the following before submitting:</strong>
+				<ul class="mb-0 mt-2">
+					{{#if this.emailError}}<li>Email address: {{this.emailError}}</li>{{/if}}
+					{{#if this.nameError}}<li>Name: {{this.nameError}}</li>{{/if}}
+					{{#if this.institutionError}}<li>Institution: {{this.institutionError}}</li>{{/if}}
+					{{#if this.countryError}}<li>Country: {{this.countryError}}</li>{{/if}}
+					{{#if this.rorUseError}}<li>API usage description: {{this.rorUseError}}</li>{{/if}}
+				</ul>
+			</div>
+		{{/if}}
 		<BsForm @formLayout="vertical" @onSubmit={{this.onSubmit}} class="card-body" as |form|>
 			<form.element
-				@controlType="email" 
+				@controlType="email"
 				@label="Email address (required)"
-				@value={{this.email}} 
+				@value={{this.email}}
 				placeholder="Enter email"
 				@onChange={{fn (mut this.email)}}
 				@required={{true}}
         		class={{if this.emailError "is-invalid"}}
 				as |el|>
-				<el.control 
+				<el.control
 					required
+					aria-invalid={{if this.emailError "true" "false"}}
+					aria-describedby={{if this.emailError "email-error"}}
 					{{on "blur" (fn this.validateField "email" this.email)}}
 				/>
 				{{#if this.emailError}}
-					<div class="invalid-feedback d-block">
+					<div id="email-error" class="invalid-feedback d-block">
 						{{this.emailError}}
 					</div>
 				{{/if}}
-				
+
 			</form.element>
 
-			<form.element 
+			<form.element
 				@controlType="text"
 				@label="Name (optional)"
 				@value={{this.name}}
 				@onChange={{fn (mut this.name)}}
 				class={{if this.nameError "is-invalid"}}
 				as |el|>
-				<el.control 
+				<el.control
+					aria-invalid={{if this.nameError "true" "false"}}
+					aria-describedby={{if this.nameError "name-error"}}
 					{{on "blur" (fn this.validateField "name" this.name)}}
 				/>
 				{{#if this.nameError}}
-					<div class="invalid-feedback d-block">
+					<div id="name-error" class="invalid-feedback d-block">
 						{{this.nameError}}
 					</div>
 				{{/if}}
@@ -74,10 +95,12 @@
 					@search={{this.searchOrganizations}}
 					@selected={{this.selectedInstitution}}
 					@onChange={{this.onInstitutionSelect}}
-					@placeholder="Search for your institution or enter manually(Press Enter to add)"
+					@placeholder="Search for your institution or enter manually (Press Enter to add)"
 					@allowClear={{true}}
 					@renderInPlace={{true}}
 					@matchTriggerWidth={{true}}
+					@ariaDescribedBy={{if this.institutionError "institution-error"}}
+					@ariaInvalid={{if this.institutionError "true" "false"}}
 					class={{if this.institutionError "is-invalid"}}
 					as |institution|>
 						{{#if institution.name}}
@@ -87,7 +110,7 @@
 						{{/if}}
 				</PowerSelect>
 				{{#if this.institutionError}}
-					<div class="invalid-feedback d-block">
+					<div id="institution-error" class="invalid-feedback d-block">
 						{{this.institutionError}}
 					</div>
 				{{/if}}
@@ -103,19 +126,21 @@
 					@placeholder="Select or search for a country"
 					@allowClear={{true}}
 					@renderInPlace={{true}}
-					@matchTriggerWidth={{true}} 
+					@matchTriggerWidth={{true}}
+					@ariaDescribedBy={{if this.countryError "country-error"}}
+					@ariaInvalid={{if this.countryError "true" "false"}}
 					class={{if this.countryError "is-invalid"}}
 					as |country|>
 						{{country.name}} ({{country.code}})
 				</PowerSelect>
 				{{#if this.countryError}}
-					<div class="invalid-feedback d-block">
+					<div id="country-error" class="invalid-feedback d-block">
 						{{this.countryError}}
 					</div>
 				{{/if}}
 			</div>
 
-			<form.element 
+			<form.element
 				@controlType="textarea"
 				@label="How do you plan to use the ROR API? (optional)"
 				@value={{this.ror_use}}
@@ -123,19 +148,21 @@
 				@rows="3"
 				class={{if this.rorUseError "is-invalid"}}
 				as |el|>
-				<el.control 
+				<el.control
+					aria-invalid={{if this.rorUseError "true" "false"}}
+					aria-describedby={{if this.rorUseError "ror-use-error" "ror-use-help"}}
 					{{on "blur" (fn this.validateField "ror_use" this.ror_use)}}
 				/>
 				{{#if this.rorUseError}}
-					<div class="invalid-feedback d-block">
+					<div id="ror-use-error" class="invalid-feedback d-block">
 						{{this.rorUseError}}
 					</div>
 				{{else}}
-					<small class="form-text text-muted">Maximum 500 characters</small>
+					<small id="ror-use-help" class="form-text text-muted">Maximum 500 characters</small>
 				{{/if}}
 			</form.element>
 
-			<BsButton 
+			<BsButton
 				@type="primary"
 				@buttonType="submit"
 				class="btn btn-sm btn-round"

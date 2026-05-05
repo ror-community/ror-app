@@ -1,9 +1,26 @@
 <div class="content">
   <div class="container-fluid">
+    <div class="sr-only" role="status" aria-live="polite" aria-atomic="true">
+      {{#if this.model}}
+        {{#if (gt this.model.meta.total 1)}}
+          Found {{this.model.meta.total}} organizations.
+        {{else if (eq this.model.meta.total 1)}}
+          Found 1 organization.
+        {{else}}
+          No organizations found.
+        {{/if}}
+      {{else}}
+        No organizations found.
+      {{/if}}
+    </div>
     {{#if this.model}}
       {{#if (gt this.model.meta.total 1)}}
-        <h4 class="ml-3">{{decimal-format this.model.meta.total}} Organizations</h4>
-        <p class="small ml-3"><i>Are we missing an organization you're looking for? <a target="_blank" rel="noopener" href="http://curation-request.ror.org/">Submit a request to add it</a></i></p>
+        <h1 class="ml-3 h4">{{decimal-format this.model.meta.total}} Organizations</h1>
+        <p class="small ml-3"><i>Are we missing an organization you're looking for? <a target="_blank" rel="noopener noreferrer" href="http://curation-request.ror.org/">Submit a request to add it</a></i></p>
+      {{else if (eq this.model.meta.total 1)}}
+        <h1 class="ml-3 h4">1 Organization</h1>
+      {{else}}
+        <h1 class="ml-3 h4">No organizations found</h1>
       {{/if}}
       <div class="row">
         <div class="col-md-2 col-sm-12">
@@ -13,19 +30,25 @@
         {{#each this.model as |organization|}}
           {{organization-item model=organization view="list"}}
         {{/each}}
+        {{#if (eq this.model.meta.total 0)}}
+          <BsAlert @dismissible={{false}} @type="warning">
+            No organizations matched your search. <LinkTo @route="organizations.index" @query={{hash query=undefined page=undefined filter=undefined}}>Return to organizations list</LinkTo>.
+          </BsAlert>
+        {{/if}}
         </div>
         {{#if (gt this.model.meta.totalPages 1)}}
           <PageNumbers @model={{this.model}} @link="organizations.index" />
         {{/if}}
       </div>
     {{else}}
+      <h1 class="ml-3 h4">No organizations found</h1>
       <div class="row">
         <div class="col-md-2">
           <FilterSidebar @model={{this.model}} />
         </div>
         <div class="col-md-10 col-sm-12">
           <BsAlert @dismissible={{false}} @type="warning">
-            No Organizations found. <LinkTo @route="organizations.index" @query={{hash query=undefined page=undefined filter=undefined}}>Return to organizations list</LinkTo>.
+            No organizations found. <LinkTo @route="organizations.index" @query={{hash query=undefined page=undefined filter=undefined}}>Return to organizations list</LinkTo>.
           </BsAlert>
         </div>
       </div>

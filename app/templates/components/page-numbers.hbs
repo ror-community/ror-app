@@ -1,42 +1,41 @@
 <div class="col-lg-8 col-sm-12">
-  <ul class="pagination justify-content-center">
-    {{#if this.previousPage}}
-      <li class="page-item">
-        <LinkTo @route={{link}} @query={{hash page=this.previousPage}} class="page-link" @aria-label="Previous"><span aria-hidden="true"><i class="fa-solid fa-angle-double-left" aria-hidden="true"></i></span>
-        </LinkTo>
-      </li>
-    {{else}}
-      <li class="page-item disabled">
-        <a class="page-link"><span aria-hidden="true"><i class="fa-solid fa-angle-double-left" aria-hidden="true"></i></span></a>
-      </li>
-    {{/if}}
-
-    {{#each this.pageItems as |item|}}
-       {{#if item.dots}}
+  <nav aria-label="Pagination">
+    <ul class="pagination justify-content-center">
+      {{#if this.previousPage}}
         <li class="page-item">
-          <a class="page-link">...</a>
-        </li>
-      {{else if item.current}}
-        <li class="page-item active">
-          <a class="page-link">{{item.page}}</a>
+          <LinkTo @route={{this.link}} @query={{hash page=this.previousPage}} class="page-link" aria-label="Previous page"><span aria-hidden="true"><i class="fa-solid fa-angle-double-left"></i></span></LinkTo>
         </li>
       {{else}}
-        <li class="page-item">
-          <LinkTo @route={{this.link}} @query={{hash page=item.page}} class="page-link">{{item.page}}
-          </LinkTo>
+        <li class="page-item disabled">
+          <span class="page-link" aria-hidden="true"><i class="fa-solid fa-angle-double-left"></i></span>
         </li>
       {{/if}}
-    {{/each}}
 
-    {{#if this.nextPage}}
-      <li class="page-item">
-        <LinkTo @route={{this.link}} @query={{hash page=this.nextPage}} class="page-link" @aria-label="Next"><span aria-hidden="true"><i class="fa-solid fa-angle-double-right" aria-hidden="true"></i></span>
-        </LinkTo>
-      </li>
-    {{else}}
-      <li class="page-item">
-        <a class="page-link"><span aria-hidden="true"><i class="fa-solid fa-angle-double-right" aria-hidden="true"></i></span></a>
-      </li>
-    {{/if}}
-  </ul>
+      {{#each this.pageItems as |item|}}
+        {{#if item.dots}}
+          <li class="page-item">
+            <span class="page-link" aria-hidden="true">…</span>
+          </li>
+        {{else if item.current}}
+          <li class="page-item active" aria-current="page">
+            <span class="page-link">{{item.page}}<span class="sr-only"> (current page)</span></span>
+          </li>
+        {{else}}
+          <li class="page-item">
+            <LinkTo @route={{this.link}} @query={{hash page=item.page}} class="page-link" aria-label="Go to page {{item.page}}">{{item.page}}</LinkTo>
+          </li>
+        {{/if}}
+      {{/each}}
+
+      {{#if this.nextPage}}
+        <li class="page-item">
+          <LinkTo @route={{this.link}} @query={{hash page=this.nextPage}} class="page-link" aria-label="Next page"><span aria-hidden="true"><i class="fa-solid fa-angle-double-right"></i></span></LinkTo>
+        </li>
+      {{else}}
+        <li class="page-item disabled">
+          <span class="page-link" aria-hidden="true"><i class="fa-solid fa-angle-double-right"></i></span>
+        </li>
+      {{/if}}
+    </ul>
+  </nav>
 </div>
