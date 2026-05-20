@@ -1,7 +1,7 @@
 'use strict';
 
 module.exports = {
-  extends: 'recommended',
+  extends: ['recommended', 'a11y'],
 
   rules: {
     'attribute-indentation': false,
@@ -10,12 +10,13 @@ module.exports = {
     'quotes': false,
     'self-closing-void-elements': false,
     'no-unnecessary-concat': false,
-    'img-alt-attributes': false,
-    'no-invalid-interactive': false,
-    'no-triple-curlies': false,
     'no-unused-block-params': false,
     'simple-unless': false,
     'no-log': false,
-    'no-bare-strings': false
-  }
+    'no-action': false,
+    'no-curly-component-invocation': false,
+    'no-implicit-this': false,
+    'no-negated-condition': false,
+    'no-bare-strings': false,
+  },
 };
