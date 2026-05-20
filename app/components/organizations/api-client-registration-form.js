@@ -214,27 +214,48 @@ export default class ApiClientRegistrationFormComponent extends Component {
   
   @action
   onSubmit() {
-    
     this.emailError = this.validateEmail(this.email);
     this.nameError = this.validateName(this.name);
     this.institutionError = this.validateInstitution(this.institution_name);
     this.countryError = this.validateCountry(this.selectedCountry);
     this.rorUseError = this.validateRorUse(this.ror_use);
-    
-    if (this.emailError) {
+
+    if (this.hasValidationErrors) {
+      this._focusValidationSummary();
       return;
     }
-    
+
     this._SubmitForm().catch(error => {
       console.error('Error submitting form:', error);
       this.showErrorMessage = true;
+      this._focusStatusHeading();
     });
   }
-  
+
+  _focusStatusHeading() {
+    requestAnimationFrame(() => {
+      const heading = document.querySelector(
+        '.api-client-registration-form [tabindex="-1"]'
+      );
+      if (heading) {
+        heading.focus();
+      }
+    });
+  }
+
+  _focusValidationSummary() {
+    requestAnimationFrame(() => {
+      const summary = document.getElementById('form-validation-summary');
+      if (summary) {
+        summary.focus();
+      }
+    });
+  }
+
   async _SubmitForm() {
     this.isSubmitting = true;
     this.showErrorMessage = false;
-    
+
     const formData = {
       email: this.sanitizeInput(this.email),
       name: this.sanitizeInput(this.name),
@@ -243,7 +264,7 @@ export default class ApiClientRegistrationFormComponent extends Component {
       country_code: this.country_code,
       ror_use: this.sanitizeRorUse(this.ror_use)
     };
-    
+
     try {
       const response = await fetch(this.configService.API_URL + '/register', { // TODO: Update this to the correct API endpoint
         method: 'POST',
@@ -256,8 +277,10 @@ export default class ApiClientRegistrationFormComponent extends Component {
         throw new Error('Registration failed');
       }
       this.showSuccessMessage = true;
+      this._focusStatusHeading();
     } catch (error) {
       this.showErrorMessage = true;
+      this._focusStatusHeading();
     } finally {
       this.isSubmitting = false;
     }

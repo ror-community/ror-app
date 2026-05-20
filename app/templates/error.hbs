@@ -1,13 +1,15 @@
 <ApplicationHeader @title="Research Organization Registry" />
 {{outlet}}
-<div class="content">
-  <div class="container-fluid">
-    <h4 class="ml-3 mb-3 mt-3">Sorry, that page doesn’t exist</h4>
+<main id="main-content" tabindex="-1">
+  <div class="content">
+    <div class="container-fluid">
+      <h1 class="ml-3 mb-3 mt-3 h4">Sorry, that page doesn’t exist</h1>
       <div class="row">
         <div class="col-md-10 col-sm-12">
          The page or ROR ID you requested does not exist. <a href="/">Go to the ROR home page</a> or <LinkTo @route="organizations.index" @query={{hash query=undefined page=undefined filter=undefined}}>go to the main search page</LinkTo> to search/browse ROR records. For technical documentation, see <a href="https://ror.readme.io">https://ror.readme.io</a>.
         </div>
       </div>
+    </div>
   </div>
-</div>
+</main>
 

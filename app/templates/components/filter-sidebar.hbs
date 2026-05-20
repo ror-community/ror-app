@@ -1,6 +1,26 @@
 <div id="filters" class="small">
-    <div class="filter-group">
-        <h3>Record status <i class="fa-solid fa-question-circle" aria-hidden="true"><BsPopover @triggerEvents="hover" class="popover">Each ROR record has a status of active, inactive or withdrawn. <b>Inactive</b> indicates that an organization has split, merged or otherwise ceased to operate. <b>Withdrawn</b> indicates that an organization was added to ROR in error.</BsPopover></i></h3>
+    <fieldset class="filter-group">
+        <legend class="filter-group-legend">
+            Record status
+            <button
+                type="button"
+                id="status-popover-trigger"
+                class="popover-trigger"
+                aria-label="About record statuses"
+                aria-expanded={{if this.popoverVisible "true" "false"}}
+                aria-haspopup="true"
+                {{on "keydown" this.handlePopoverKeydown}}
+            >
+                <i class="fa-solid fa-question-circle" aria-hidden="true"></i>
+            </button>
+        </legend>
+        <BsPopover
+            @triggerElement="#status-popover-trigger"
+            @triggerEvents="click"
+            @onShown={{this.onPopoverShown}}
+            @onHidden={{this.onPopoverHidden}}
+            class="popover"
+        >Each ROR record has a status of active, inactive or withdrawn. <b>Inactive</b> indicates that an organization has split, merged or otherwise ceased to operate. <b>Withdrawn</b> indicates that an organization was added to ROR in error.</BsPopover>
         <hr>
         <div class="filters-list">
             <input
@@ -9,7 +29,7 @@
                 id="active-status"
                 name="activeStatus"
                 checked={{this.activeStatus}}
-                onchange={{action "toggleStatus"}}
+                {{on "change" this.toggleStatus}}
             />
             <label class="filters-list-label" for="active-status">Active</label>
         </div>
@@ -20,7 +40,7 @@
                 id="inactive-status"
                 name="inactiveStatus"
                 checked={{this.inactiveStatus}}
-                onchange={{action "toggleStatus"}}
+                {{on "change" this.toggleStatus}}
             />
             <label class="filters-list-label" for="inactive-status">Inactive</label>
         </div>
@@ -31,13 +51,13 @@
                 id="withdrawn-status"
                 name="withdrawnStatus"
                 checked={{this.withdrawnStatus}}
-                onchange={{action "toggleStatus"}}
+                {{on "change" this.toggleStatus}}
             />
             <label class="filters-list-label" for="withdrawn-status">Withdrawn</label>
         </div>
-    </div>
+    </fieldset>
     <div>
-        <button class="btn btn-sma btn-round btn-primary" type="submit" id="filter-button" {{action "applyFilter"}}><i class="fa-solid fa-check-circle" aria-hidden="true"></i>Apply</button>
-        <button class="btn btn-sma btn-round btn-secondary" type="submit" id="clear-button" {{action "clearFilter"}}><i class="fa-solid fa-times-circle" aria-hidden="true"></i>Clear</button>
+        <button class="btn btn-sm btn-round btn-primary" type="button" id="filter-button" {{on "click" this.applyFilter}}><i class="fa-solid fa-check-circle" aria-hidden="true"></i>Apply</button>
+        <button class="btn btn-sm btn-round btn-secondary" type="button" id="clear-button" {{on "click" this.clearFilter}}><i class="fa-solid fa-times-circle" aria-hidden="true"></i>Clear</button>
     </div>
 </div>

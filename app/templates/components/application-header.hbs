@@ -5,18 +5,19 @@
     </a>
     <div id="search">
       <form {{on "submit" this.search}} class="form-inline mw-25" role="search">
+        <label for="query" class="sr-only">Search ROR</label>
         <input
           name="query"
           value={{this.query}}
           id="query"
           class="form-control"
           placeholder="Search Registry..."
-          aria-label="Search ROR"
         />
       </form>
     </div>
 
-    {{navbar.toggle}}
+    <navbar.toggle aria-label="Toggle navigation menu" />
+
 
     <navbar.content>
       <navbar.nav @class="ml-auto" as |nav|>

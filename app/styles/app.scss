@@ -10,6 +10,45 @@ $raspberry: #e0004d;
 $purple: #520c70;
 $black: #293030;
 
+.skip-link {
+  position: absolute;
+  top: -100px;
+  left: 0;
+  z-index: 1000;
+  padding: 0.75rem 1rem;
+  background-color: $black;
+  color: #fff;
+  font-weight: bold;
+  text-decoration: none;
+  border: 2px solid transparent;
+
+  &:focus {
+    top: 0;
+    outline: 2px solid $green;
+    outline-offset: 2px;
+    color: #fff;
+    text-decoration: underline;
+  }
+}
+
+main[tabindex="-1"]:focus {
+  outline: none;
+}
+
+.form-control:focus-visible,
+.btn:focus-visible,
+.btn-group > .btn:focus-visible,
+.btn-group-vertical > .btn:focus-visible,
+.input-group-append .btn:focus-visible,
+.input-group-prepend .btn:focus-visible,
+.navbar-toggler:focus-visible,
+.modal-header > button:focus-visible,
+.alert .close:focus-visible,
+.page-link:focus-visible {
+  outline: 2px solid $black !important;
+  outline-offset: 2px;
+}
+
 
 $phone-width: 420px;
 $tablet-width: 768px;
@@ -60,7 +99,7 @@ $desktop-width: 1024px;
 .badge-status{
     border-color: $orange;
     background-color: $orange;
-    color: #FFF;
+    color: $black;
 }
 
 .ror-id {
@@ -106,6 +145,38 @@ $desktop-width: 1024px;
     font-size: 1rem;
     margin: 0;
     line-height: normal;
+  }
+  legend.filter-group-legend {
+    font-size: 1rem;
+    margin: 0;
+    line-height: normal;
+    font-weight: 500;
+    width: auto;
+    padding: 0;
+  }
+  fieldset.filter-group {
+    border: none;
+    padding: 0;
+    margin: 0 0 1rem 0;
+    min-width: 0;
+  }
+  .popover-trigger {
+    background: transparent;
+    border: none;
+    padding: 0 0 0 0.25rem;
+    color: inherit;
+    cursor: pointer;
+    line-height: 1;
+
+    &:hover {
+      color: #53baa1;
+    }
+
+    &:focus-visible {
+      outline: 2px solid $black;
+      outline-offset: 2px;
+      border-radius: 2px;
+    }
   }
   p {
     margin-bottom: 0;
