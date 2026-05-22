@@ -213,3 +213,17 @@ $desktop-width: 1024px;
 	background-color:$dark-grey;
 	color:$light-grey !important;
 }
+
+.alert-warning {
+	color: $black;
+
+	a {
+		color: $black;
+		text-decoration: underline;
+
+		&:hover,
+		&:focus {
+			color: $black;
+		}
+	}
+}
