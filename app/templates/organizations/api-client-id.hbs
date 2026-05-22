@@ -6,7 +6,9 @@
       <div class="info-text">
         <p>ROR API users are encouraged to register for a client ID and to include it in the header of API requests. Requests that include a header named client-id with a valid client ID as its value will receive a rate limit of 2,000 requests/5min. API requests that don't include a client ID will receive a rate limit of 50 requests/5min.</p>
         
-        <p>Please complete the form below to register for a ROR API client ID. Your client ID will be sent to the email address you provide.</p>
+        {{#unless this.model.registrationPaused}}
+          <p>Please complete the form below to register for a ROR API client ID. Your client ID will be sent to the email address you provide.</p>
+        {{/unless}}
 
         <h2 class="h3">A few notes about ROR API client IDs:</h2>
         <ul>
@@ -20,6 +22,19 @@
   </div>
 </div>
 <div class="container">
-  <Organizations::ApiClientRegistrationForm />
+  {{#if this.model.registrationPaused}}
+    <BsAlert @dismissible={{false}} @type="warning">
+      <strong>Client ID registration is temporarily paused.</strong>
+      <p class="mb-0">We've paused new ROR API client ID registrations while we make updates to the service. No rate limits
+        are currently enforced based on the presence or absence of a client ID, and none will be introduced before
+        registration is restored, so API usage is not affected by this pause.
+      </p>
+      <p class="mb-0">
+        If you have questions or an urgent request, please contact <a href="mailto:support@ror.org">support@ror.org</a>.
+        Thanks for your patience!</p>
+    </BsAlert>
+  {{/if}}
+
+  <Organizations::ApiClientRegistrationForm @registrationPaused={{this.model.registrationPaused}} />
 </div>
 

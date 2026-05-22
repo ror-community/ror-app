@@ -29,7 +29,7 @@ export default class ApiClientRegistrationFormComponent extends Component {
   countries = countries;
 
   get isFormInvalid() {
-    return this.hasValidationErrors || !this.email || this.isSubmitting;
+    return this.args.registrationPaused || this.hasValidationErrors || !this.email || this.isSubmitting;
   }
 
   get hasValidationErrors() {
@@ -214,6 +214,10 @@ export default class ApiClientRegistrationFormComponent extends Component {
   
   @action
   onSubmit() {
+    if (this.args.registrationPaused) {
+      return;
+    }
+
     this.emailError = this.validateEmail(this.email);
     this.nameError = this.validateName(this.name);
     this.institutionError = this.validateInstitution(this.institution_name);
@@ -253,6 +257,10 @@ export default class ApiClientRegistrationFormComponent extends Component {
   }
 
   async _SubmitForm() {
+    if (this.args.registrationPaused) {
+      return;
+    }
+
     this.isSubmitting = true;
     this.showErrorMessage = false;
 
