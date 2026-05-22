@@ -1,4 +1,4 @@
-<div class="card api-client-registration-form {{if @registrationPaused 'api-client-registration-form--paused'}}">
+<div class="card api-client-registration-form">
 	{{#if this.showSuccessMessage}}
 		<div class="card-body" role="status" aria-live="polite">
 		<h2 class="h4" tabindex="-1">Thank you for registering!</h2>
@@ -59,7 +59,6 @@
 					required
 					aria-invalid={{if this.emailError "true" "false"}}
 					aria-describedby={{if this.emailError "email-error"}}
-					disabled={{@registrationPaused}}
 					{{on "blur" (fn this.validateField "email" this.email)}}
 				/>
 				{{#if this.emailError}}
@@ -80,7 +79,6 @@
 				<el.control
 					aria-invalid={{if this.nameError "true" "false"}}
 					aria-describedby={{if this.nameError "name-error"}}
-					disabled={{@registrationPaused}}
 					{{on "blur" (fn this.validateField "name" this.name)}}
 				/>
 				{{#if this.nameError}}
@@ -103,7 +101,6 @@
 					@matchTriggerWidth={{true}}
 					@ariaDescribedBy={{if this.institutionError "institution-error"}}
 					@ariaInvalid={{if this.institutionError "true" "false"}}
-					@disabled={{@registrationPaused}}
 					class={{if this.institutionError "is-invalid"}}
 					as |institution|>
 						{{#if institution.name}}
@@ -132,7 +129,6 @@
 					@matchTriggerWidth={{true}}
 					@ariaDescribedBy={{if this.countryError "country-error"}}
 					@ariaInvalid={{if this.countryError "true" "false"}}
-					@disabled={{@registrationPaused}}
 					class={{if this.countryError "is-invalid"}}
 					as |country|>
 						{{country.name}} ({{country.code}})
@@ -155,7 +151,6 @@
 				<el.control
 					aria-invalid={{if this.rorUseError "true" "false"}}
 					aria-describedby={{if this.rorUseError "ror-use-error" "ror-use-help"}}
-					disabled={{@registrationPaused}}
 					{{on "blur" (fn this.validateField "ror_use" this.ror_use)}}
 				/>
 				{{#if this.rorUseError}}
