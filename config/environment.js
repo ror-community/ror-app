@@ -20,6 +20,7 @@ module.exports = function(environment) {
     },
 
     API_URL: process.env.API_URL || "https://api.ror.org/v2",
+    CLIENT_ID_REGISTRATION_PAUSED: true,
     BASE_URL: process.env.BASE_URL || null,
     SENTRY_DSN: process.env.SENTRY_DSN || null,
     VERSION: pkg.version,
